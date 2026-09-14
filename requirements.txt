@@ -1,0 +1,21 @@
+# Core
+requests>=2.31,<3
+feedparser>=6.0,<7
+python-dotenv>=1.0,<2
+APScheduler>=3.10,<4
+
+# tzdata ships the IANA timezone database. Not needed on most Linux/
+# macOS systems (the OS already has it) but required on Windows for
+# Python's zoneinfo (Asia/Ho_Chi_Minh) to resolve - the README targets
+# Windows venv activation, so we pin it explicitly rather than assume.
+tzdata>=2024.1
+
+# Kept for a future HTML-scraping fallback (spec section 13 priority:
+# RSS first, HTML scraping only if a source has no suitable RSS).
+# Currently unused by any of the 5 crawlers - see README for why.
+beautifulsoup4>=4.12,<5
+
+# Dev / tests only
+pytest>=8.0,<9
+responses>=0.25,<1
+freezegun>=1.4,<2
