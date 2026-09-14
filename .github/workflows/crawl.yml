@@ -1,9 +1,24 @@
 name: Crawl news
 
 # GitHub Actions runners are ephemeral — each run starts from a fresh
-# checkout of `main`, so data/news.db (the SQLite dedup state) has to be
-# committed back to the repo at the end of every run, or the app would
-# treat every article as "new" again on the next run and flood Telegram.
+# checkout of `main`, so data/news.db (the SQLite dedup state) has to
+# survive somewhere between runs, or the app would treat every article
+# as "new" again next time and flood Telegram.
+#
+# The database lives on a dedicated orphan branch (DB_BRANCH below),
+# completely separate from `main`. `main` only ever receives normal
+# commits (your own code pushes) and this workflow never touches it.
+# The db branch is rewritten (force-pushed) as a single commit every
+# run — nobody reads its history, so there is nothing to preserve, and
+# this keeps the repo from accumulating ~96 junk commits/day.
+#
+# (An earlier version of this workflow force-pushed the db commit onto
+# `main` itself, amending in place. That was switched to a separate
+# branch after `main`'s scheduled `cron` trigger mysteriously stopped
+# firing — force-rewriting the default branch's tip on every run is
+# not a normal repo access pattern, and cron silently going stale
+# afterward lines up with that. Undocumented by GitHub either way, but
+# keeping `main` untouched removes the suspicion entirely.)
 #
 # Day/night cadence (mirrors scheduler.py's day_start_hour=6/
 # night_start_hour=23 defaults — keep these two in sync if you change
@@ -17,21 +32,27 @@ name: Crawl news
     - cron: "0 16-22 * * *" # VN night window: every 60 min
   workflow_dispatch: {} # lets you trigger a run manually from the Actions tab
 
+env:
+  DB_BRANCH: db-state
+
 # Only one crawl at a time: if a run is still going when the next
 # scheduled trigger fires (e.g. a slow source), queue instead of
-# overlapping — two runs racing to commit data/news.db would conflict.
+# overlapping — two runs racing to push db-state would conflict.
 concurrency:
   group: news-crawl
   cancel-in-progress: false
 
 permissions:
-  contents: write # required to commit data/news.db back to the repo
+  contents: write # required to push the db-state branch
 
 jobs:
   crawl:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        # Only `main` (code) is checked out into the working tree;
+        # db-state is fetched as a ref below without switching branches,
+        # so this job never runs `git checkout` away from `main`.
 
       - uses: actions/setup-python@v5
         with:
@@ -40,35 +61,32 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
+      - name: Restore database from db-state branch
+        run: |
+          if git ls-remote --exit-code --heads origin "$DB_BRANCH" > /dev/null 2>&1; then
+            git fetch --depth 1 origin "$DB_BRANCH"
+            git show "origin/$DB_BRANCH:data/news.db" > data/news.db
+            echo "Restored data/news.db from $DB_BRANCH."
+          else
+            echo "$DB_BRANCH doesn't exist yet — first run, starting empty."
+          fi
+
       - name: Run one crawl cycle
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: python main.py --run-once
 
-      - name: Commit updated database
+      - name: Push updated database to db-state branch
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
-          # -f: data/*.db is gitignored for the normal VPS/local deploy
-          # mode (state that must NOT be committed there); this workflow
-          # is the one exception that needs it tracked to survive across
-          # ephemeral runners.
-          git add -f data/news.db
-          if git diff --cached --quiet; then
-            echo "No database changes this cycle."
-            exit 0
-          fi
-
-          # Fold routine state updates into one rolling commit instead of
-          # growing history forever (~96 runs/day). A real code commit
-          # (any message other than this exact one) is never touched —
-          # the next cycle just starts a fresh rolling commit after it.
-          if [ "$(git log -1 --pretty=%s)" = "chore: update news database [bot]" ]; then
-            git commit --amend --no-edit
-            git push --force origin HEAD:main
-          else
-            git commit -m "chore: update news database [bot]"
-            git push origin HEAD:main
-          fi
+          # Plumbing commands build the new commit directly from the
+          # blob, without touching the `main` working tree/index at
+          # all — no checkout, no branch switch in this job.
+          BLOB=$(git hash-object -w data/news.db)
+          DATA_TREE=$(printf '100644 blob %s\tnews.db\n' "$BLOB" | git mktree)
+          ROOT_TREE=$(printf '040000 tree %s\tdata\n' "$DATA_TREE" | git mktree)
+          COMMIT=$(git commit-tree "$ROOT_TREE" -m "chore: update news database [bot]")
+          git push --force origin "$COMMIT:refs/heads/$DB_BRANCH"

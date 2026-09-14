@@ -221,9 +221,11 @@ Khôi phục: dừng app, copy đè file backup muốn khôi phục vào `data/n
 
 Máy chạy GitHub Actions là **tạm thời** — mỗi lần chạy là 1 máy ảo mới tinh, không giữ được `data/news.db` giữa các lần như chạy trên VPS. Nếu không xử lý, app sẽ coi mọi bài là "mới" mỗi lần chạy và spam Telegram vô tận.
 
-Cách giải quyết: workflow tự commit `data/news.db` ngược lại vào repo sau mỗi lần chạy, để lần chạy sau lấy lại đúng trạng thái dedup. Để tránh phình repo (mỗi ngày chạy ~96 lần, commit bình thường sẽ tích luỹ hàng nghìn commit vô nghĩa mỗi năm), workflow dùng kỹ thuật **amend + force-push**: các lần cập nhật database liên tiếp được gộp đè vào cùng 1 commit "chore: update news database [bot]", không tạo commit mới mỗi lần — nhưng **bất kỳ commit code thật nào bạn tự push đều không bị đụng tới** (chỉ commit đúng message đó mới bị amend).
+Cách giải quyết: workflow lưu `data/news.db` trên 1 **nhánh riêng** `db-state`, hoàn toàn tách biệt khỏi `main`. Mỗi lần chạy: đọc `data/news.db` từ `db-state` (nếu đã có) → chạy `--run-once` → build commit mới chỉ chứa file db bằng git plumbing (`hash-object`/`mktree`/`commit-tree`, không cần checkout đổi nhánh) → force-push đè commit đó lên `db-state`. Nhánh này luôn chỉ có đúng 1 commit (không có "lịch sử" gì để giữ), nên không bao giờ phình dù chạy hàng nghìn lần — và quan trọng nhất, **`main` không bao giờ bị workflow này đụng vào**.
 
-**Đánh đổi cần biết:** vì dùng amend, git history **không** giữ lại lịch sử database theo từng mốc thời gian (khác với backup thật ở chế độ VPS) — chỉ có bản mới nhất. Job backup nội bộ 03:00 hàng ngày (`run_backup` trong `scheduler.py`) cũng **không chạy** ở chế độ này vì `--run-once` không khởi động `BlockingScheduler`. Nếu cần point-in-time backup thật khi chạy bằng GitHub Actions, đây là điểm có thể mở rộng thêm sau.
+> **Vì sao không force-push thẳng lên `main` như thiết kế ban đầu:** phiên bản đầu tiên của workflow amend + force-push commit database ngay trên `main`. Sau đó, lịch `schedule` (cron) tự nhiên **ngừng tự kích hoạt** dù chạy tay (`workflow_dispatch`) vẫn hoạt động bình thường — nghi vấn lớn nhất là việc liên tục force-rewrite đầu nhánh mặc định không phải hành vi repo bình thường, có thể khiến hệ thống lập lịch nền của GitHub bị rối khi xác định "commit mới nhất". Không có tài liệu chính thức xác nhận, nhưng tách hẳn database ra nhánh riêng loại bỏ hoàn toàn nghi vấn này, đồng thời cũng là kiến trúc sạch hơn.
+
+**Đánh đổi cần biết:** vì `db-state` bị force-push đè mỗi lần, git history **không** giữ lại lịch sử database theo từng mốc thời gian (khác với backup thật ở chế độ VPS) — chỉ có bản mới nhất. Job backup nội bộ 03:00 hàng ngày (`run_backup` trong `scheduler.py`) cũng **không chạy** ở chế độ này vì `--run-once` không khởi động `BlockingScheduler`. Nếu cần point-in-time backup thật khi chạy bằng GitHub Actions, đây là điểm có thể mở rộng thêm sau.
 
 ### Cách setup
 
@@ -239,7 +241,7 @@ Cách giải quyết: workflow tự commit `data/news.db` ngược lại vào re
 
 ### Lưu ý quan trọng
 
-- **Không chạy đồng thời cả VPS/local daemon lẫn GitHub Actions trên cùng 1 kho code** — cả 2 sẽ tranh nhau ghi `data/news.db`, dễ gây dedup sai hoặc mất đồng bộ. Chọn 1 trong 2 cách.
+- **Không nên chạy đồng thời cả VPS/local daemon lẫn GitHub Actions** — dù từ bản cập nhật này database của 2 chế độ đã tách biệt (`data/news.db` cục bộ cho VPS/local vs. nhánh `db-state` riêng cho GitHub Actions, không còn tranh nhau ghi file/git nữa), 2 tiến trình độc lập vẫn sẽ **tự dedup riêng và gửi trùng tin lên cùng 1 Telegram chat**. Chọn 1 trong 2 cách để chạy production thật.
 - Lịch chạy của GitHub Actions (`schedule: cron`) là **best-effort** — GitHub không đảm bảo đúng giờ tuyệt đối, có thể trễ vài phút khi hệ thống tải cao (bình thường, không phải lỗi app).
 - Nếu repo không có commit nào trong 60 ngày, GitHub tự tắt scheduled workflow — nhưng vì chính workflow này commit database định kỳ nên tự nó giữ repo "hoạt động", không bị tắt.
 - Cần bật quyền ghi cho Actions nếu tổ chức/tài khoản bạn đã tắt mặc định: Settings → Actions → General → Workflow permissions → **Read and write permissions**.
