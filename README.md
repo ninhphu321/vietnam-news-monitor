@@ -1,6 +1,6 @@
 # Vietnam News Monitor
 
-Theo dõi 14 chuyên mục kinh tế/tài chính của báo Việt Nam (gồm cả báo nhà nước/thông tấn chính thống) mỗi 15 phút, phát hiện bài mới, chống gửi trùng, và đẩy title (kèm link) + thời gian về Telegram — **group theo từng nguồn báo, có icon riêng để phân biệt nhanh**.
+Theo dõi 14 chuyên mục kinh tế/tài chính của báo Việt Nam (gồm cả báo nhà nước/thông tấn chính thống), phát hiện bài mới, chống gửi trùng, và đẩy title (kèm link) + thời gian về Telegram — **group theo từng nguồn báo (icon riêng để phân biệt nhanh), tách riêng tin nóng lên đầu**. Tần suất quét thay đổi theo khung giờ: 30 phút/lần ban ngày (06:00-23:00), 60 phút/lần ban đêm (23:00-06:00) — tin tài chính ít biến động ban đêm nên không cần quét dày.
 
 Xem đầy đủ yêu cầu gốc trong `PROJECT SPEC V2` đã cung cấp. README này chỉ tập trung vào cách chạy.
 
@@ -52,11 +52,14 @@ Muốn triển khai tiếp các nguồn còn thiếu, việc chính là viết c
 Mỗi nguồn có 1 icon riêng để nhận diện nhanh không cần đọc chữ (bảng icon ở trên). Ví dụ tin nhắn thật:
 
 ```
-📬 5 bài mới · 3 nguồn
+📬 6 bài mới · 3 nguồn
 
-📻 VOV (2 bài)
+🚨 TIN NÓNG
 
-• Hướng dẫn giới kinh doanh vàng đá quý phòng, chống rửa tiền — 19:42
+📻 Ngân hàng Nhà nước bất ngờ tăng lãi suất điều hành — 14:32 (VOV)
+
+📻 VOV (1 bài)
+
 • Cục Thuế yêu cầu không thêm thủ tục khi đóng mã số thuế — 18:43
 
 🏛️ CHÍNH PHỦ (2 bài)
@@ -70,6 +73,14 @@ Mỗi nguồn có 1 icon riêng để nhận diện nhanh không cần đọc ch
 ```
 
 Title là link click được (Telegram `parse_mode=HTML`), tên nguồn in đậm kèm số bài. Nếu 1 chu kỳ có nguồn lỗi, dòng `⚠️ Nguồn lỗi: ...` được thêm vào cuối cùng 1 tin nhắn này — không tách thành tin riêng (tối đa 1 batch/chu kỳ, chỉ tách khi vượt 4096 ký tự, xem mục "Luồng xử lý" bên dưới).
+
+### Tin nóng (🚨 TIN NÓNG)
+
+Vấn đề gốc: khi nhiều bài đổ về cùng lúc, thứ tự hiển thị chỉ theo cấu hình nguồn (cố định) — 1 tin thị trường quan trọng từ nguồn cấu hình cuối cùng (VD: VTV) có thể nằm tuốt cuối tin nhắn, dễ bị bỏ sót nếu chỉ lướt nhanh vài giây.
+
+Cách xử lý: `telegram.HOT_KEYWORDS` (rule-based, không dùng AI) là danh sách từ khóa mang tính khẩn cấp/đột biến trong tài chính (`tăng vọt`, `giảm sốc`, `lao dốc`, `phá sản`, `khủng hoảng`, `kỷ lục`...). Bài nào khớp bất kỳ từ khóa nào (không phân biệt hoa/thường) được **tách ra khỏi khối nguồn của nó**, gộp vào 1 khối `🚨 TIN NÓNG` ở **đầu tin nhắn**, kèm icon + tên nguồn để không mất ngữ cảnh.
+
+Đây chỉ là bộ lọc từ khóa đơn giản, không hiểu ngữ nghĩa — có thể bỏ sót tin quan trọng không dùng đúng từ trong danh sách, hoặc thỉnh thoảng bắt nhầm tin không thật sự khẩn cấp. Chỉnh danh sách `HOT_KEYWORDS` trong [telegram.py](telegram.py) dựa trên thực tế dùng (thêm từ hay bị bỏ sót, bớt từ hay bắt nhầm).
 
 ## Cài đặt
 
@@ -117,7 +128,7 @@ TELEGRAM_BOT_TOKEN=...
 TELEGRAM_CHAT_ID=...
 ```
 
-Các biến khác (`CRAWL_INTERVAL_MINUTES`, `REQUEST_TIMEOUT`, `MAX_RETRIES`, `INITIAL_SCAN_SEND`, `LOG_LEVEL`, `TIMEZONE`, `STALE_SOURCE_HOURS`, `STALE_ALERT_COOLDOWN_HOURS`, `BACKUP_KEEP_DAYS`) đã có giá trị mặc định hợp lý (`CRAWL_INTERVAL_MINUTES=15` từ V2), chỉ cần chỉnh nếu muốn.
+Các biến khác (`DAY_START_HOUR`, `NIGHT_START_HOUR`, `DAY_CRAWL_INTERVAL_MINUTES`, `NIGHT_CRAWL_INTERVAL_MINUTES`, `REQUEST_TIMEOUT`, `MAX_RETRIES`, `INITIAL_SCAN_SEND`, `LOG_LEVEL`, `TIMEZONE`, `STALE_SOURCE_HOURS`, `STALE_ALERT_COOLDOWN_HOURS`, `BACKUP_KEEP_DAYS`) đã có giá trị mặc định hợp lý (30 phút ban ngày/60 phút ban đêm theo mặc định), chỉ cần chỉnh nếu muốn.
 
 **Không commit `.env` lên Git** — đã có trong `.gitignore`.
 
@@ -135,7 +146,7 @@ Dry run: crawl → parse → kiểm tra trùng với database hiện có → in 
 pytest
 ```
 
-85 test bao phủ: normalize title/URL (kể cả giải mã HTML entity lỗi của Thanh Niên), crawler parse RSS cho cả 14 nguồn (kèm test riêng cho override User-Agent VOV và parse ngày lạ của Chính phủ/VTV) (dùng fixture RSS lấy từ dữ liệu thực tế lúc audit, mock qua thư viện `responses` — không cần mạng), dedup theo URL (không theo title), restart không mất/không gửi lại dữ liệu, format Telegram group-theo-nguồn + chia nhỏ khi vượt giới hạn 4096 ký tự, retry khi gửi Telegram lỗi, cô lập lỗi từng nguồn không làm crash app, giữ đúng thứ tự nguồn theo cấu hình, baseline seeding lần chạy đầu **và** baseline riêng cho nguồn mới thêm vào một DB đã có dữ liệu, toàn bộ luồng `run_cycle` (dry-run / gửi thành công / lỗi 1 phần vẫn gửi tin nguồn OK / tất cả lỗi / Telegram lỗi thì không đánh dấu sent), phát hiện nguồn "chết âm thầm" (mới ở V3: ngưỡng giờ, cooldown cảnh báo, tự gỡ cảnh báo khi hồi phục), và backup database (tạo bản có timestamp + tự xoá bản cũ).
+99 test bao phủ: normalize title/URL (kể cả giải mã HTML entity lỗi của Thanh Niên), crawler parse RSS cho cả 14 nguồn (kèm test riêng cho override User-Agent VOV và parse ngày lạ của Chính phủ/VTV) (dùng fixture RSS lấy từ dữ liệu thực tế lúc audit, mock qua thư viện `responses` — không cần mạng), dedup theo URL (không theo title), restart không mất/không gửi lại dữ liệu, format Telegram group-theo-nguồn + tách tin nóng + chia nhỏ khi vượt giới hạn 4096 ký tự, retry khi gửi Telegram lỗi, cô lập lỗi từng nguồn không làm crash app, giữ đúng thứ tự nguồn theo cấu hình, baseline seeding lần chạy đầu **và** baseline riêng cho nguồn mới thêm vào một DB đã có dữ liệu, toàn bộ luồng `run_cycle` (dry-run / gửi thành công / lỗi 1 phần vẫn gửi tin nguồn OK / tất cả lỗi / Telegram lỗi thì không đánh dấu sent), phát hiện nguồn "chết âm thầm" (ngưỡng giờ, cooldown cảnh báo, tự gỡ cảnh báo khi hồi phục), backup database (tạo bản có timestamp + tự xoá bản cũ), và **lịch quét ngày/đêm** — kiểm tra cả cron string sinh ra lẫn thời điểm bắn thật của `CronTrigger` (APScheduler) khớp đúng ranh giới 06:00/23:00, không hở/chồng giờ nào.
 
 ## Chạy lần đầu / chạy thủ công
 
@@ -149,15 +160,22 @@ Nếu muốn gửi luôn cả các bài đang có ngay từ lần chạy đầu,
 
 **V2:** nếu database đã có dữ liệu (app đã chạy từ trước) và bạn vừa thêm một crawler mới, app tự phát hiện nguồn đó "chưa có lịch sử" và âm thầm baseline riêng cho đúng nguồn đó — không đụng tới trạng thái của các nguồn cũ, không flood Telegram hàng loạt bài cũ của nguồn mới. Hành vi này chạy tự động, không cần config gì thêm.
 
-## Chạy production (scheduler 15 phút)
+## Chạy production (scheduler theo khung giờ ngày/đêm)
 
 ```bash
 python main.py
 ```
 
-App sẽ tự động crawl theo chu kỳ đặt trong `CRAWL_INTERVAL_MINUTES` (mặc định 15 phút), canh theo mốc giờ tròn khi có thể (ví dụ 10:00, 10:15, 10:30 — đúng ví dụ trong spec V2) và chạy 1 lần ngay khi khởi động. Dừng bằng `Ctrl+C`.
+App tự động crawl theo **2 lịch khác nhau tuỳ khung giờ** (V3, theo yêu cầu người dùng), canh theo mốc giờ tròn, và chạy 1 lần ngay khi khởi động (dùng đúng lịch của khung giờ hiện tại). Dừng bằng `Ctrl+C`.
 
-`APScheduler` được cấu hình `max_instances=1` — nếu chu kỳ trước chưa crawl/gửi xong khi mốc giờ tiếp theo tới, chu kỳ mới **tự động bị bỏ qua** thay vì chạy chồng lên (spec V2 mục 19: không chạy 2 batch cùng lúc). Không cần thêm lock file hay cấu hình gì khác.
+| Khung giờ | Biến `.env` | Mặc định |
+|---|---|---|
+| Ban ngày `[DAY_START_HOUR, NIGHT_START_HOUR)` | `DAY_CRAWL_INTERVAL_MINUTES` | 30 phút — 06:00, 06:30, 07:00, ... 22:30 |
+| Ban đêm (còn lại, vắt qua nửa đêm) | `NIGHT_CRAWL_INTERVAL_MINUTES` | 60 phút — 23:00, 00:00, ... 05:00 |
+
+Lý do: tin tài chính gần như không có gì mới về đêm, quét dày lúc đó chỉ tốn tài nguyên vô ích; ban ngày mới cần bám sát.
+
+Đây là 2 `CronTrigger` độc lập của `APScheduler` (`scheduler._time_windowed_cron_kwargs`), không phải 1 trigger duy nhất đổi giá trị — nên ranh giới 06:00/23:00 chuyển tiếp chính xác, không có khoảng hở hay chạy chồng. Cả 2 đều `max_instances=1` — nếu 1 chu kỳ chưa crawl/gửi xong khi mốc tiếp theo tới, chu kỳ mới **tự động bị bỏ qua** thay vì chạy chồng lên (spec V2 mục 19). Không cần thêm lock file hay cấu hình gì khác.
 
 ## V3 — Cảnh báo nguồn "chết âm thầm"
 
@@ -172,7 +190,7 @@ Một RSS feed có thể vẫn trả về HTTP 200 bình thường (không lỗi
 
   - VietnamNet (bài mới gần nhất: 08/08/2026 10:54)
   ```
-- Để tránh spam lặp lại mỗi 15 phút, cùng 1 nguồn chỉ được cảnh báo lại sau mỗi `STALE_ALERT_COOLDOWN_HOURS` giờ (mặc định **24h**).
+- Để tránh spam lặp lại mỗi chu kỳ, cùng 1 nguồn chỉ được cảnh báo lại sau mỗi `STALE_ALERT_COOLDOWN_HOURS` giờ (mặc định **24h**).
 - Khi nguồn có bài mới trở lại, cảnh báo tự động được "gỡ" — lần chết tiếp theo (nếu có) sẽ báo lại từ đầu.
 
 Chỉnh 2 biến này trong `.env` nếu muốn nhạy hơn/chậm hơn.
@@ -197,11 +215,11 @@ Khôi phục: dừng app, copy đè file backup muốn khôi phục vào `data/n
 
 ## Deploy bằng GitHub Actions (miễn phí, không cần VPS)
 
-Đây là cách chạy 24/7 hoàn toàn miễn phí mà không cần quản lý server nào — dùng chính GitHub để tự động chạy `python main.py --run-once` mỗi 15 phút. Workflow đã có sẵn tại [.github/workflows/crawl.yml](.github/workflows/crawl.yml).
+Đây là cách chạy 24/7 hoàn toàn miễn phí mà không cần quản lý server nào — dùng chính GitHub để tự động chạy `python main.py --run-once` theo đúng lịch ngày/đêm (30/60 phút, xem workflow). Workflow đã có sẵn tại [.github/workflows/crawl.yml](.github/workflows/crawl.yml).
 
 ### Vấn đề kỹ thuật đã xử lý sẵn
 
-Máy chạy GitHub Actions là **tạm thời** — mỗi lần chạy là 1 máy ảo mới tinh, không giữ được `data/news.db` giữa các lần như chạy trên VPS. Nếu không xử lý, app sẽ coi mọi bài là "mới" mỗi 15 phút và spam Telegram vô tận.
+Máy chạy GitHub Actions là **tạm thời** — mỗi lần chạy là 1 máy ảo mới tinh, không giữ được `data/news.db` giữa các lần như chạy trên VPS. Nếu không xử lý, app sẽ coi mọi bài là "mới" mỗi lần chạy và spam Telegram vô tận.
 
 Cách giải quyết: workflow tự commit `data/news.db` ngược lại vào repo sau mỗi lần chạy, để lần chạy sau lấy lại đúng trạng thái dedup. Để tránh phình repo (mỗi ngày chạy ~96 lần, commit bình thường sẽ tích luỹ hàng nghìn commit vô nghĩa mỗi năm), workflow dùng kỹ thuật **amend + force-push**: các lần cập nhật database liên tiếp được gộp đè vào cùng 1 commit "chore: update news database [bot]", không tạo commit mới mỗi lần — nhưng **bất kỳ commit code thật nào bạn tự push đều không bị đụng tới** (chỉ commit đúng message đó mới bị amend).
 
@@ -217,13 +235,13 @@ Cách giải quyết: workflow tự commit `data/news.db` ngược lại vào re
 
 3. **Chạy thử thủ công** để xác nhận hoạt động ngay, không cần đợi lịch: vào tab **Actions** trên GitHub → chọn workflow **Crawl news** → **Run workflow**.
 
-4. Từ đó app tự chạy mỗi 15 phút, xem log từng lần chạy trong tab **Actions**.
+4. Từ đó app tự chạy theo đúng lịch ngày/đêm, xem log từng lần chạy trong tab **Actions**.
 
 ### Lưu ý quan trọng
 
 - **Không chạy đồng thời cả VPS/local daemon lẫn GitHub Actions trên cùng 1 kho code** — cả 2 sẽ tranh nhau ghi `data/news.db`, dễ gây dedup sai hoặc mất đồng bộ. Chọn 1 trong 2 cách.
 - Lịch chạy của GitHub Actions (`schedule: cron`) là **best-effort** — GitHub không đảm bảo đúng giờ tuyệt đối, có thể trễ vài phút khi hệ thống tải cao (bình thường, không phải lỗi app).
-- Nếu repo không có commit nào trong 60 ngày, GitHub tự tắt scheduled workflow — nhưng vì chính workflow này commit database mỗi 15 phút nên tự nó giữ repo "hoạt động", không bị tắt.
+- Nếu repo không có commit nào trong 60 ngày, GitHub tự tắt scheduled workflow — nhưng vì chính workflow này commit database định kỳ nên tự nó giữ repo "hoạt động", không bị tắt.
 - Cần bật quyền ghi cho Actions nếu tổ chức/tài khoản bạn đã tắt mặc định: Settings → Actions → General → Workflow permissions → **Read and write permissions**.
 
 ## Deploy VPS 24/7
@@ -258,20 +276,22 @@ sudo systemctl status news-monitor
 sudo journalctl -u news-monitor -f
 ```
 
-`main.py` (không tham số) đã tự chứa scheduler 15 phút bên trong (`BlockingScheduler`), nên chỉ cần systemd giữ tiến trình sống — không cần cron gọi lặp lại.
+`main.py` (không tham số) đã tự chứa scheduler ngày/đêm bên trong (`BlockingScheduler`), nên chỉ cần systemd giữ tiến trình sống — không cần cron gọi lặp lại.
 
 ### Cron (thay thế, nếu không dùng systemd)
 
-Cách khác — theo đúng gợi ý ở spec mục 2 — là để cron gọi `--run-once` mỗi 15 phút thay vì chạy `main.py` daemon:
+Cách khác — theo đúng gợi ý ở spec mục 2 — là để cron gọi `--run-once` thay vì chạy `main.py` daemon. Vì lịch quét giờ theo khung ngày/đêm, cần 2 dòng cron thay vì 1 (giả định crontab của VPS đã đặt múi giờ `Asia/Ho_Chi_Minh` — nếu không, đổi giờ cho khớp UTC như cách làm ở mục GitHub Actions bên trên):
 
 ```cron
-*/15 * * * * cd /opt/news-monitor && /opt/news-monitor/.venv/bin/python main.py --run-once >> logs/cron.log 2>&1
+*/30 6-22 * * * cd /opt/news-monitor && /opt/news-monitor/.venv/bin/python main.py --run-once >> logs/cron.log 2>&1
+0 23,0-5 * * * cd /opt/news-monitor && /opt/news-monitor/.venv/bin/python main.py --run-once >> logs/cron.log 2>&1
 ```
 
-Cách này restart-safe tự nhiên (mỗi lần chạy là 1 process độc lập, không có state daemon để mất), nhưng **không** có bảo vệ "không chạy chồng" tự động như `max_instances=1` của APScheduler — nếu 1 lần chạy kéo dài hơn 15 phút (mạng chậm/1 nguồn treo), 2 tiến trình có thể trùng nhau. Nếu chọn cách này, nên thêm `flock` để tự loại trừ:
+Cách này restart-safe tự nhiên (mỗi lần chạy là 1 process độc lập, không có state daemon để mất), nhưng **không** có bảo vệ "không chạy chồng" tự động như `max_instances=1` của APScheduler — nếu 1 lần chạy kéo dài hơn khoảng cách giữa 2 lần cron (mạng chậm/1 nguồn treo), 2 tiến trình có thể trùng nhau. Nếu chọn cách này, nên thêm `flock` để tự loại trừ:
 
 ```cron
-*/15 * * * * flock -n /tmp/news-monitor.lock -c "cd /opt/news-monitor && .venv/bin/python main.py --run-once >> logs/cron.log 2>&1"
+*/30 6-22 * * * flock -n /tmp/news-monitor.lock -c "cd /opt/news-monitor && .venv/bin/python main.py --run-once >> logs/cron.log 2>&1"
+0 23,0-5 * * * flock -n /tmp/news-monitor.lock -c "cd /opt/news-monitor && .venv/bin/python main.py --run-once >> logs/cron.log 2>&1"
 ```
 
 **Lưu ý nếu chọn cron thay vì daemon:** job backup tự động 03:00 chỉ chạy bên trong `python main.py` (daemon/scheduler) — `--run-once` không đăng ký job đó. Nếu dùng cron, thêm 1 dòng cron riêng gọi `--backup-now`:
@@ -349,7 +369,7 @@ news-monitor/
 
 ### Vì sao không dùng thư viện `python-telegram-bot`
 
-`python-telegram-bot` (bản v20+) là thư viện async, khá nặng cho nhu cầu ở đây (gọi 1 API POST đơn giản, đồng bộ, mỗi 15 phút). `telegram.py` dùng thẳng `requests` gọi Telegram Bot API (`parse_mode=HTML` để title là hyperlink click được) — ít dependency hơn, dễ đọc từ đầu đến cuối, đúng tinh thần "SIMPLE STABLE MAINTAINABLE" của spec.
+`python-telegram-bot` (bản v20+) là thư viện async, khá nặng cho nhu cầu ở đây (gọi 1 API POST đơn giản, đồng bộ, vài chục lần mỗi ngày). `telegram.py` dùng thẳng `requests` gọi Telegram Bot API (`parse_mode=HTML` để title là hyperlink click được) — ít dependency hơn, dễ đọc từ đầu đến cuối, đúng tinh thần "SIMPLE STABLE MAINTAINABLE" của spec.
 
 ## Giới hạn đã biết
 

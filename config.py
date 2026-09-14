@@ -41,7 +41,19 @@ class Config:
     telegram_bot_token: str = field(default_factory=lambda: os.getenv("TELEGRAM_BOT_TOKEN", ""))
     telegram_chat_id: str = field(default_factory=lambda: os.getenv("TELEGRAM_CHAT_ID", ""))
 
-    crawl_interval_minutes: int = field(default_factory=lambda: _env_int("CRAWL_INTERVAL_MINUTES", 30))
+    # Day/night variable crawl cadence (V3, per user request): finance
+    # news volume drops overnight, so poll less often then. Day window
+    # is [day_start_hour, night_start_hour); night is the rest,
+    # wrapping past midnight. Replaces a single fixed interval.
+    day_start_hour: int = field(default_factory=lambda: _env_int("DAY_START_HOUR", 6))
+    night_start_hour: int = field(default_factory=lambda: _env_int("NIGHT_START_HOUR", 23))
+    day_crawl_interval_minutes: int = field(
+        default_factory=lambda: _env_int("DAY_CRAWL_INTERVAL_MINUTES", 30)
+    )
+    night_crawl_interval_minutes: int = field(
+        default_factory=lambda: _env_int("NIGHT_CRAWL_INTERVAL_MINUTES", 60)
+    )
+
     request_timeout: int = field(default_factory=lambda: _env_int("REQUEST_TIMEOUT", 15))
     max_retries: int = field(default_factory=lambda: _env_int("MAX_RETRIES", 3))
     initial_scan_send: bool = field(default_factory=lambda: _env_bool("INITIAL_SCAN_SEND", False))

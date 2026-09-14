@@ -5,11 +5,16 @@ name: Crawl news
 # committed back to the repo at the end of every run, or the app would
 # treat every article as "new" again on the next run and flood Telegram.
 #
-# Schedule is UTC; */15 divides both 60 and Vietnam's +7 offset evenly,
-# so this still lands on Vietnam-local :00/:15/:30/:45 marks.
+# Day/night cadence (mirrors scheduler.py's day_start_hour=6/
+# night_start_hour=23 defaults — keep these two in sync if you change
+# either): GitHub Actions cron is UTC-only, so the Vietnam-local
+# (UTC+7) windows below are converted by hand:
+#   VN 06:00-22:30 (every 30 min) -> UTC hours 23,0-15
+#   VN 23:00-05:00 (every 60 min) -> UTC hours 16-22
 "on":
   schedule:
-    - cron: "*/15 * * * *"
+    - cron: "*/30 23,0-15 * * *" # VN day window: every 30 min
+    - cron: "0 16-22 * * *" # VN night window: every 60 min
   workflow_dispatch: {} # lets you trigger a run manually from the Actions tab
 
 # Only one crawl at a time: if a run is still going when the next

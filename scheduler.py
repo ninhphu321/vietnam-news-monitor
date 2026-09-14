@@ -17,7 +17,6 @@ from zoneinfo import ZoneInfo
 
 from apscheduler.schedulers.blocking import BlockingScheduler
 from apscheduler.triggers.cron import CronTrigger
-from apscheduler.triggers.interval import IntervalTrigger
 
 from backup import backup_database
 from config import Config
@@ -344,28 +343,81 @@ def _print_dry_run(items_by_source, status, db: Database) -> None:
         print()
 
 
+def _minute_expr(interval_minutes: int) -> str:
+    """APScheduler/cron minute field for firing every `interval_minutes`
+    within an hour. >=60 collapses to "once per hour, on the hour";
+    an interval that doesn't evenly divide 60 also falls back to that
+    (there is no clean "every 30 minutes" for e.g. 40) rather than
+    silently firing at the wrong cadence."""
+    if interval_minutes >= 60 or 60 % interval_minutes != 0:
+        return "0"
+    return f"*/{interval_minutes}"
+
+
+def _time_windowed_cron_kwargs(cfg: Config) -> Tuple[Dict[str, str], Dict[str, str]]:
+    """Two non-overlapping firing schedules for run_cycle: a slower one
+    overnight (finance news volume drops) and a faster one during the
+    day, per spec: day [day_start_hour, night_start_hour) at
+    day_crawl_interval_minutes, night (wrapping past midnight) at
+    night_crawl_interval_minutes. Returns (day_kwargs, night_kwargs)
+    ready to pass as CronTrigger(**kwargs).
+
+    Pure and side-effect-free so the boundary math (does 22:59 vs 23:00
+    land in the right window, does the night window correctly wrap
+    across midnight) can be tested directly instead of only by
+    inspecting a live BlockingScheduler.
+    """
+    day_start = cfg.day_start_hour
+    night_start = cfg.night_start_hour
+
+    day_hours = f"{day_start}-{night_start - 1}"
+    night_upper = "23" if night_start == 23 else f"{night_start}-23"
+    night_hours = night_upper if day_start == 0 else f"{night_upper},0-{day_start - 1}"
+
+    day_kwargs = {"hour": day_hours, "minute": _minute_expr(cfg.day_crawl_interval_minutes)}
+    night_kwargs = {"hour": night_hours, "minute": _minute_expr(cfg.night_crawl_interval_minutes)}
+    return day_kwargs, night_kwargs
+
+
+def _is_night(hour: int, cfg: Config) -> bool:
+    """Whether `hour` (0-23, local time) falls in the night window."""
+    if cfg.day_start_hour <= cfg.night_start_hour:
+        return hour >= cfg.night_start_hour or hour < cfg.day_start_hour
+    return cfg.night_start_hour <= hour < cfg.day_start_hour  # night window doesn't wrap midnight
+
+
 def start_scheduler(db: Database, cfg: Config) -> None:
     ensure_initial_baseline(db, cfg)
 
     scheduler = BlockingScheduler(timezone=cfg.timezone)
-    interval = cfg.crawl_interval_minutes
+    day_kwargs, night_kwargs = _time_windowed_cron_kwargs(cfg)
+    now = datetime.now(ZoneInfo(cfg.timezone))
+    night_now = _is_night(now.hour, cfg)
 
-    if 60 % interval == 0:
-        # Clock-aligned firing (10:00, 10:30, 11:00, ... per spec
-        # section 6's example) whenever the interval evenly divides an
-        # hour; falls back to a plain rolling interval otherwise.
-        trigger = CronTrigger(minute=f"*/{interval}", timezone=cfg.timezone)
-    else:
-        trigger = IntervalTrigger(minutes=interval, timezone=cfg.timezone)
+    # APScheduler docs: passing next_run_time=None means "add the job
+    # paused", NOT "compute normally" — so that kwarg must be omitted
+    # entirely for whichever job should just wait for its own next
+    # cron-computed time, rather than passed as None.
+    day_job_kwargs = {} if night_now else {"next_run_time": now}
+    night_job_kwargs = {"next_run_time": now} if night_now else {}
 
     scheduler.add_job(
         run_cycle,
-        trigger=trigger,
+        trigger=CronTrigger(timezone=cfg.timezone, **day_kwargs),
         kwargs={"db": db, "cfg": cfg, "dry_run": False},
-        next_run_time=datetime.now(ZoneInfo(cfg.timezone)),
-        id="crawl_cycle",
+        id="crawl_cycle_day",
         max_instances=1,
         coalesce=True,
+        **day_job_kwargs,
+    )
+    scheduler.add_job(
+        run_cycle,
+        trigger=CronTrigger(timezone=cfg.timezone, **night_kwargs),
+        kwargs={"db": db, "cfg": cfg, "dry_run": False},
+        id="crawl_cycle_night",
+        max_instances=1,
+        coalesce=True,
+        **night_job_kwargs,
     )
 
     # V3 reliability: daily SQLite backup, independent of the crawl
@@ -379,7 +431,11 @@ def start_scheduler(db: Database, cfg: Config) -> None:
         coalesce=True,
     )
 
-    logger.info("Scheduler started: every %d minute(s).", interval)
+    logger.info(
+        "Scheduler started: every %d minute(s) from %02d:00-%02d:00, every %d minute(s) overnight.",
+        cfg.day_crawl_interval_minutes, cfg.day_start_hour, cfg.night_start_hour,
+        cfg.night_crawl_interval_minutes,
+    )
     logger.info("Daily backup scheduled: 03:00 (%s), keeping %d day(s).", cfg.timezone, cfg.backup_keep_days)
     try:
         scheduler.start()

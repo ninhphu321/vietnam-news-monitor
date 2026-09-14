@@ -88,6 +88,52 @@ def test_format_grouped_item_without_time_omits_dash_time():
     assert "—" not in text.split("\n")[-1] or "No time" in text
 
 
+def test_format_grouped_pulls_hot_keyword_match_to_top_section():
+    items = {
+        "VnExpress": [NewsItem("VnExpress", "Cửa hàng khai trương chi nhánh mới", "https://x/1", datetime(2026, 9, 14, 14, 20, tzinfo=TZ))],
+        "VTV": [NewsItem("VTV", "Ngân hàng Nhà nước bất ngờ tăng lãi suất điều hành", "https://x/2", datetime(2026, 9, 14, 14, 32, tzinfo=TZ))],
+    }
+    text = telegram.format_grouped_articles(items)[0]
+
+    assert "🚨 <b>TIN NÓNG</b>" in text
+    # The hot item must appear inside the hot section, tagged with its
+    # source since it's out of its normal per-source block.
+    hot_idx = text.index("🚨 <b>TIN NÓNG</b>")
+    hot_title_idx = text.index("Ngân hàng Nhà nước")
+    assert hot_idx < hot_title_idx
+    assert "(VTV)" in text
+    # And it must be removed from VTV's normal block, not duplicated.
+    assert text.count("Ngân hàng Nhà nước bất ngờ tăng lãi suất điều hành") == 1
+    assert "<b>VTV</b>" not in text  # VTV had nothing else -> no normal block for it at all
+
+
+def test_format_grouped_hot_section_appears_before_normal_sources():
+    items = {
+        "VnExpress": [NewsItem("VnExpress", "Tin thường 1", "https://x/1", datetime(2026, 9, 14, 10, 0, tzinfo=TZ))],
+        "CafeF": [
+            NewsItem("CafeF", "Tin thường 2", "https://x/2", datetime(2026, 9, 14, 10, 0, tzinfo=TZ)),
+            NewsItem("CafeF", "Giá vàng giảm sốc phiên sáng nay", "https://x/3", datetime(2026, 9, 14, 10, 5, tzinfo=TZ)),
+        ],
+    }
+    text = telegram.format_grouped_articles(items)[0]
+    assert text.index("TIN NÓNG") < text.index("VNEXPRESS")
+    assert text.index("TIN NÓNG") < text.index("CAFEF")
+    # CafeF's normal block keeps its one remaining non-hot article.
+    assert "Tin thường 2" in text
+
+
+def test_format_grouped_no_hot_section_when_nothing_matches():
+    items = {"VnExpress": [NewsItem("VnExpress", "Tin bình thường", "https://x/1", datetime(2026, 9, 14, 10, 0, tzinfo=TZ))]}
+    text = telegram.format_grouped_articles(items)[0]
+    assert "TIN NÓNG" not in text
+
+
+def test_is_hot_matches_curated_keywords_case_insensitively():
+    assert telegram._is_hot("Giá vàng TĂNG VỌT trong phiên sáng") is True
+    assert telegram._is_hot("giá vàng giảm sốc") is True
+    assert telegram._is_hot("Doanh nghiệp ký hợp tác chiến lược") is False
+
+
 def test_format_grouped_appends_error_footer_when_given():
     items = [NewsItem("Vietstock", "T", "https://x/1", datetime(2026, 9, 14, 10, 0, tzinfo=TZ))]
     text = telegram.format_grouped_articles({"Vietstock": items}, errored_sources=["VnExpress"])[0]

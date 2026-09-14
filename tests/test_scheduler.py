@@ -16,7 +16,6 @@ def make_cfg(**overrides):
     defaults = dict(
         telegram_bot_token="t",
         telegram_chat_id="c",
-        crawl_interval_minutes=30,
         request_timeout=1,
         max_retries=1,
         initial_scan_send=False,
@@ -320,6 +319,90 @@ def test_detect_stale_sources_clears_alert_once_recovered(db):
     db.insert_if_new(NewsItem("VietnamNet", "fresh", "https://x/2", now))
     scheduler._detect_stale_sources(db, cfg, status, now)
     assert db.get_stale_alert("VietnamNet") is None
+
+
+def test_time_windowed_cron_kwargs_matches_default_day_night_split():
+    """Spec: 06:00-23:00 -> every 30 min, 23:00-06:00 -> every 60 min."""
+    cfg = make_cfg()  # day_start_hour=6, night_start_hour=23 by default
+    day_kwargs, night_kwargs = scheduler._time_windowed_cron_kwargs(cfg)
+
+    assert day_kwargs == {"hour": "6-22", "minute": "*/30"}
+    assert night_kwargs == {"hour": "23,0-5", "minute": "0"}
+
+
+def test_time_windowed_cron_kwargs_respects_custom_boundaries():
+    cfg = make_cfg(
+        day_start_hour=8, night_start_hour=20,
+        day_crawl_interval_minutes=15, night_crawl_interval_minutes=60,
+    )
+    day_kwargs, night_kwargs = scheduler._time_windowed_cron_kwargs(cfg)
+
+    assert day_kwargs == {"hour": "8-19", "minute": "*/15"}
+    assert night_kwargs == {"hour": "20-23,0-7", "minute": "0"}
+
+
+@pytest.mark.parametrize(
+    "hour,expected_night",
+    [
+        (5, True),   # 05:00 -> still last hour of the night window
+        (6, False),  # 06:00 -> day window starts exactly here
+        (12, False), # midday -> clearly day
+        (22, False), # 22:00 -> last hour of the day window
+        (23, True),  # 23:00 -> night window starts exactly here
+        (0, True),   # midnight -> night (wrapped past 24h)
+    ],
+)
+def test_is_night_matches_the_configured_window_boundaries(hour, expected_night):
+    """Regression guard for the exact 'does the article's crawl hour
+    fall in the window it should' boundary check the user asked for —
+    off-by-one here would either double-fire or skip a hour at 06:00
+    or 23:00."""
+    cfg = make_cfg()  # day_start_hour=6, night_start_hour=23
+    assert scheduler._is_night(hour, cfg) is expected_night
+
+
+def test_minute_expr_falls_back_to_once_per_hour_for_non_divisors():
+    assert scheduler._minute_expr(30) == "*/30"
+    assert scheduler._minute_expr(60) == "0"
+    assert scheduler._minute_expr(90) == "0"  # >=60
+    assert scheduler._minute_expr(40) == "0"  # doesn't evenly divide 60
+
+
+def test_day_and_night_crontriggers_actually_fire_at_the_right_times():
+    """End-to-end check (not just the cron-string kwargs) that the real
+    APScheduler CronTrigger built from them fires article crawls
+    exactly inside the window it belongs to — the concrete "does the
+    time it actually runs match the window it's supposed to" check."""
+    from apscheduler.triggers.cron import CronTrigger
+
+    cfg = make_cfg()
+    day_kwargs, night_kwargs = scheduler._time_windowed_cron_kwargs(cfg)
+    day_trigger = CronTrigger(timezone=TZ, **day_kwargs)
+    night_trigger = CronTrigger(timezone=TZ, **night_kwargs)
+
+    # Day trigger: every 30 min from 06:00, last fire at 22:30, then
+    # nothing more until 06:00 the next day (never strays into night).
+    after_2229 = datetime(2026, 9, 14, 22, 29, tzinfo=TZ)
+    next_day_fire = day_trigger.get_next_fire_time(None, after_2229)
+    assert next_day_fire == datetime(2026, 9, 14, 22, 30, tzinfo=TZ)
+
+    after_2230 = datetime(2026, 9, 14, 22, 30, 1, tzinfo=TZ)
+    next_day_fire_2 = day_trigger.get_next_fire_time(None, after_2230)
+    assert next_day_fire_2 == datetime(2026, 9, 15, 6, 0, tzinfo=TZ)
+
+    # Night trigger: hourly starting exactly at 23:00, then 00:00,
+    # never fires during the 06:00-22:59 day window.
+    after_2259 = datetime(2026, 9, 14, 22, 59, tzinfo=TZ)
+    next_night_fire = night_trigger.get_next_fire_time(None, after_2259)
+    assert next_night_fire == datetime(2026, 9, 14, 23, 0, tzinfo=TZ)
+
+    after_2300 = datetime(2026, 9, 14, 23, 0, 1, tzinfo=TZ)
+    next_night_fire_2 = night_trigger.get_next_fire_time(None, after_2300)
+    assert next_night_fire_2 == datetime(2026, 9, 15, 0, 0, tzinfo=TZ)
+
+    after_0500 = datetime(2026, 9, 15, 5, 0, 1, tzinfo=TZ)
+    next_night_fire_3 = night_trigger.get_next_fire_time(None, after_0500)
+    assert next_night_fire_3 == datetime(2026, 9, 15, 23, 0, tzinfo=TZ)  # skips straight past the whole day
 
 
 def test_group_pending_by_source_preserves_config_order_and_drops_empty(monkeypatch):

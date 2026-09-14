@@ -69,6 +69,23 @@ _FALLBACK_ICONS = ["🟢", "🔶", "🔷", "🟩", "🟦", "🟧"]
 # — comfortably covers up to 3-digit part counts.
 _PART_HEADER_RESERVE = 48
 
+# Rule-based "this might be a big story" flagging — no AI, just a
+# curated list of urgency/magnitude phrases common in Vietnamese
+# finance headlines, matched case-insensitively as a plain substring
+# of the title. This exists because, without it, a market-moving
+# headline from the 14th configured source lands at the very bottom
+# of the message, visually identical to routine news above it — a
+# user skimming on their phone can easily miss the one line that
+# actually mattered. Tune this list from real false positives/
+# negatives once running; it is deliberately conservative (phrases,
+# not bare words like "tăng", which would flag almost everything).
+HOT_KEYWORDS = [
+    "khẩn cấp", "khủng hoảng", "sụp đổ", "sập sàn", "phá sản", "vỡ nợ",
+    "vỡ trận", "tăng vọt", "giảm mạnh", "giảm sốc", "tăng sốc",
+    "lao dốc", "rơi tự do", "kỷ lục", "bất ngờ tăng", "bất ngờ giảm",
+    "đình chỉ", "thu hồi", "sa thải hàng loạt",
+]
+
 
 def _esc(text: str) -> str:
     return html.escape(text, quote=True)
@@ -89,10 +106,25 @@ def _time_str(item: NewsItem) -> Optional[str]:
     return item.published_at.strftime("%H:%M")
 
 
+def _is_hot(title: str) -> bool:
+    lowered = title.lower()
+    return any(kw in lowered for kw in HOT_KEYWORDS)
+
+
 def _article_line(item: NewsItem) -> str:
     link = f'<a href="{_esc(item.url)}">{_esc(item.title)}</a>'
     t = _time_str(item)
     return f"• {link} — {t}" if t else f"• {link}"
+
+
+def _hot_line(source: str, item: NewsItem) -> str:
+    """Like _article_line, but also names the source inline — hot
+    items are pulled out of their normal per-source block, so that
+    context would otherwise be lost."""
+    link = f'<a href="{_esc(item.url)}">{_esc(item.title)}</a>'
+    t = _time_str(item)
+    tail = f" — {t}" if t else ""
+    return f"{_icon_for(source)} {link}{tail} <i>({_esc(source)})</i>"
 
 
 def _source_header(source: str, count: int) -> str:
@@ -103,6 +135,26 @@ def _source_block(source: str, items: List[NewsItem]) -> List[str]:
     lines = [_source_header(source, len(items)), ""]
     lines += [_article_line(i) for i in items]
     return lines
+
+
+def _pack_bullets(header: str, bullets: List[str], limit: int) -> List[str]:
+    """Split a too-large-for-one-message list of bullet lines under a
+    single repeated `header` into as few messages as possible, never
+    cutting a bullet in half. Used both for one source with an
+    unusually large batch and for an oversized hot-news section."""
+    messages: List[str] = []
+    chunk: List[str] = []
+    chunk_len = len(header) + 2
+    for bullet in bullets:
+        if chunk and chunk_len + len(bullet) + 1 > limit:
+            messages.append(header + "\n\n" + "\n".join(chunk))
+            chunk = []
+            chunk_len = len(header) + 2
+        chunk.append(bullet)
+        chunk_len += len(bullet) + 1
+    if chunk:
+        messages.append(header + "\n\n" + "\n".join(chunk))
+    return messages
 
 
 def format_grouped_articles(
@@ -136,28 +188,62 @@ def format_grouped_articles(
     if errored_sources:
         footer = "\n\n⚠️ Nguồn lỗi: " + ", ".join(errored_sources)
 
-    blocks = {s: _source_block(s, items_by_source[s]) for s in sources}
-    body = "\n\n".join("\n".join(blocks[s]) for s in sources)
-    full_text = f"{summary}\n\n{body}{footer}"
+    # Pull "hot" articles (matches HOT_KEYWORDS) out into a dedicated
+    # top section regardless of which source or how deep in the
+    # configured source order they'd otherwise land — a keyword match
+    # from the last-configured source must not get buried under a
+    # dozen blocks of routine news. Removed from their normal block
+    # (not duplicated) so the message doesn't repeat itself.
+    hot_pairs: List[Tuple[str, NewsItem]] = []
+    normal_by_source: Dict[str, List[NewsItem]] = {}
+    for s in sources:
+        normal_items = []
+        for item in items_by_source[s]:
+            if _is_hot(item.title):
+                hot_pairs.append((s, item))
+            else:
+                normal_items.append(item)
+        if normal_items:
+            normal_by_source[s] = normal_items
+    normal_sources = list(normal_by_source.keys())
+
+    hot_header = "🚨 <b>TIN NÓNG</b>"
+    hot_lines = [hot_header, ""] + [_hot_line(s, i) for s, i in hot_pairs] if hot_pairs else []
+    hot_block = "\n".join(hot_lines)
+
+    blocks = {s: _source_block(s, normal_by_source[s]) for s in normal_sources}
+    body_parts = ([hot_block] if hot_block else []) + [
+        "\n".join(blocks[s]) for s in normal_sources
+    ]
+    full_text = f"{summary}\n\n" + "\n\n".join(body_parts) + footer
     if len(full_text) <= limit:
         return [full_text]
 
-    # Pack whole source-blocks per message, reserving room for the
-    # "(phần N/M)" header added to every message below; a single source
-    # with so many articles that its own block exceeds that reduced
-    # limit gets its bullet lines split across messages instead,
-    # repeating its header.
+    # Pack whole blocks per message, reserving room for the "(phần
+    # N/M)" header added to every message below; a single block (hot
+    # section included) with so many articles that it alone exceeds
+    # that reduced limit gets its bullet lines split across messages
+    # instead, repeating its header.
     split_limit = limit - _PART_HEADER_RESERVE
     messages: List[str] = []
-    current: List[str] = []
-
     def flush() -> None:
         if current:
             messages.append("\n".join(current))
             current.clear()
 
-    for source in sources:
-        items = items_by_source[source]
+    if hot_pairs and len(hot_block) > split_limit:
+        # The hot section itself is too big for one message — pack it
+        # on its own (never silently dropped), `current` starts empty.
+        current: List[str] = []
+        messages.extend(_pack_bullets(hot_header, [_hot_line(s, i) for s, i in hot_pairs], split_limit))
+    else:
+        # The hot section always leads the first message — it's the
+        # whole point of pulling it out — so it seeds `current` before
+        # anything else is packed.
+        current = list(hot_lines)
+
+    for source in normal_sources:
+        items = normal_by_source[source]
         header = _source_header(source, len(items))
         bullets = [_article_line(i) for i in items]
         block_text = header + "\n\n" + "\n".join(bullets)
@@ -173,17 +259,7 @@ def format_grouped_articles(
 
         # This one source alone has too many articles for one message.
         flush()
-        chunk: List[str] = []
-        chunk_len = len(header) + 2
-        for bullet in bullets:
-            if chunk and chunk_len + len(bullet) + 1 > split_limit:
-                messages.append(header + "\n\n" + "\n".join(chunk))
-                chunk = []
-                chunk_len = len(header) + 2
-            chunk.append(bullet)
-            chunk_len += len(bullet) + 1
-        if chunk:
-            messages.append(header + "\n\n" + "\n".join(chunk))
+        messages.extend(_pack_bullets(header, bullets, split_limit))
 
     flush()
 
