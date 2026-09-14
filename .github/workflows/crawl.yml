@@ -1,0 +1,69 @@
+name: Crawl news
+
+# GitHub Actions runners are ephemeral — each run starts from a fresh
+# checkout of `main`, so data/news.db (the SQLite dedup state) has to be
+# committed back to the repo at the end of every run, or the app would
+# treat every article as "new" again on the next run and flood Telegram.
+#
+# Schedule is UTC; */15 divides both 60 and Vietnam's +7 offset evenly,
+# so this still lands on Vietnam-local :00/:15/:30/:45 marks.
+"on":
+  schedule:
+    - cron: "*/15 * * * *"
+  workflow_dispatch: {} # lets you trigger a run manually from the Actions tab
+
+# Only one crawl at a time: if a run is still going when the next
+# scheduled trigger fires (e.g. a slow source), queue instead of
+# overlapping — two runs racing to commit data/news.db would conflict.
+concurrency:
+  group: news-crawl
+  cancel-in-progress: false
+
+permissions:
+  contents: write # required to commit data/news.db back to the repo
+
+jobs:
+  crawl:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run one crawl cycle
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: python main.py --run-once
+
+      - name: Commit updated database
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          # -f: data/*.db is gitignored for the normal VPS/local deploy
+          # mode (state that must NOT be committed there); this workflow
+          # is the one exception that needs it tracked to survive across
+          # ephemeral runners.
+          git add -f data/news.db
+          if git diff --cached --quiet; then
+            echo "No database changes this cycle."
+            exit 0
+          fi
+
+          # Fold routine state updates into one rolling commit instead of
+          # growing history forever (~96 runs/day). A real code commit
+          # (any message other than this exact one) is never touched —
+          # the next cycle just starts a fresh rolling commit after it.
+          if [ "$(git log -1 --pretty=%s)" = "chore: update news database [bot]" ]; then
+            git commit --amend --no-edit
+            git push --force origin HEAD:main
+          else
+            git commit -m "chore: update news database [bot]"
+            git push origin HEAD:main
+          fi

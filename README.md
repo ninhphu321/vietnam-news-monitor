@@ -195,6 +195,37 @@ python main.py --backup-now
 
 Khôi phục: dừng app, copy đè file backup muốn khôi phục vào `data/news.db`, chạy lại app.
 
+## Deploy bằng GitHub Actions (miễn phí, không cần VPS)
+
+Đây là cách chạy 24/7 hoàn toàn miễn phí mà không cần quản lý server nào — dùng chính GitHub để tự động chạy `python main.py --run-once` mỗi 15 phút. Workflow đã có sẵn tại [.github/workflows/crawl.yml](.github/workflows/crawl.yml).
+
+### Vấn đề kỹ thuật đã xử lý sẵn
+
+Máy chạy GitHub Actions là **tạm thời** — mỗi lần chạy là 1 máy ảo mới tinh, không giữ được `data/news.db` giữa các lần như chạy trên VPS. Nếu không xử lý, app sẽ coi mọi bài là "mới" mỗi 15 phút và spam Telegram vô tận.
+
+Cách giải quyết: workflow tự commit `data/news.db` ngược lại vào repo sau mỗi lần chạy, để lần chạy sau lấy lại đúng trạng thái dedup. Để tránh phình repo (mỗi ngày chạy ~96 lần, commit bình thường sẽ tích luỹ hàng nghìn commit vô nghĩa mỗi năm), workflow dùng kỹ thuật **amend + force-push**: các lần cập nhật database liên tiếp được gộp đè vào cùng 1 commit "chore: update news database [bot]", không tạo commit mới mỗi lần — nhưng **bất kỳ commit code thật nào bạn tự push đều không bị đụng tới** (chỉ commit đúng message đó mới bị amend).
+
+**Đánh đổi cần biết:** vì dùng amend, git history **không** giữ lại lịch sử database theo từng mốc thời gian (khác với backup thật ở chế độ VPS) — chỉ có bản mới nhất. Job backup nội bộ 03:00 hàng ngày (`run_backup` trong `scheduler.py`) cũng **không chạy** ở chế độ này vì `--run-once` không khởi động `BlockingScheduler`. Nếu cần point-in-time backup thật khi chạy bằng GitHub Actions, đây là điểm có thể mở rộng thêm sau.
+
+### Cách setup
+
+1. **Thêm GitHub Secrets** (Settings → Secrets and variables → Actions → New repository secret):
+   - `TELEGRAM_BOT_TOKEN`
+   - `TELEGRAM_CHAT_ID`
+
+2. **Đẩy code lên GitHub** (nếu chưa) — workflow tự động kích hoạt ngay khi file `.github/workflows/crawl.yml` có mặt trên nhánh mặc định.
+
+3. **Chạy thử thủ công** để xác nhận hoạt động ngay, không cần đợi lịch: vào tab **Actions** trên GitHub → chọn workflow **Crawl news** → **Run workflow**.
+
+4. Từ đó app tự chạy mỗi 15 phút, xem log từng lần chạy trong tab **Actions**.
+
+### Lưu ý quan trọng
+
+- **Không chạy đồng thời cả VPS/local daemon lẫn GitHub Actions trên cùng 1 kho code** — cả 2 sẽ tranh nhau ghi `data/news.db`, dễ gây dedup sai hoặc mất đồng bộ. Chọn 1 trong 2 cách.
+- Lịch chạy của GitHub Actions (`schedule: cron`) là **best-effort** — GitHub không đảm bảo đúng giờ tuyệt đối, có thể trễ vài phút khi hệ thống tải cao (bình thường, không phải lỗi app).
+- Nếu repo không có commit nào trong 60 ngày, GitHub tự tắt scheduled workflow — nhưng vì chính workflow này commit database mỗi 15 phút nên tự nó giữ repo "hoạt động", không bị tắt.
+- Cần bật quyền ghi cho Actions nếu tổ chức/tài khoản bạn đã tắt mặc định: Settings → Actions → General → Workflow permissions → **Read and write permissions**.
+
 ## Deploy VPS 24/7
 
 ### systemd (khuyến nghị)
