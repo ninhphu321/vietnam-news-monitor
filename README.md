@@ -1,6 +1,6 @@
 # Vietnam News Monitor
 
-Theo dõi 18 chuyên mục kinh tế/tài chính của báo Việt Nam (gồm cả báo nhà nước/thông tấn chính thống), phát hiện bài mới, chống gửi trùng, và đẩy title (kèm link) + thời gian về Telegram — **group theo từng nguồn báo (icon riêng để phân biệt nhanh), tách riêng tin nóng lên đầu**. Tần suất quét thay đổi theo khung giờ: 15 phút/lần ban ngày (06:00-23:00), 30 phút/lần ban đêm (23:00-06:00) — tin tài chính ít biến động ban đêm nên không cần quét dày.
+Theo dõi 18 chuyên mục kinh tế/tài chính của báo Việt Nam (gồm cả báo nhà nước/thông tấn chính thống), phát hiện bài mới, chống gửi trùng, và đẩy title (kèm link) + thời gian về Telegram — **group theo từng nguồn báo (icon riêng để phân biệt nhanh), tách riêng tin nóng lên đầu**. Quét mỗi 20 phút/lần, cả ngày lẫn đêm (không phân biệt khung giờ).
 
 Xem đầy đủ yêu cầu gốc trong `PROJECT SPEC V2` đã cung cấp. README này chỉ tập trung vào cách chạy.
 
@@ -143,7 +143,7 @@ TELEGRAM_BOT_TOKEN=...
 TELEGRAM_CHAT_ID=...
 ```
 
-Các biến khác (`DAY_START_HOUR`, `NIGHT_START_HOUR`, `DAY_CRAWL_INTERVAL_MINUTES`, `NIGHT_CRAWL_INTERVAL_MINUTES`, `REQUEST_TIMEOUT`, `MAX_RETRIES`, `INITIAL_SCAN_SEND`, `LOG_LEVEL`, `TIMEZONE`, `STALE_SOURCE_HOURS`, `STALE_ALERT_COOLDOWN_HOURS`, `BACKUP_KEEP_DAYS`) đã có giá trị mặc định hợp lý (15 phút ban ngày/30 phút ban đêm theo mặc định), chỉ cần chỉnh nếu muốn.
+Các biến khác (`CRAWL_INTERVAL_MINUTES`, `REQUEST_TIMEOUT`, `MAX_RETRIES`, `INITIAL_SCAN_SEND`, `LOG_LEVEL`, `TIMEZONE`, `STALE_SOURCE_HOURS`, `STALE_ALERT_COOLDOWN_HOURS`, `BACKUP_KEEP_DAYS`) đã có giá trị mặc định hợp lý (20 phút/lần, cả ngày lẫn đêm), chỉ cần chỉnh nếu muốn.
 
 **Không commit `.env` lên Git** — đã có trong `.gitignore`.
 
@@ -161,7 +161,7 @@ Dry run: crawl → parse → kiểm tra trùng với database hiện có → in 
 pytest
 ```
 
-106 test bao phủ: normalize title/URL (kể cả giải mã HTML entity lỗi của Thanh Niên/VietnamBiz), crawler parse RSS cho 14 nguồn (kèm test riêng cho 3 kiểu parse ngày phi chuẩn của Chính phủ/VTV/VietnamBiz) và crawler scrape HTML cho 4 nguồn còn lại (lọc khối "nổi bật" không có giờ ở CafeBiz, chống 1 bài xuất hiện nhiều lần với giờ khác nhau ở Đầu tư Chứng khoán, báo lỗi khi selector không khớp gì thay vì âm thầm "0 bài mới") (dùng fixture lấy từ dữ liệu thực tế lúc audit, mock qua thư viện `responses` — không cần mạng), dedup theo URL (không theo title), restart không mất/không gửi lại dữ liệu, format Telegram group-theo-nguồn + tách tin nóng + chia nhỏ khi vượt giới hạn 4096 ký tự, retry khi gửi Telegram lỗi, cô lập lỗi từng nguồn không làm crash app, giữ đúng thứ tự nguồn theo cấu hình, baseline seeding lần chạy đầu **và** baseline riêng cho nguồn mới thêm vào một DB đã có dữ liệu, toàn bộ luồng `run_cycle` (dry-run / gửi thành công / lỗi 1 phần vẫn gửi tin nguồn OK / tất cả lỗi / Telegram lỗi thì không đánh dấu sent), phát hiện nguồn "chết âm thầm" (ngưỡng giờ, cooldown cảnh báo, tự gỡ cảnh báo khi hồi phục), backup database (tạo bản có timestamp + tự xoá bản cũ), và **lịch quét ngày/đêm** — kiểm tra cả cron string sinh ra lẫn thời điểm bắn thật của `CronTrigger` (APScheduler) khớp đúng ranh giới 06:00/23:00, không hở/chồng giờ nào; và hiển thị ngày kèm giờ (`dd/mm HH:MM`) cho batch trải dài nhiều ngày.
+98 test bao phủ: normalize title/URL (kể cả giải mã HTML entity lỗi của Thanh Niên/VietnamBiz), crawler parse RSS cho 14 nguồn (kèm test riêng cho 3 kiểu parse ngày phi chuẩn của Chính phủ/VTV/VietnamBiz) và crawler scrape HTML cho 4 nguồn còn lại (lọc khối "nổi bật" không có giờ ở CafeBiz, chống 1 bài xuất hiện nhiều lần với giờ khác nhau ở Đầu tư Chứng khoán, báo lỗi khi selector không khớp gì thay vì âm thầm "0 bài mới") (dùng fixture lấy từ dữ liệu thực tế lúc audit, mock qua thư viện `responses` — không cần mạng), dedup theo URL (không theo title), restart không mất/không gửi lại dữ liệu, format Telegram group-theo-nguồn + tách tin nóng + chia nhỏ khi vượt giới hạn 4096 ký tự, retry khi gửi Telegram lỗi, cô lập lỗi từng nguồn không làm crash app, giữ đúng thứ tự nguồn theo cấu hình, baseline seeding lần chạy đầu **và** baseline riêng cho nguồn mới thêm vào một DB đã có dữ liệu, toàn bộ luồng `run_cycle` (dry-run / gửi thành công / lỗi 1 phần vẫn gửi tin nguồn OK / tất cả lỗi / Telegram lỗi thì không đánh dấu sent), phát hiện nguồn "chết âm thầm" (ngưỡng giờ, cooldown cảnh báo, tự gỡ cảnh báo khi hồi phục), backup database (tạo bản có timestamp + tự xoá bản cũ), và **lịch quét cố định** — kiểm tra thời điểm bắn thật của `CronTrigger` (APScheduler) khớp đúng mỗi `CRAWL_INTERVAL_MINUTES` phút, xuyên suốt nửa đêm không hở/chồng giờ nào; và hiển thị ngày kèm giờ (`dd/mm HH:MM`) cho batch trải dài nhiều ngày.
 
 ## Chạy lần đầu / chạy thủ công
 
@@ -175,22 +175,15 @@ Nếu muốn gửi luôn cả các bài đang có ngay từ lần chạy đầu,
 
 **V2:** nếu database đã có dữ liệu (app đã chạy từ trước) và bạn vừa thêm một crawler mới, app tự phát hiện nguồn đó "chưa có lịch sử" và âm thầm baseline riêng cho đúng nguồn đó — không đụng tới trạng thái của các nguồn cũ, không flood Telegram hàng loạt bài cũ của nguồn mới. Hành vi này chạy tự động, không cần config gì thêm.
 
-## Chạy production (scheduler theo khung giờ ngày/đêm)
+## Chạy production (scheduler tần suất cố định)
 
 ```bash
 python main.py
 ```
 
-App tự động crawl theo **2 lịch khác nhau tuỳ khung giờ** (V3, theo yêu cầu người dùng), canh theo mốc giờ tròn, và chạy 1 lần ngay khi khởi động (dùng đúng lịch của khung giờ hiện tại). Dừng bằng `Ctrl+C`.
+App tự động crawl **mỗi `CRAWL_INTERVAL_MINUTES` phút, cả ngày lẫn đêm** (mặc định 20 phút, không còn phân biệt khung giờ ngày/đêm — bản trước có tách lịch nhanh/chậm theo giờ nhưng đã bỏ theo yêu cầu người dùng vì thêm phức tạp không cần thiết), canh theo mốc giờ tròn, và chạy 1 lần ngay khi khởi động. Dừng bằng `Ctrl+C`.
 
-| Khung giờ | Biến `.env` | Mặc định |
-|---|---|---|
-| Ban ngày `[DAY_START_HOUR, NIGHT_START_HOUR)` | `DAY_CRAWL_INTERVAL_MINUTES` | 15 phút — 06:00, 06:15, 06:30, ... 22:45 |
-| Ban đêm (còn lại, vắt qua nửa đêm) | `NIGHT_CRAWL_INTERVAL_MINUTES` | 30 phút — 23:00, 23:30, 00:00, ... 05:30 |
-
-Lý do: tin tài chính gần như không có gì mới về đêm, quét dày lúc đó chỉ tốn tài nguyên vô ích; ban ngày mới cần bám sát.
-
-Đây là 2 `CronTrigger` độc lập của `APScheduler` (`scheduler._time_windowed_cron_kwargs`), không phải 1 trigger duy nhất đổi giá trị — nên ranh giới 06:00/23:00 chuyển tiếp chính xác, không có khoảng hở hay chạy chồng. Cả 2 đều `max_instances=1` — nếu 1 chu kỳ chưa crawl/gửi xong khi mốc tiếp theo tới, chu kỳ mới **tự động bị bỏ qua** thay vì chạy chồng lên (spec V2 mục 19). Không cần thêm lock file hay cấu hình gì khác.
+Đây là 1 `CronTrigger` duy nhất của `APScheduler` với `max_instances=1` — nếu 1 chu kỳ chưa crawl/gửi xong khi mốc tiếp theo tới, chu kỳ mới **tự động bị bỏ qua** thay vì chạy chồng lên (spec V2 mục 19). Không cần thêm lock file hay cấu hình gì khác.
 
 ## V3 — Cảnh báo nguồn "chết âm thầm"
 
@@ -230,7 +223,7 @@ Khôi phục: dừng app, copy đè file backup muốn khôi phục vào `data/n
 
 ## Deploy bằng GitHub Actions (miễn phí, không cần VPS)
 
-Đây là cách chạy 24/7 hoàn toàn miễn phí mà không cần quản lý server nào — dùng chính GitHub để tự động chạy `python main.py --run-once` theo đúng lịch ngày/đêm (15/30 phút, xem workflow). Workflow đã có sẵn tại [.github/workflows/crawl.yml](.github/workflows/crawl.yml).
+Đây là cách chạy 24/7 hoàn toàn miễn phí mà không cần quản lý server nào — dùng chính GitHub để tự động chạy `python main.py --run-once` mỗi 20 phút, cả ngày lẫn đêm (xem workflow). Workflow đã có sẵn tại [.github/workflows/crawl.yml](.github/workflows/crawl.yml).
 
 ### Vấn đề kỹ thuật đã xử lý sẵn
 
@@ -238,7 +231,7 @@ Máy chạy GitHub Actions là **tạm thời** — mỗi lần chạy là 1 má
 
 Cách giải quyết: workflow lưu `data/news.db` trên 1 **nhánh riêng** `db-state`, hoàn toàn tách biệt khỏi `main`. Mỗi lần chạy: đọc `data/news.db` từ `db-state` (nếu đã có) → chạy `--run-once` → build commit mới chỉ chứa file db bằng git plumbing (`hash-object`/`mktree`/`commit-tree`, không cần checkout đổi nhánh) → force-push đè commit đó lên `db-state`. Nhánh này luôn chỉ có đúng 1 commit (không có "lịch sử" gì để giữ), nên không bao giờ phình dù chạy hàng nghìn lần — và quan trọng nhất, **`main` không bao giờ bị workflow này đụng vào**.
 
-> **Vì sao không force-push thẳng lên `main` như thiết kế ban đầu:** phiên bản đầu tiên của workflow amend + force-push commit database ngay trên `main`. Sau đó, lịch `schedule` (cron) tự nhiên **ngừng tự kích hoạt** dù chạy tay (`workflow_dispatch`) vẫn hoạt động bình thường — nghi vấn lớn nhất là việc liên tục force-rewrite đầu nhánh mặc định không phải hành vi repo bình thường, có thể khiến hệ thống lập lịch nền của GitHub bị rối khi xác định "commit mới nhất". Không có tài liệu chính thức xác nhận, nhưng tách hẳn database ra nhánh riêng loại bỏ hoàn toàn nghi vấn này, đồng thời cũng là kiến trúc sạch hơn.
+> **Vì sao không force-push thẳng lên `main` như thiết kế ban đầu:** phiên bản đầu tiên của workflow amend + force-push commit database ngay trên `main`. Sau đó, lịch `schedule` (cron) tự nhiên **ngừng tự kích hoạt** dù chạy tay (`workflow_dispatch`) vẫn hoạt động bình thường. Ban đầu nghi ngờ do force-rewrite đầu nhánh mặc định. Tuy nhiên, sau khi tách database ra nhánh riêng (loại bỏ hoàn toàn việc đụng vào `main`), hiện tượng "cron ngừng tự chạy" vẫn lặp lại **chỉ từ việc sửa nội dung `schedule: cron` trong workflow** — bằng chứng cho thấy nguyên nhân thật sự là: **mỗi lần sửa biểu thức cron, hệ thống lập lịch nền của GitHub cần một khoảng thời gian (quan sát được là ~1-2 tiếng) để đăng ký lại lịch mới**, hoàn toàn ở phía GitHub, không phải do code hay cấu trúc repo. Vì vậy sau khi sửa cron (như lần đổi sang 20 phút/lần này), cron tự động có thể im lặng một thời gian trước khi chạy lại — dùng **Run workflow** để chạy tay ngay lập tức, không cần chờ.
 
 **Đánh đổi cần biết:** vì `db-state` bị force-push đè mỗi lần, git history **không** giữ lại lịch sử database theo từng mốc thời gian (khác với backup thật ở chế độ VPS) — chỉ có bản mới nhất. Job backup nội bộ 03:00 hàng ngày (`run_backup` trong `scheduler.py`) cũng **không chạy** ở chế độ này vì `--run-once` không khởi động `BlockingScheduler`. Nếu cần point-in-time backup thật khi chạy bằng GitHub Actions, đây là điểm có thể mở rộng thêm sau.
 
@@ -252,7 +245,7 @@ Cách giải quyết: workflow lưu `data/news.db` trên 1 **nhánh riêng** `db
 
 3. **Chạy thử thủ công** để xác nhận hoạt động ngay, không cần đợi lịch: vào tab **Actions** trên GitHub → chọn workflow **Crawl news** → **Run workflow**.
 
-4. Từ đó app tự chạy theo đúng lịch ngày/đêm, xem log từng lần chạy trong tab **Actions**.
+4. Từ đó app tự chạy mỗi 20 phút, xem log từng lần chạy trong tab **Actions**.
 
 ### Lưu ý quan trọng
 
@@ -293,22 +286,20 @@ sudo systemctl status news-monitor
 sudo journalctl -u news-monitor -f
 ```
 
-`main.py` (không tham số) đã tự chứa scheduler ngày/đêm bên trong (`BlockingScheduler`), nên chỉ cần systemd giữ tiến trình sống — không cần cron gọi lặp lại.
+`main.py` (không tham số) đã tự chứa scheduler bên trong (`BlockingScheduler`), nên chỉ cần systemd giữ tiến trình sống — không cần cron gọi lặp lại.
 
 ### Cron (thay thế, nếu không dùng systemd)
 
-Cách khác — theo đúng gợi ý ở spec mục 2 — là để cron gọi `--run-once` thay vì chạy `main.py` daemon. Vì lịch quét giờ theo khung ngày/đêm, cần 2 dòng cron thay vì 1 (giả định crontab của VPS đã đặt múi giờ `Asia/Ho_Chi_Minh` — nếu không, đổi giờ cho khớp UTC như cách làm ở mục GitHub Actions bên trên):
+Cách khác — theo đúng gợi ý ở spec mục 2 — là để cron gọi `--run-once` thay vì chạy `main.py` daemon (giả định crontab của VPS đã đặt múi giờ `Asia/Ho_Chi_Minh` — nếu không, đổi giờ cho khớp UTC như cách làm ở mục GitHub Actions bên trên):
 
 ```cron
-*/15 6-22 * * * cd /opt/news-monitor && /opt/news-monitor/.venv/bin/python main.py --run-once >> logs/cron.log 2>&1
-*/30 23,0-5 * * * cd /opt/news-monitor && /opt/news-monitor/.venv/bin/python main.py --run-once >> logs/cron.log 2>&1
+*/20 * * * * cd /opt/news-monitor && /opt/news-monitor/.venv/bin/python main.py --run-once >> logs/cron.log 2>&1
 ```
 
 Cách này restart-safe tự nhiên (mỗi lần chạy là 1 process độc lập, không có state daemon để mất), nhưng **không** có bảo vệ "không chạy chồng" tự động như `max_instances=1` của APScheduler — nếu 1 lần chạy kéo dài hơn khoảng cách giữa 2 lần cron (mạng chậm/1 nguồn treo), 2 tiến trình có thể trùng nhau. Nếu chọn cách này, nên thêm `flock` để tự loại trừ:
 
 ```cron
-*/15 6-22 * * * flock -n /tmp/news-monitor.lock -c "cd /opt/news-monitor && .venv/bin/python main.py --run-once >> logs/cron.log 2>&1"
-*/30 23,0-5 * * * flock -n /tmp/news-monitor.lock -c "cd /opt/news-monitor && .venv/bin/python main.py --run-once >> logs/cron.log 2>&1"
+*/20 * * * * flock -n /tmp/news-monitor.lock -c "cd /opt/news-monitor && .venv/bin/python main.py --run-once >> logs/cron.log 2>&1"
 ```
 
 **Lưu ý nếu chọn cron thay vì daemon:** job backup tự động 03:00 chỉ chạy bên trong `python main.py` (daemon/scheduler) — `--run-once` không đăng ký job đó. Nếu dùng cron, thêm 1 dòng cron riêng gọi `--backup-now`:

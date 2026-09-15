@@ -1,4 +1,4 @@
-"""Crawl orchestration + the 30-minute scheduler.
+"""Crawl orchestration + the fixed-interval scheduler.
 
 This module owns the flow from PROJECT SPEC section 16:
 
@@ -354,70 +354,20 @@ def _minute_expr(interval_minutes: int) -> str:
     return f"*/{interval_minutes}"
 
 
-def _time_windowed_cron_kwargs(cfg: Config) -> Tuple[Dict[str, str], Dict[str, str]]:
-    """Two non-overlapping firing schedules for run_cycle: a slower one
-    overnight (finance news volume drops) and a faster one during the
-    day, per spec: day [day_start_hour, night_start_hour) at
-    day_crawl_interval_minutes, night (wrapping past midnight) at
-    night_crawl_interval_minutes. Returns (day_kwargs, night_kwargs)
-    ready to pass as CronTrigger(**kwargs).
-
-    Pure and side-effect-free so the boundary math (does 22:59 vs 23:00
-    land in the right window, does the night window correctly wrap
-    across midnight) can be tested directly instead of only by
-    inspecting a live BlockingScheduler.
-    """
-    day_start = cfg.day_start_hour
-    night_start = cfg.night_start_hour
-
-    day_hours = f"{day_start}-{night_start - 1}"
-    night_upper = "23" if night_start == 23 else f"{night_start}-23"
-    night_hours = night_upper if day_start == 0 else f"{night_upper},0-{day_start - 1}"
-
-    day_kwargs = {"hour": day_hours, "minute": _minute_expr(cfg.day_crawl_interval_minutes)}
-    night_kwargs = {"hour": night_hours, "minute": _minute_expr(cfg.night_crawl_interval_minutes)}
-    return day_kwargs, night_kwargs
-
-
-def _is_night(hour: int, cfg: Config) -> bool:
-    """Whether `hour` (0-23, local time) falls in the night window."""
-    if cfg.day_start_hour <= cfg.night_start_hour:
-        return hour >= cfg.night_start_hour or hour < cfg.day_start_hour
-    return cfg.night_start_hour <= hour < cfg.day_start_hour  # night window doesn't wrap midnight
-
-
 def start_scheduler(db: Database, cfg: Config) -> None:
     ensure_initial_baseline(db, cfg)
 
     scheduler = BlockingScheduler(timezone=cfg.timezone)
-    day_kwargs, night_kwargs = _time_windowed_cron_kwargs(cfg)
     now = datetime.now(ZoneInfo(cfg.timezone))
-    night_now = _is_night(now.hour, cfg)
-
-    # APScheduler docs: passing next_run_time=None means "add the job
-    # paused", NOT "compute normally" — so that kwarg must be omitted
-    # entirely for whichever job should just wait for its own next
-    # cron-computed time, rather than passed as None.
-    day_job_kwargs = {} if night_now else {"next_run_time": now}
-    night_job_kwargs = {"next_run_time": now} if night_now else {}
 
     scheduler.add_job(
         run_cycle,
-        trigger=CronTrigger(timezone=cfg.timezone, **day_kwargs),
+        trigger=CronTrigger(minute=_minute_expr(cfg.crawl_interval_minutes), timezone=cfg.timezone),
         kwargs={"db": db, "cfg": cfg, "dry_run": False},
-        id="crawl_cycle_day",
+        id="crawl_cycle",
         max_instances=1,
         coalesce=True,
-        **day_job_kwargs,
-    )
-    scheduler.add_job(
-        run_cycle,
-        trigger=CronTrigger(timezone=cfg.timezone, **night_kwargs),
-        kwargs={"db": db, "cfg": cfg, "dry_run": False},
-        id="crawl_cycle_night",
-        max_instances=1,
-        coalesce=True,
-        **night_job_kwargs,
+        next_run_time=now,  # fire once immediately on startup, then follow the cron cadence
     )
 
     # V3 reliability: daily SQLite backup, independent of the crawl
@@ -431,11 +381,7 @@ def start_scheduler(db: Database, cfg: Config) -> None:
         coalesce=True,
     )
 
-    logger.info(
-        "Scheduler started: every %d minute(s) from %02d:00-%02d:00, every %d minute(s) overnight.",
-        cfg.day_crawl_interval_minutes, cfg.day_start_hour, cfg.night_start_hour,
-        cfg.night_crawl_interval_minutes,
-    )
+    logger.info("Scheduler started: every %d minute(s), around the clock.", cfg.crawl_interval_minutes)
     logger.info("Daily backup scheduled: 03:00 (%s), keeping %d day(s).", cfg.timezone, cfg.backup_keep_days)
     try:
         scheduler.start()

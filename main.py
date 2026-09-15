@@ -1,6 +1,6 @@
 """Entry point / CLI.
 
-    python main.py               # start the 15-minute scheduler (production)
+    python main.py               # start the fixed-interval scheduler (production)
     python main.py --run-once    # crawl immediately, once, then exit
     python main.py --dry-run     # crawl + dedup-check + print, no DB writes, no Telegram
     python main.py --backup-now  # timestamped SQLite backup, then exit (no crawl)

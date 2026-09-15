@@ -20,17 +20,13 @@ name: Crawl news
 # afterward lines up with that. Undocumented by GitHub either way, but
 # keeping `main` untouched removes the suspicion entirely.)
 #
-# Day/night cadence (mirrors scheduler.py's day_start_hour=6/
-# night_start_hour=23/day_crawl_interval_minutes=15/
-# night_crawl_interval_minutes=30 defaults — keep these in sync if you
-# change either): GitHub Actions cron is UTC-only, so the
-# Vietnam-local (UTC+7) windows below are converted by hand:
-#   VN 06:00-22:45 (every 15 min) -> UTC hours 23,0-15
-#   VN 23:00-05:30 (every 30 min) -> UTC hours 16-22
+# Flat cadence, around the clock (mirrors config.py's
+# crawl_interval_minutes=20 default — keep in sync if you change
+# either). GitHub Actions cron is UTC-only, but "every 20 minutes"
+# needs no timezone conversion since it applies to every hour equally.
 "on":
   schedule:
-    - cron: "*/15 23,0-15 * * *" # VN day window: every 15 min
-    - cron: "*/30 16-22 * * *" # VN night window: every 30 min
+    - cron: "*/20 * * * *" # every 20 min, all day
   workflow_dispatch: {} # lets you trigger a run manually from the Actions tab
 
 env:
