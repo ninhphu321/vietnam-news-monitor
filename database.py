@@ -135,6 +135,32 @@ class Database:
             published_at=published_at,
         )
 
+    def get_all_articles(self) -> List[dict]:
+        """Every article ever recorded (sent, pending, or baseline-seeded
+        alike), newest-crawled first. Used by web/generate_site.py to
+        build the multi-day archive — unlike get_pending(), this is not
+        filtered to "not yet sent" and includes first_seen_at, since
+        published_at is None for some sources and the archive still
+        needs a date to file those articles under."""
+        with self._connect() as conn:
+            rows = conn.execute(
+                """
+                SELECT source, title, url, published_at, first_seen_at
+                FROM news
+                ORDER BY first_seen_at DESC
+                """
+            ).fetchall()
+        return [
+            {
+                "source": r["source"],
+                "title": r["title"],
+                "url": r["url"],
+                "published_at": datetime.fromisoformat(r["published_at"]) if r["published_at"] else None,
+                "first_seen_at": datetime.fromisoformat(r["first_seen_at"]),
+            }
+            for r in rows
+        ]
+
     def count_all(self) -> int:
         with self._connect() as conn:
             return conn.execute("SELECT COUNT(*) AS c FROM news").fetchone()["c"]

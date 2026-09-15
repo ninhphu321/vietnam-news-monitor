@@ -48,10 +48,15 @@ concurrency:
 
 permissions:
   contents: write # required to push the db-state branch
+  pages: write # required to deploy the static site to GitHub Pages
+  id-token: write # required by actions/deploy-pages for its OIDC token
 
 jobs:
   crawl:
     runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy_pages.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
         # Only `main` (code) is checked out into the working tree;
@@ -94,3 +99,15 @@ jobs:
           ROOT_TREE=$(printf '040000 tree %s\tdata\n' "$DATA_TREE" | git mktree)
           COMMIT=$(git commit-tree "$ROOT_TREE" -m "chore: update news database [bot]")
           git push --force origin "$COMMIT:refs/heads/$DB_BRANCH"
+
+      - name: Generate static site (multi-day archive)
+        run: python -m web.generate_site
+
+      - name: Upload site to GitHub Pages
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+      - name: Deploy to GitHub Pages
+        id: deploy_pages
+        uses: actions/deploy-pages@v4

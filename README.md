@@ -161,7 +161,7 @@ Dry run: crawl → parse → kiểm tra trùng với database hiện có → in 
 pytest
 ```
 
-98 test bao phủ: normalize title/URL (kể cả giải mã HTML entity lỗi của Thanh Niên/VietnamBiz), crawler parse RSS cho 14 nguồn (kèm test riêng cho 3 kiểu parse ngày phi chuẩn của Chính phủ/VTV/VietnamBiz) và crawler scrape HTML cho 4 nguồn còn lại (lọc khối "nổi bật" không có giờ ở CafeBiz, chống 1 bài xuất hiện nhiều lần với giờ khác nhau ở Đầu tư Chứng khoán, báo lỗi khi selector không khớp gì thay vì âm thầm "0 bài mới") (dùng fixture lấy từ dữ liệu thực tế lúc audit, mock qua thư viện `responses` — không cần mạng), dedup theo URL (không theo title), restart không mất/không gửi lại dữ liệu, format Telegram group-theo-nguồn + tách tin nóng + chia nhỏ khi vượt giới hạn 4096 ký tự, retry khi gửi Telegram lỗi, cô lập lỗi từng nguồn không làm crash app, giữ đúng thứ tự nguồn theo cấu hình, baseline seeding lần chạy đầu **và** baseline riêng cho nguồn mới thêm vào một DB đã có dữ liệu, toàn bộ luồng `run_cycle` (dry-run / gửi thành công / lỗi 1 phần vẫn gửi tin nguồn OK / tất cả lỗi / Telegram lỗi thì không đánh dấu sent), phát hiện nguồn "chết âm thầm" (ngưỡng giờ, cooldown cảnh báo, tự gỡ cảnh báo khi hồi phục), backup database (tạo bản có timestamp + tự xoá bản cũ), và **lịch quét cố định** — kiểm tra thời điểm bắn thật của `CronTrigger` (APScheduler) khớp đúng mỗi `CRAWL_INTERVAL_MINUTES` phút, xuyên suốt nửa đêm không hở/chồng giờ nào; và hiển thị ngày kèm giờ (`dd/mm HH:MM`) cho batch trải dài nhiều ngày.
+105 test bao phủ: normalize title/URL (kể cả giải mã HTML entity lỗi của Thanh Niên/VietnamBiz), crawler parse RSS cho 14 nguồn (kèm test riêng cho 3 kiểu parse ngày phi chuẩn của Chính phủ/VTV/VietnamBiz) và crawler scrape HTML cho 4 nguồn còn lại (lọc khối "nổi bật" không có giờ ở CafeBiz, chống 1 bài xuất hiện nhiều lần với giờ khác nhau ở Đầu tư Chứng khoán, báo lỗi khi selector không khớp gì thay vì âm thầm "0 bài mới") (dùng fixture lấy từ dữ liệu thực tế lúc audit, mock qua thư viện `responses` — không cần mạng), dedup theo URL (không theo title), restart không mất/không gửi lại dữ liệu, format Telegram group-theo-nguồn + tách tin nóng + chia nhỏ khi vượt giới hạn 4096 ký tự, retry khi gửi Telegram lỗi, cô lập lỗi từng nguồn không làm crash app, giữ đúng thứ tự nguồn theo cấu hình, baseline seeding lần chạy đầu **và** baseline riêng cho nguồn mới thêm vào một DB đã có dữ liệu, toàn bộ luồng `run_cycle` (dry-run / gửi thành công / lỗi 1 phần vẫn gửi tin nguồn OK / tất cả lỗi / Telegram lỗi thì không đánh dấu sent), phát hiện nguồn "chết âm thầm" (ngưỡng giờ, cooldown cảnh báo, tự gỡ cảnh báo khi hồi phục), backup database (tạo bản có timestamp + tự xoá bản cũ), và **lịch quét cố định** — kiểm tra thời điểm bắn thật của `CronTrigger` (APScheduler) khớp đúng mỗi `CRAWL_INTERVAL_MINUTES` phút, xuyên suốt nửa đêm không hở/chồng giờ nào; hiển thị ngày kèm giờ (`dd/mm HH:MM`) cho batch trải dài nhiều ngày, và trang web tĩnh (`web/generate_site.py`) — gom bài theo đúng ngày kể cả khi thiếu `published_at`, sắp mới nhất lên đầu trong từng nguồn, escape HTML tiêu đề (chống XSS từ tiêu đề bài crawl được), và luôn dọn sạch `site/` cũ trước khi sinh lại thay vì cộng dồn file rác.
 
 ## Chạy lần đầu / chạy thủ công
 
@@ -253,6 +253,20 @@ Cách giải quyết: workflow lưu `data/news.db` trên 1 **nhánh riêng** `db
 - Lịch chạy của GitHub Actions (`schedule: cron`) là **best-effort** — GitHub không đảm bảo đúng giờ tuyệt đối, có thể trễ vài phút khi hệ thống tải cao (bình thường, không phải lỗi app).
 - Nếu repo không có commit nào trong 60 ngày, GitHub tự tắt scheduled workflow — nhưng vì chính workflow này commit database định kỳ nên tự nó giữ repo "hoạt động", không bị tắt.
 - Cần bật quyền ghi cho Actions nếu tổ chức/tài khoản bạn đã tắt mặc định: Settings → Actions → General → Workflow permissions → **Read and write permissions**.
+
+## V4 — Trang web tổng hợp tin tức (GitHub Pages)
+
+Ngoài Telegram, mỗi lần crawl cũng sinh ra 1 **trang web tĩnh** liệt kê lại toàn bộ tin đã thu thập, xem lại được theo từng ngày — hữu ích khi cần tra cứu lịch sử thay vì chỉ xem được đúng đợt tin mới nhất trên Telegram.
+
+- Module sinh trang: [web/generate_site.py](web/generate_site.py) — đọc toàn bộ `data/news.db` (`Database.get_all_articles`), gom theo **ngày** (theo `published_at`, hoặc theo `first_seen_at` nếu nguồn không có ngày — ví dụ Báo Đầu tư) rồi theo **nguồn** (đúng thứ tự cấu hình như Telegram), xuất ra các file HTML tĩnh thuần (không JS, không build tool) vào thư mục `site/`.
+- Mỗi ngày có 1 file `site/YYYY-MM-DD.html`; `site/index.html` luôn là bản sao của ngày mới nhất. Thanh điều hướng ở đầu mỗi trang liệt kê tất cả các ngày đã có dữ liệu để bấm xem lại.
+- Xem thử ở máy (không cần mạng, không cần Telegram):
+  ```bash
+  python -m web.generate_site
+  ```
+  rồi mở `site/index.html` bằng trình duyệt bất kỳ.
+- **Deploy:** [.github/workflows/news-crawl.yml](.github/workflows/news-crawl.yml) tự sinh lại `site/` và deploy lên **GitHub Pages** sau mỗi lần crawl, bằng action chính chủ của GitHub (`actions/upload-pages-artifact` + `actions/deploy-pages`) — không cần thêm nhánh riêng hay dịch vụ hosting nào khác.
+- **Cần bật 1 lần duy nhất:** Settings → Pages → Build and deployment → Source → chọn **"GitHub Actions"** (không chọn "Deploy from a branch"). Sau đó URL trang sẽ hiện ở đúng mục Settings → Pages này (dạng `https://<username>.github.io/<repo>/`), và cũng hiện trong output của mỗi lần chạy workflow (bước "Deploy to GitHub Pages").
 
 ## Deploy VPS 24/7
 
