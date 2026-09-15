@@ -56,23 +56,25 @@ Mỗi nguồn có 1 icon riêng để nhận diện nhanh không cần đọc ch
 
 🚨 TIN NÓNG
 
-📻 Ngân hàng Nhà nước bất ngờ tăng lãi suất điều hành — 14:32 (VOV)
+📻 Ngân hàng Nhà nước bất ngờ tăng lãi suất điều hành — 14/09 14:32 (VOV)
 
 📻 VOV (1 bài)
 
-• Cục Thuế yêu cầu không thêm thủ tục khi đóng mã số thuế — 18:43
+• Cục Thuế yêu cầu không thêm thủ tục khi đóng mã số thuế — 14/09 18:43
 
 🏛️ CHÍNH PHỦ (2 bài)
 
-• Cửa khẩu số hóa, doanh nghiệp thêm lựa chọn thanh toán CNY — 18:44
-• Vietjet và Thales mở rộng hợp tác hàng không công nghệ cao — 20:01
+• Cửa khẩu số hóa, doanh nghiệp thêm lựa chọn thanh toán CNY — 14/09 18:44
+• Vietjet và Thales mở rộng hợp tác hàng không công nghệ cao — 13/09 20:01
 
 🔵 VNEXPRESS (1 bài)
 
-• Tesla lập công ty ở Việt Nam — 14:55
+• Tesla lập công ty ở Việt Nam — 14/09 14:55
 ```
 
 Title là link click được (Telegram `parse_mode=HTML`), tên nguồn in đậm kèm số bài. Nếu 1 chu kỳ có nguồn lỗi, dòng `⚠️ Nguồn lỗi: ...` được thêm vào cuối cùng 1 tin nhắn này — không tách thành tin riêng (tối đa 1 batch/chu kỳ, chỉ tách khi vượt 4096 ký tự, xem mục "Luồng xử lý" bên dưới).
+
+**Vì sao mỗi giờ luôn kèm ngày (`dd/mm HH:MM`) thay vì chỉ `HH:MM`:** một số feed (VTV rõ nhất — audit cho thấy 1 lần fetch có thể chứa bài trải dài **~25 ngày** khác nhau) khiến 1 đợt "bài mới" đôi khi gồm cả bài từ nhiều ngày khác nhau, không chỉ hôm nay. Sắp xếp bên trong luôn đúng theo ngày-giờ đầy đủ, nhưng nếu chỉ hiện giờ thì nhìn vào sẽ tưởng thứ tự bị lộn xộn (bài "12:45" đứng trước "04:26" chẳng hạn) — trong khi thực ra chúng thuộc 2 ngày khác nhau và đã đúng thứ tự.
 
 ### Tin nóng (🚨 TIN NÓNG)
 

@@ -337,7 +337,7 @@ def _print_dry_run(items_by_source, status, db: Database) -> None:
         if not new_items:
             print("  (không có bài mới)")
         for item in _sort_for_delivery(new_items):
-            t = item.published_at.strftime("%H:%M") if item.published_at else "--:--"
+            t = item.published_at.strftime("%d/%m %H:%M") if item.published_at else "--/-- --:--"
             print(f"  {t} | {item.title}")
             print(f"       {item.url}")
         print()

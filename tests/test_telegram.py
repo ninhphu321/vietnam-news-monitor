@@ -47,8 +47,8 @@ def test_format_grouped_single_source_has_heading_and_bullets():
     # it can be told apart from other sources at a glance.
     assert "<b>VIETSTOCK</b> (2 bài)" in text
     assert telegram.SOURCE_ICONS["Vietstock"] in text
-    assert '<a href="https://vietstock.vn/1">Tin 1</a> — 10:03' in text
-    assert '<a href="https://vietstock.vn/2">Tin 2</a> — 10:11' in text
+    assert '<a href="https://vietstock.vn/1">Tin 1</a> — 14/09 10:03' in text
+    assert '<a href="https://vietstock.vn/2">Tin 2</a> — 14/09 10:11' in text
     # V3: opens with a one-line summary (total count, source count).
     assert "📬 <b>2 bài mới</b> · 1 nguồn" in text
 
@@ -80,6 +80,20 @@ def test_format_grouped_escapes_html_special_chars_in_title():
     assert "<5%>" not in text
     assert "&lt;5%&gt;" in text
     assert "&amp;" in text  # both in the title and the URL's query string
+
+
+def test_time_str_shows_date_not_just_hour_for_multi_day_batches():
+    """Regression guard: some feeds (VTV in particular, verified during
+    audit to span ~25 different calendar days in one RSS response) can
+    surface "new" articles from several different days in a single
+    batch. Showing only HH:MM made same-looking times from different
+    days look randomly ordered even though the underlying sort (by
+    full datetime) was always correct."""
+    older = NewsItem("VTV", "Bài cũ hơn", "https://x/1", datetime(2026, 9, 12, 12, 45, tzinfo=TZ))
+    newer = NewsItem("VTV", "Bài mới hơn", "https://x/2", datetime(2026, 9, 14, 4, 26, tzinfo=TZ))
+    text = telegram.format_grouped_articles({"VTV": [older, newer]})[0]
+    assert "12/09 12:45" in text
+    assert "14/09 04:26" in text
 
 
 def test_format_grouped_item_without_time_omits_dash_time():

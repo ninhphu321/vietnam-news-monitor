@@ -101,9 +101,15 @@ def _icon_for(source: str) -> str:
 
 
 def _time_str(item: NewsItem) -> Optional[str]:
+    """dd/mm HH:MM, not just HH:MM: some feeds (VTV in particular) keep
+    weeks of archived items in one RSS response, so a single batch of
+    "new" articles can span several different calendar days. Showing
+    only the hour made same-looking times from different days appear
+    in what looked like random order (they were correctly sorted by
+    full date+time underneath — the date was just invisible)."""
     if item.published_at is None:
         return None
-    return item.published_at.strftime("%H:%M")
+    return item.published_at.strftime("%d/%m %H:%M")
 
 
 def _is_hot(title: str) -> bool:
