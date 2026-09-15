@@ -19,6 +19,7 @@ from typing import Dict, List
 from config import config
 from crawlers import CRAWLER_CLASSES
 from database import Database
+from telegram import _icon_for
 
 SITE_DIR = Path(__file__).resolve().parent.parent / "site"
 
@@ -28,29 +29,98 @@ SITE_DIR = Path(__file__).resolve().parent.parent / "site"
 # after, alphabetically, rather than silently dropped.
 _SOURCE_ORDER = [cls.source_name for cls in CRAWLER_CLASSES]
 
+# Bold, flat "stamp ink" colors instead of the pastel-gradient palette
+# every other bento/SaaS template reaches for — one per source, picked
+# by a deterministic hash (same trick as telegram._icon_for) rather
+# than list position, so a source keeps its color even if
+# CRAWLER_CLASSES gets reordered.
+_ACCENT_PALETTE = [
+    "#e63f2e", "#f2a900", "#1f6feb", "#1a936f", "#7c3aed",
+    "#c2410c", "#0f766e", "#be185d", "#0369a1", "#4d7c0f",
+]
+
+
+def _accent_for(source: str) -> str:
+    return _ACCENT_PALETTE[sum(map(ord, source)) % len(_ACCENT_PALETTE)]
+
+
+# How many date tabs sit in the always-visible horizontal strip (spec:
+# "7 tab trải ngang" — spread edge-to-edge, no horizontal scrolling for
+# the common case). Older dates beyond this window are still reachable
+# through the "Ngày khác" picker rendered alongside the strip.
+TAB_WINDOW_SIZE = 7
+
+
+def _tab_window(all_dates: List[date], day: date, size: int = TAB_WINDOW_SIZE) -> List[date]:
+    """Up to `size` dates centered on `day` (all_dates is newest-first),
+    clamped to the available range — e.g. viewing the oldest day still
+    fills the strip with the `size` oldest dates rather than a lopsided
+    handful trailing off on one side."""
+    if len(all_dates) <= size:
+        return all_dates
+    idx = all_dates.index(day)
+    start = max(0, idx - size // 2)
+    start = min(start, len(all_dates) - size)
+    return all_dates[start : start + size]
+
+
+# Editorial-masthead-meets-neo-brutalist look: flat ink borders and a
+# hard offset shadow (no blur, no gradients) instead of the soft
+# pastel-glass "AI bento dashboard" look this kind of layout usually
+# gets — deliberately picked to not look like every other template.
 STYLE = """
-:root{color-scheme:light dark;--bg:#f7f7f8;--fg:#1a1a1a;--muted:#666;--accent:#2563eb;--border:#e2e2e2;--card:#fff;}
-@media (prefers-color-scheme: dark){:root{--bg:#0f1115;--fg:#e6e6e6;--muted:#9aa0a6;--accent:#60a5fa;--border:#2a2d34;--card:#171a21;}}
+@import url('https://fonts.googleapis.com/css2?family=Archivo+Black&family=IBM+Plex+Mono:wght@500;700&display=swap');
+:root{
+  color-scheme:light dark;
+  --bg:#f4f0e6;--fg:#18140f;--muted:#6b6255;--ink:#18140f;--card:#fffdf8;
+  --accent:#e63f2e;
+  --shadow:4px 4px 0 var(--ink);
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --bg:#141210;--fg:#f2ece0;--muted:#a89f8f;--ink:#f2ece0;--card:#1e1b17;
+    --accent:#ff6a52;
+    --shadow:4px 4px 0 var(--ink);
+  }
+}
 *{box-sizing:border-box;}
 body{margin:0;background:var(--bg);color:var(--fg);font-family:-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;line-height:1.5;}
-header{padding:24px 16px 8px;text-align:center;}
-header h1{margin:0 0 4px;font-size:1.4rem;}
-.subtitle{margin:0;color:var(--muted);font-size:.9rem;}
-nav.dates{overflow-x:auto;white-space:nowrap;padding:8px 16px;border-bottom:1px solid var(--border);}
-nav.dates ul{list-style:none;display:inline-flex;gap:8px;margin:0;padding:0;}
-nav.dates a{display:inline-block;padding:6px 12px;border-radius:999px;background:var(--card);border:1px solid var(--border);color:var(--fg);text-decoration:none;font-size:.85rem;}
-nav.dates a.active{background:var(--accent);color:#fff;border-color:var(--accent);}
-main{max-width:720px;margin:0 auto;padding:16px;}
-section.source{margin-bottom:24px;}
-section.source h2{font-size:1rem;margin:0 0 8px;padding-bottom:4px;border-bottom:1px solid var(--border);}
-.count{color:var(--muted);font-weight:normal;font-size:.85rem;}
-section.source ul{list-style:none;margin:0;padding:0;}
-section.source li{padding:8px 0;border-bottom:1px dashed var(--border);}
+header{padding:32px 16px 20px;text-align:center;border-bottom:3px solid var(--ink);}
+header h1{margin:0 0 8px;font-family:"Archivo Black",Impact,sans-serif;font-weight:400;
+  font-size:clamp(1.6rem,5vw,2.4rem);letter-spacing:.02em;text-transform:uppercase;color:var(--fg);}
+header h1 .dot{color:var(--accent);}
+.subtitle{margin:0;color:var(--muted);font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:.8rem;
+  text-transform:uppercase;letter-spacing:.06em;}
+nav.dates{position:sticky;top:0;z-index:10;background:var(--bg);border-bottom:3px solid var(--ink);}
+nav.dates .strip{display:flex;max-width:1200px;margin:0 auto;}
+nav.dates a{flex:1 1 0;text-align:center;padding:12px 4px;text-decoration:none;color:var(--fg);
+  font-family:"IBM Plex Mono",ui-monospace,monospace;font-weight:700;font-size:.78rem;
+  border-right:2px solid var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+nav.dates a:last-child{border-right:none;}
+nav.dates a:hover{background:var(--card);}
+nav.dates a.active{background:var(--ink);color:var(--bg);}
+nav.picker{display:flex;justify-content:center;padding:8px 16px;gap:8px;align-items:center;
+  font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:.75rem;color:var(--muted);}
+nav.picker select{font:inherit;color:var(--fg);background:var(--card);border:2px solid var(--ink);
+  border-radius:0;padding:4px 8px;}
+main{max-width:1200px;margin:0 auto;padding:28px 16px 8px;columns:260px;column-gap:18px;}
+section.source{break-inside:avoid;background:var(--card);border:2px solid var(--ink);
+  box-shadow:var(--shadow);padding:0 0 6px;margin:0 0 26px;}
+section.source h2{display:flex;align-items:center;gap:8px;margin:0;padding:10px 14px;
+  font-size:.98rem;font-weight:700;color:#fff;background:var(--src-color,var(--accent));}
+section.source h2 .icon{font-size:1.15rem;}
+section.source .count{margin-left:auto;font-family:"IBM Plex Mono",ui-monospace,monospace;
+  font-weight:700;font-size:.72rem;background:rgba(0,0,0,.22);padding:2px 8px;}
+section.source ul{list-style:none;margin:0;padding:6px 14px 4px;}
+section.source li{display:flex;gap:10px;padding:9px 0;border-bottom:1px dashed var(--muted);}
 section.source li:last-child{border-bottom:none;}
-.time{color:var(--muted);font-size:.8rem;margin-right:8px;font-variant-numeric:tabular-nums;}
-a{color:var(--accent);}
-.empty{text-align:center;color:var(--muted);padding:40px 0;}
-footer{text-align:center;color:var(--muted);font-size:.8rem;padding:24px 16px;}
+section.source a{color:var(--fg);text-decoration:none;font-size:.92rem;}
+section.source a:hover{color:var(--accent);text-decoration:underline;}
+.time{color:var(--muted);font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:.72rem;
+  white-space:nowrap;padding-top:2px;}
+.empty{text-align:center;color:var(--muted);padding:60px 0;}
+footer{text-align:center;color:var(--muted);font-family:"IBM Plex Mono",ui-monospace,monospace;
+  font-size:.72rem;padding:16px 16px 40px;text-transform:uppercase;letter-spacing:.04em;}
 """.strip()
 
 
@@ -89,11 +159,25 @@ def _time_label(article: dict) -> str:
 
 
 def render_day_page(day: date, sources: Dict[str, List[dict]], all_dates: List[date]) -> str:
-    nav_items = []
-    for d in all_dates:
+    window = _tab_window(all_dates, day)
+    tab_items = []
+    for d in window:
         cls = ' class="active"' if d == day else ""
-        nav_items.append(f'<li><a href="{d.isoformat()}.html"{cls}>{d.strftime("%d/%m/%Y")}</a></li>')
-    nav_html = "".join(nav_items)
+        # dd/mm on its own line reads better than dd/mm/yyyy in a narrow
+        # equal-width tab; the year is redundant for a 7-day strip anyway.
+        tab_items.append(f'<a href="{d.isoformat()}.html"{cls}>{d.strftime("%d/%m")}</a>')
+    tabs_html = "".join(tab_items)
+
+    picker_html = ""
+    if len(all_dates) > len(window):
+        options = "".join(
+            f'<option value="{d.isoformat()}.html"{" selected" if d == day else ""}>{d.strftime("%d/%m/%Y")}</option>'
+            for d in all_dates
+        )
+        picker_html = (
+            '<nav class="picker">Ngày khác: '
+            f'<select onchange="location.href=this.value">{options}</select></nav>'
+        )
 
     total = sum(len(items) for items in sources.values())
 
@@ -106,8 +190,9 @@ def render_day_page(day: date, sources: Dict[str, List[dict]], all_dates: List[d
             for a in items
         )
         sections.append(
-            f'<section class="source"><h2>{escape(source)} '
-            f'<span class="count">({len(items)})</span></h2><ul>{rows}</ul></section>'
+            f'<section class="source" style="--src-color:{_accent_for(source)}">'
+            f'<h2><span class="icon">{_icon_for(source)}</span>{escape(source)}'
+            f'<span class="count">{len(items)}</span></h2><ul>{rows}</ul></section>'
         )
     body_html = "".join(sections) if sections else '<p class="empty">Không có bài nào.</p>'
 
@@ -121,10 +206,13 @@ def render_day_page(day: date, sources: Dict[str, List[dict]], all_dates: List[d
 </head>
 <body>
 <header>
-<h1>📰 Vietnam News Monitor</h1>
-<p class="subtitle">{day.strftime('%d/%m/%Y')} — {total} bài, {len(sources)} nguồn</p>
+<h1>Vietnam News<span class="dot">.</span>Monitor</h1>
+<p class="subtitle">Số ra ngày {day.strftime('%d/%m/%Y')} · {total} bài · {len(sources)} nguồn</p>
 </header>
-<nav class="dates"><ul>{nav_html}</ul></nav>
+<nav class="dates">
+<div class="strip">{tabs_html}</div>
+{picker_html}
+</nav>
 <main>{body_html}</main>
 <footer><p>Tự động cập nhật mỗi {config.crawl_interval_minutes} phút qua GitHub Actions.</p></footer>
 </body>

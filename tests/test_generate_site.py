@@ -2,7 +2,7 @@ from datetime import date, datetime
 from zoneinfo import ZoneInfo
 
 from models import NewsItem
-from web.generate_site import build_site, group_by_date_and_source, render_day_page
+from web.generate_site import _tab_window, build_site, group_by_date_and_source, render_day_page
 
 TZ = ZoneInfo("Asia/Ho_Chi_Minh")
 
@@ -57,17 +57,54 @@ def test_render_day_page_includes_titles_links_and_date_nav():
     assert "VnExpress" in html
     assert "https://x/1" in html
     assert "10:30" in html
-    assert "14/09/2026" in html
+    assert "14/09/2026" in html  # in the masthead subtitle
     # Title is HTML-escaped, not injected raw (XSS guard for scraped titles).
     assert "<script>" not in html
     assert "&lt;script&gt;" in html
-    # Both dates appear in the nav, including days with no content shown here.
-    assert "15/09/2026" in html
+    # Both dates appear as tabs (dd/mm, no year needed in a 7-day strip),
+    # including days with no content shown here.
+    assert '<a href="2026-09-14.html" class="active">14/09</a>' in html
+    assert '<a href="2026-09-15.html">15/09</a>' in html
+    # Only 2 dates total (well under the 7-tab window) -> no "Ngày khác" picker.
+    assert "Ngày khác" not in html
 
 
 def test_render_day_page_handles_empty_day():
     html = render_day_page(date(2026, 9, 14), {}, [date(2026, 9, 14)])
     assert "Không có bài nào" in html
+
+
+def test_render_day_page_shows_date_picker_when_more_dates_than_the_tab_window():
+    all_dates = [date(2026, 9, d) for d in range(15, 1, -1)]  # 14 dates, newest first
+    html = render_day_page(date(2026, 9, 15), {}, all_dates)
+
+    assert "Ngày khác" in html
+    assert 'value="2026-09-02.html"' in html  # oldest date still reachable via the picker
+
+
+def test_tab_window_returns_everything_when_fewer_dates_than_the_window():
+    all_dates = [date(2026, 9, 15), date(2026, 9, 14)]
+    assert _tab_window(all_dates, date(2026, 9, 14)) == all_dates
+
+
+def test_tab_window_centers_on_the_current_day():
+    all_dates = [date(2026, 9, d) for d in range(20, 0, -1)]  # 20 dates, newest first
+    window = _tab_window(all_dates, date(2026, 9, 10), size=7)
+
+    assert len(window) == 7
+    assert date(2026, 9, 10) in window
+    assert window.index(date(2026, 9, 10)) == 3  # 3 newer dates before it, centered
+
+
+def test_tab_window_clamps_at_the_oldest_end():
+    """Viewing the very oldest day must still fill a full 7-tab strip
+    (from the oldest end) instead of a lopsided 1-tab sliver."""
+    all_dates = [date(2026, 9, d) for d in range(20, 0, -1)]
+    oldest = all_dates[-1]
+    window = _tab_window(all_dates, oldest, size=7)
+
+    assert len(window) == 7
+    assert window[-1] == oldest
 
 
 def test_build_site_writes_one_file_per_date_plus_index(tmp_path, db):
