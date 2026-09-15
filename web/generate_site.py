@@ -35,7 +35,7 @@ _SOURCE_ORDER = [cls.source_name for cls in CRAWLER_CLASSES]
 # than list position, so a source keeps its color even if
 # CRAWLER_CLASSES gets reordered.
 _ACCENT_PALETTE = [
-    "#e63f2e", "#f2a900", "#1f6feb", "#1a936f", "#7c3aed",
+    "#e63f2e", "#b45309", "#1f6feb", "#1a936f", "#7c3aed",
     "#c2410c", "#0f766e", "#be185d", "#0369a1", "#4d7c0f",
 ]
 
@@ -90,7 +90,7 @@ header h1{margin:0 0 8px;font-family:"Archivo Black",Impact,sans-serif;font-weig
   font-size:clamp(1.6rem,5vw,2.4rem);letter-spacing:.02em;text-transform:uppercase;color:var(--fg);}
 header h1 .dot{color:var(--accent);}
 .subtitle{margin:0;color:var(--muted);font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:.8rem;
-  text-transform:uppercase;letter-spacing:.06em;}
+  text-transform:uppercase;letter-spacing:.03em;}
 nav.dates{position:sticky;top:0;z-index:10;background:var(--bg);border-bottom:3px solid var(--ink);}
 nav.dates .strip{display:flex;max-width:1200px;margin:0 auto;}
 nav.dates a{flex:1 1 0;text-align:center;padding:12px 4px;text-decoration:none;color:var(--fg);
@@ -114,7 +114,7 @@ section.source .count{margin-left:auto;font-family:"IBM Plex Mono",ui-monospace,
 section.source ul{list-style:none;margin:0;padding:6px 14px 4px;}
 section.source li{display:flex;gap:10px;padding:9px 0;border-bottom:1px dashed var(--muted);}
 section.source li:last-child{border-bottom:none;}
-section.source a{color:var(--fg);text-decoration:none;font-size:.92rem;}
+section.source a{color:var(--fg);text-decoration:none;font-size:.93rem;line-height:1.4;}
 section.source a:hover{color:var(--accent);text-decoration:underline;}
 .time{color:var(--muted);font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:.72rem;
   white-space:nowrap;padding-top:2px;}
