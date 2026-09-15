@@ -260,7 +260,7 @@ Ngoài Telegram, mỗi lần crawl cũng sinh ra 1 **trang web tĩnh** liệt k�
 
 - Module sinh trang: [web/generate_site.py](web/generate_site.py) — đọc toàn bộ `data/news.db` (`Database.get_all_articles`), gom theo **ngày** (theo `published_at`, hoặc theo `first_seen_at` nếu nguồn không có ngày — ví dụ Báo Đầu tư) rồi theo **nguồn** (đúng thứ tự cấu hình như Telegram), xuất ra các file HTML tĩnh thuần (gần như không JS, không build tool) vào thư mục `site/`.
 - Mỗi ngày có 1 file `site/YYYY-MM-DD.html`; `site/index.html` luôn là bản sao của ngày mới nhất.
-- **Giao diện:** dạng lưới bento masonry (CSS `columns`, tự co giãn số cột theo bề rộng màn hình), mỗi nguồn 1 thẻ viền đen + đổ bóng cứng offset (không dùng gradient/soft-shadow kiểu SaaS phổ biến), màu riêng theo từng nguồn (cùng bảng màu với icon Telegram). Thanh điều hướng ngày cố định **7 tab trải đều hết chiều ngang** (theo yêu cầu), tự căn giữa quanh ngày đang xem; ngày cũ hơn 7 tab đó vẫn xem được qua dropdown "Ngày khác" ngay bên dưới.
+- **Giao diện:** dạng bảng Kanban nằm ngang — mỗi nguồn 1 cột (viền đen + đổ bóng cứng offset, không dùng gradient/soft-shadow kiểu SaaS phổ biến, màu riêng theo từng nguồn trùng bảng màu icon Telegram), cả hàng **cuộn ngang**, mỗi cột **tự cuộn dọc riêng** khi quá dài (VTV có ngày lên tới 500 bài) thay vì kéo dài cả trang. Bấm vào thanh tiêu đề màu của 1 cột để **đóng/mở** cột đó — dùng `<details>/<summary>` gốc của HTML nên không cần JS. Thanh điều hướng ngày cố định **7 tab trải đều hết chiều ngang** (theo yêu cầu), tự căn giữa quanh ngày đang xem; ngày cũ hơn 7 tab đó vẫn xem được qua dropdown "Ngày khác" ngay bên dưới.
 - Xem thử ở máy (không cần mạng, không cần Telegram):
   ```bash
   python -m web.generate_site

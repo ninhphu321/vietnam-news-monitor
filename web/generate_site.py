@@ -103,22 +103,26 @@ nav.picker{display:flex;justify-content:center;padding:8px 16px;gap:8px;align-it
   font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:.75rem;color:var(--muted);}
 nav.picker select{font:inherit;color:var(--fg);background:var(--card);border:2px solid var(--ink);
   border-radius:0;padding:4px 8px;}
-main{max-width:1200px;margin:0 auto;padding:28px 16px 8px;columns:260px;column-gap:18px;}
-section.source{break-inside:avoid;background:var(--card);border:2px solid var(--ink);
-  box-shadow:var(--shadow);padding:0 0 6px;margin:0 0 26px;}
-section.source h2{display:flex;align-items:center;gap:8px;margin:0;padding:10px 14px;
-  font-size:.98rem;font-weight:700;color:#fff;background:var(--src-color,var(--accent));}
-section.source h2 .icon{font-size:1.15rem;}
-section.source .count{margin-left:auto;font-family:"IBM Plex Mono",ui-monospace,monospace;
+main{margin:0;padding:24px 16px 40px;display:flex;align-items:flex-start;gap:18px;overflow-x:auto;}
+details.source{flex:0 0 300px;background:var(--card);border:2px solid var(--ink);box-shadow:var(--shadow);}
+details.source summary{display:flex;align-items:center;gap:8px;padding:10px 14px;cursor:pointer;
+  font-size:.98rem;font-weight:700;color:#fff;background:var(--src-color,var(--accent));
+  list-style:none;user-select:none;}
+details.source summary::-webkit-details-marker{display:none;}
+details.source summary .icon{font-size:1.15rem;}
+details.source summary .count{margin-left:auto;font-family:"IBM Plex Mono",ui-monospace,monospace;
   font-weight:700;font-size:.72rem;background:rgba(0,0,0,.22);padding:2px 8px;}
-section.source ul{list-style:none;margin:0;padding:6px 14px 4px;}
-section.source li{display:flex;gap:10px;padding:9px 0;border-bottom:1px dashed var(--muted);}
-section.source li:last-child{border-bottom:none;}
-section.source a{color:var(--fg);text-decoration:none;font-size:.93rem;line-height:1.4;}
-section.source a:hover{color:var(--accent);text-decoration:underline;}
+details.source summary .chevron{font-size:.7rem;transition:transform .15s ease;}
+details.source[open] summary .chevron{transform:rotate(180deg);}
+details.source .list-wrap{max-height:min(65vh,600px);overflow-y:auto;padding:6px 14px 4px;}
+details.source ul{list-style:none;margin:0;padding:0;}
+details.source li{display:flex;gap:10px;padding:9px 0;border-bottom:1px dashed var(--muted);}
+details.source li:last-child{border-bottom:none;}
+details.source a{color:var(--fg);text-decoration:none;font-size:.93rem;line-height:1.4;}
+details.source a:hover{color:var(--accent);text-decoration:underline;}
 .time{color:var(--muted);font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:.72rem;
   white-space:nowrap;padding-top:2px;}
-.empty{text-align:center;color:var(--muted);padding:60px 0;}
+.empty{flex:1 1 auto;text-align:center;color:var(--muted);padding:60px 0;}
 footer{text-align:center;color:var(--muted);font-family:"IBM Plex Mono",ui-monospace,monospace;
   font-size:.72rem;padding:16px 16px 40px;text-transform:uppercase;letter-spacing:.04em;}
 """.strip()
@@ -189,10 +193,15 @@ def render_day_page(day: date, sources: Dict[str, List[dict]], all_dates: List[d
             f'<a href="{escape(a["url"])}" target="_blank" rel="noopener">{escape(a["title"])}</a></li>'
             for a in items
         )
+        # <details>/<summary> gives per-source collapse/expand for free,
+        # no JS needed — clicking the colored header bar toggles it.
+        # `open` by default so the page reads the same as before until
+        # the user chooses to close a source they don't care about.
         sections.append(
-            f'<section class="source" style="--src-color:{_accent_for(source)}">'
-            f'<h2><span class="icon">{_icon_for(source)}</span>{escape(source)}'
-            f'<span class="count">{len(items)}</span></h2><ul>{rows}</ul></section>'
+            f'<details class="source" open style="--src-color:{_accent_for(source)}">'
+            f'<summary><span class="icon">{_icon_for(source)}</span>{escape(source)}'
+            f'<span class="count">{len(items)}</span><span class="chevron">▾</span></summary>'
+            f'<div class="list-wrap"><ul>{rows}</ul></div></details>'
         )
     body_html = "".join(sections) if sections else '<p class="empty">Không có bài nào.</p>'
 
