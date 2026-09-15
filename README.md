@@ -223,7 +223,7 @@ Khôi phục: dừng app, copy đè file backup muốn khôi phục vào `data/n
 
 ## Deploy bằng GitHub Actions (miễn phí, không cần VPS)
 
-Đây là cách chạy 24/7 hoàn toàn miễn phí mà không cần quản lý server nào — dùng chính GitHub để tự động chạy `python main.py --run-once` mỗi 20 phút, cả ngày lẫn đêm (xem workflow). Workflow đã có sẵn tại [.github/workflows/crawl.yml](.github/workflows/crawl.yml).
+Đây là cách chạy 24/7 hoàn toàn miễn phí mà không cần quản lý server nào — dùng chính GitHub để tự động chạy `python main.py --run-once` mỗi 20 phút, cả ngày lẫn đêm (xem workflow). Workflow đã có sẵn tại [.github/workflows/news-crawl.yml](.github/workflows/news-crawl.yml).
 
 ### Vấn đề kỹ thuật đã xử lý sẵn
 
@@ -241,7 +241,7 @@ Cách giải quyết: workflow lưu `data/news.db` trên 1 **nhánh riêng** `db
    - `TELEGRAM_BOT_TOKEN`
    - `TELEGRAM_CHAT_ID`
 
-2. **Đẩy code lên GitHub** (nếu chưa) — workflow tự động kích hoạt ngay khi file `.github/workflows/crawl.yml` có mặt trên nhánh mặc định.
+2. **Đẩy code lên GitHub** (nếu chưa) — workflow tự động kích hoạt ngay khi file `.github/workflows/news-crawl.yml` có mặt trên nhánh mặc định.
 
 3. **Chạy thử thủ công** để xác nhận hoạt động ngay, không cần đợi lịch: vào tab **Actions** trên GitHub → chọn workflow **Crawl news** → **Run workflow**.
 

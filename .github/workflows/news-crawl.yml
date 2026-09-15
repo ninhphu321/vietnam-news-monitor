@@ -1,5 +1,12 @@
 name: Crawl news
 
+# File renamed from crawl.yml -> news-crawl.yml on 2026-09-15: the
+# schedule trigger had gone stale (no automatic run for ~6h after a
+# cron edit) and disabling+re-enabling the workflow in the UI didn't
+# clear it. Renaming makes GitHub register a brand-new workflow ID,
+# which sidesteps whatever internal state the old one was stuck in —
+# a workaround reported to work elsewhere when disable/enable doesn't.
+#
 # GitHub Actions runners are ephemeral — each run starts from a fresh
 # checkout of `main`, so data/news.db (the SQLite dedup state) has to
 # survive somewhere between runs, or the app would treat every article
