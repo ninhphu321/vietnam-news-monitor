@@ -48,10 +48,10 @@ class Config:
     day_start_hour: int = field(default_factory=lambda: _env_int("DAY_START_HOUR", 6))
     night_start_hour: int = field(default_factory=lambda: _env_int("NIGHT_START_HOUR", 23))
     day_crawl_interval_minutes: int = field(
-        default_factory=lambda: _env_int("DAY_CRAWL_INTERVAL_MINUTES", 30)
+        default_factory=lambda: _env_int("DAY_CRAWL_INTERVAL_MINUTES", 15)
     )
     night_crawl_interval_minutes: int = field(
-        default_factory=lambda: _env_int("NIGHT_CRAWL_INTERVAL_MINUTES", 60)
+        default_factory=lambda: _env_int("NIGHT_CRAWL_INTERVAL_MINUTES", 30)
     )
 
     request_timeout: int = field(default_factory=lambda: _env_int("REQUEST_TIMEOUT", 15))

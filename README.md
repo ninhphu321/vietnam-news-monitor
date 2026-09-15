@@ -1,6 +1,6 @@
 # Vietnam News Monitor
 
-Theo dõi 14 chuyên mục kinh tế/tài chính của báo Việt Nam (gồm cả báo nhà nước/thông tấn chính thống), phát hiện bài mới, chống gửi trùng, và đẩy title (kèm link) + thời gian về Telegram — **group theo từng nguồn báo (icon riêng để phân biệt nhanh), tách riêng tin nóng lên đầu**. Tần suất quét thay đổi theo khung giờ: 30 phút/lần ban ngày (06:00-23:00), 60 phút/lần ban đêm (23:00-06:00) — tin tài chính ít biến động ban đêm nên không cần quét dày.
+Theo dõi 14 chuyên mục kinh tế/tài chính của báo Việt Nam (gồm cả báo nhà nước/thông tấn chính thống), phát hiện bài mới, chống gửi trùng, và đẩy title (kèm link) + thời gian về Telegram — **group theo từng nguồn báo (icon riêng để phân biệt nhanh), tách riêng tin nóng lên đầu**. Tần suất quét thay đổi theo khung giờ: 15 phút/lần ban ngày (06:00-23:00), 30 phút/lần ban đêm (23:00-06:00) — tin tài chính ít biến động ban đêm nên không cần quét dày.
 
 Xem đầy đủ yêu cầu gốc trong `PROJECT SPEC V2` đã cung cấp. README này chỉ tập trung vào cách chạy.
 
@@ -56,15 +56,11 @@ Muốn triển khai tiếp các nguồn còn thiếu, việc chính là viết c
 Mỗi nguồn có 1 icon riêng để nhận diện nhanh không cần đọc chữ (bảng icon ở trên). Ví dụ tin nhắn thật:
 
 ```
-📬 6 bài mới · 3 nguồn
+📬 5 bài mới · 3 nguồn
 
 🚨 TIN NÓNG
 
-📻 Ngân hàng Nhà nước bất ngờ tăng lãi suất điều hành — 14/09 14:32 (VOV)
-
-📻 VOV (1 bài)
-
-• Cục Thuế yêu cầu không thêm thủ tục khi đóng mã số thuế — 14/09 18:43
+💱 Ngân hàng Nhà nước bất ngờ tăng lãi suất điều hành — 14/09 14:32 (VietnamBiz)
 
 🏛️ CHÍNH PHỦ (2 bài)
 
@@ -74,6 +70,10 @@ Mỗi nguồn có 1 icon riêng để nhận diện nhanh không cần đọc ch
 🔵 VNEXPRESS (1 bài)
 
 • Tesla lập công ty ở Việt Nam — 14/09 14:55
+
+💱 VIETNAMBIZ (1 bài)
+
+• Tỷ giá euro ngày 15/9: Euro tiếp tục mất giá — 15/09 09:02
 ```
 
 Title là link click được (Telegram `parse_mode=HTML`), tên nguồn in đậm kèm số bài. Nếu 1 chu kỳ có nguồn lỗi, dòng `⚠️ Nguồn lỗi: ...` được thêm vào cuối cùng 1 tin nhắn này — không tách thành tin riêng (tối đa 1 batch/chu kỳ, chỉ tách khi vượt 4096 ký tự, xem mục "Luồng xử lý" bên dưới).
@@ -134,7 +134,7 @@ TELEGRAM_BOT_TOKEN=...
 TELEGRAM_CHAT_ID=...
 ```
 
-Các biến khác (`DAY_START_HOUR`, `NIGHT_START_HOUR`, `DAY_CRAWL_INTERVAL_MINUTES`, `NIGHT_CRAWL_INTERVAL_MINUTES`, `REQUEST_TIMEOUT`, `MAX_RETRIES`, `INITIAL_SCAN_SEND`, `LOG_LEVEL`, `TIMEZONE`, `STALE_SOURCE_HOURS`, `STALE_ALERT_COOLDOWN_HOURS`, `BACKUP_KEEP_DAYS`) đã có giá trị mặc định hợp lý (30 phút ban ngày/60 phút ban đêm theo mặc định), chỉ cần chỉnh nếu muốn.
+Các biến khác (`DAY_START_HOUR`, `NIGHT_START_HOUR`, `DAY_CRAWL_INTERVAL_MINUTES`, `NIGHT_CRAWL_INTERVAL_MINUTES`, `REQUEST_TIMEOUT`, `MAX_RETRIES`, `INITIAL_SCAN_SEND`, `LOG_LEVEL`, `TIMEZONE`, `STALE_SOURCE_HOURS`, `STALE_ALERT_COOLDOWN_HOURS`, `BACKUP_KEEP_DAYS`) đã có giá trị mặc định hợp lý (15 phút ban ngày/30 phút ban đêm theo mặc định), chỉ cần chỉnh nếu muốn.
 
 **Không commit `.env` lên Git** — đã có trong `.gitignore`.
 
@@ -176,8 +176,8 @@ App tự động crawl theo **2 lịch khác nhau tuỳ khung giờ** (V3, theo 
 
 | Khung giờ | Biến `.env` | Mặc định |
 |---|---|---|
-| Ban ngày `[DAY_START_HOUR, NIGHT_START_HOUR)` | `DAY_CRAWL_INTERVAL_MINUTES` | 30 phút — 06:00, 06:30, 07:00, ... 22:30 |
-| Ban đêm (còn lại, vắt qua nửa đêm) | `NIGHT_CRAWL_INTERVAL_MINUTES` | 60 phút — 23:00, 00:00, ... 05:00 |
+| Ban ngày `[DAY_START_HOUR, NIGHT_START_HOUR)` | `DAY_CRAWL_INTERVAL_MINUTES` | 15 phút — 06:00, 06:15, 06:30, ... 22:45 |
+| Ban đêm (còn lại, vắt qua nửa đêm) | `NIGHT_CRAWL_INTERVAL_MINUTES` | 30 phút — 23:00, 23:30, 00:00, ... 05:30 |
 
 Lý do: tin tài chính gần như không có gì mới về đêm, quét dày lúc đó chỉ tốn tài nguyên vô ích; ban ngày mới cần bám sát.
 
@@ -221,7 +221,7 @@ Khôi phục: dừng app, copy đè file backup muốn khôi phục vào `data/n
 
 ## Deploy bằng GitHub Actions (miễn phí, không cần VPS)
 
-Đây là cách chạy 24/7 hoàn toàn miễn phí mà không cần quản lý server nào — dùng chính GitHub để tự động chạy `python main.py --run-once` theo đúng lịch ngày/đêm (30/60 phút, xem workflow). Workflow đã có sẵn tại [.github/workflows/crawl.yml](.github/workflows/crawl.yml).
+Đây là cách chạy 24/7 hoàn toàn miễn phí mà không cần quản lý server nào — dùng chính GitHub để tự động chạy `python main.py --run-once` theo đúng lịch ngày/đêm (15/30 phút, xem workflow). Workflow đã có sẵn tại [.github/workflows/crawl.yml](.github/workflows/crawl.yml).
 
 ### Vấn đề kỹ thuật đã xử lý sẵn
 
@@ -291,15 +291,15 @@ sudo journalctl -u news-monitor -f
 Cách khác — theo đúng gợi ý ở spec mục 2 — là để cron gọi `--run-once` thay vì chạy `main.py` daemon. Vì lịch quét giờ theo khung ngày/đêm, cần 2 dòng cron thay vì 1 (giả định crontab của VPS đã đặt múi giờ `Asia/Ho_Chi_Minh` — nếu không, đổi giờ cho khớp UTC như cách làm ở mục GitHub Actions bên trên):
 
 ```cron
-*/30 6-22 * * * cd /opt/news-monitor && /opt/news-monitor/.venv/bin/python main.py --run-once >> logs/cron.log 2>&1
-0 23,0-5 * * * cd /opt/news-monitor && /opt/news-monitor/.venv/bin/python main.py --run-once >> logs/cron.log 2>&1
+*/15 6-22 * * * cd /opt/news-monitor && /opt/news-monitor/.venv/bin/python main.py --run-once >> logs/cron.log 2>&1
+*/30 23,0-5 * * * cd /opt/news-monitor && /opt/news-monitor/.venv/bin/python main.py --run-once >> logs/cron.log 2>&1
 ```
 
 Cách này restart-safe tự nhiên (mỗi lần chạy là 1 process độc lập, không có state daemon để mất), nhưng **không** có bảo vệ "không chạy chồng" tự động như `max_instances=1` của APScheduler — nếu 1 lần chạy kéo dài hơn khoảng cách giữa 2 lần cron (mạng chậm/1 nguồn treo), 2 tiến trình có thể trùng nhau. Nếu chọn cách này, nên thêm `flock` để tự loại trừ:
 
 ```cron
-*/30 6-22 * * * flock -n /tmp/news-monitor.lock -c "cd /opt/news-monitor && .venv/bin/python main.py --run-once >> logs/cron.log 2>&1"
-0 23,0-5 * * * flock -n /tmp/news-monitor.lock -c "cd /opt/news-monitor && .venv/bin/python main.py --run-once >> logs/cron.log 2>&1"
+*/15 6-22 * * * flock -n /tmp/news-monitor.lock -c "cd /opt/news-monitor && .venv/bin/python main.py --run-once >> logs/cron.log 2>&1"
+*/30 23,0-5 * * * flock -n /tmp/news-monitor.lock -c "cd /opt/news-monitor && .venv/bin/python main.py --run-once >> logs/cron.log 2>&1"
 ```
 
 **Lưu ý nếu chọn cron thay vì daemon:** job backup tự động 03:00 chỉ chạy bên trong `python main.py` (daemon/scheduler) — `--run-once` không đăng ký job đó. Nếu dùng cron, thêm 1 dòng cron riêng gọi `--backup-now`:
