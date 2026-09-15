@@ -6,11 +6,15 @@ crawlers/<site>.py, append it here — nothing else changes.
 """
 
 from crawlers.baochinhphu import BaoChinhPhuCrawler
+from crawlers.baodautu import BaoDauTuCrawler
+from crawlers.cafebiz import CafeBizCrawler
 from crawlers.cafef import CafeFCrawler
 from crawlers.dantri import DanTriCrawler
+from crawlers.diendandoanhnghiep import DienDanDoanhNghiepCrawler
 from crawlers.nhandan import NhanDanCrawler
 from crawlers.thanhnien import ThanhNienCrawler
 from crawlers.tienphong import TienPhongCrawler
+from crawlers.tinnhanhchungkhoan import TinNhanhChungKhoanCrawler
 from crawlers.tuoitre import TuoiTreCrawler
 from crawlers.vietnambiz import VietnamBizCrawler
 from crawlers.vietnamplus import VietnamPlusCrawler
@@ -35,6 +39,10 @@ CRAWLER_CLASSES = [
     BaoChinhPhuCrawler,
     VTVCrawler,
     VietnamBizCrawler,
+    CafeBizCrawler,
+    TinNhanhChungKhoanCrawler,
+    DienDanDoanhNghiepCrawler,
+    BaoDauTuCrawler,
 ]
 
 __all__ = ["CRAWLER_CLASSES"]

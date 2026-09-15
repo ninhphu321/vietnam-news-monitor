@@ -3,16 +3,18 @@
 BaseCrawler is the contract from PROJECT SPEC section 19: every
 crawler exposes source_name/source_url and a crawl() returning
 List[NewsItem]. Nothing else in the app (database, telegram) needs to
-know which subclass produced the data.
+know which subclass produced the data. It also owns the HTTP fetch
+(timeout, retry, User-Agent per spec section 13) shared by every
+concrete crawler regardless of whether it parses RSS or scrapes HTML.
 
-RSSCrawlerBase is a shared implementation for the common case (this
-project's audit found all 5 target sources publish an RSS feed that
-matches the requested category exactly — see README "Vì sao dùng RSS
-cho cả 5 nguồn"). It handles the HTTP fetch (timeout, retry, User-Agent
-per spec section 13) and RSS parsing so each site file only needs to
-declare its feed URL. A site-specific subclass can still override
-`crawl()` entirely to do HTML scraping instead, without touching
-anything else in the app — that's the whole point of the interface.
+RSSCrawlerBase is a shared implementation for the common case (most of
+this project's sources publish an RSS feed that matches the requested
+category exactly — see README "Vì sao dùng RSS cho cả 14 nguồn"). It
+handles RSS parsing so each site file only needs to declare its feed
+URL. A site with no suitable RSS subclasses BaseCrawler directly and
+overrides `crawl()` to scrape HTML with BeautifulSoup instead (see
+crawlers/cafebiz.py for an example) — nothing else in the app needs to
+know the difference.
 """
 
 import calendar
@@ -44,20 +46,6 @@ class CrawlerError(Exception):
 class BaseCrawler(ABC):
     source_name: str
     source_url: str
-
-    @abstractmethod
-    def crawl(self) -> List[NewsItem]:
-        raise NotImplementedError
-
-
-class RSSCrawlerBase(BaseCrawler):
-    """Shared RSS-based crawl implementation.
-
-    Subclasses set: source_name, source_url (the human category page,
-    used only for display/error messages), feed_url.
-    """
-
-    feed_url: str
     timezone_name: str = "Asia/Ho_Chi_Minh"
 
     def __init__(
@@ -70,6 +58,43 @@ class RSSCrawlerBase(BaseCrawler):
         self.max_retries = max_retries
         self.user_agent = user_agent
         self.tz = ZoneInfo(self.timezone_name)
+
+    @abstractmethod
+    def crawl(self) -> List[NewsItem]:
+        raise NotImplementedError
+
+    def _fetch(self, url: str) -> bytes:
+        headers = {"User-Agent": self.user_agent}
+        last_exc: Optional[Exception] = None
+        for attempt in range(1, self.max_retries + 1):
+            try:
+                resp = requests.get(url, headers=headers, timeout=self.timeout)
+                resp.raise_for_status()
+                return resp.content
+            except requests.RequestException as exc:
+                last_exc = exc
+                logger.warning(
+                    "%s: fetch attempt %d/%d failed: %s",
+                    self.source_name,
+                    attempt,
+                    self.max_retries,
+                    exc,
+                )
+                if attempt < self.max_retries:
+                    time.sleep(min(2**attempt, 10))
+        raise CrawlerError(
+            f"{self.source_name}: failed to fetch {url} after {self.max_retries} attempts: {last_exc}"
+        )
+
+
+class RSSCrawlerBase(BaseCrawler):
+    """Shared RSS-based crawl implementation.
+
+    Subclasses set: source_name, source_url (the human category page,
+    used only for display/error messages), feed_url.
+    """
+
+    feed_url: str
 
     def crawl(self) -> List[NewsItem]:
         raw = self._fetch(self.feed_url)
@@ -115,26 +140,3 @@ class RSSCrawlerBase(BaseCrawler):
             return utc_dt.astimezone(self.tz)
         except (OverflowError, ValueError):
             return None
-
-    def _fetch(self, url: str) -> bytes:
-        headers = {"User-Agent": self.user_agent}
-        last_exc: Optional[Exception] = None
-        for attempt in range(1, self.max_retries + 1):
-            try:
-                resp = requests.get(url, headers=headers, timeout=self.timeout)
-                resp.raise_for_status()
-                return resp.content
-            except requests.RequestException as exc:
-                last_exc = exc
-                logger.warning(
-                    "%s: fetch attempt %d/%d failed: %s",
-                    self.source_name,
-                    attempt,
-                    self.max_retries,
-                    exc,
-                )
-                if attempt < self.max_retries:
-                    time.sleep(min(2**attempt, 10))
-        raise CrawlerError(
-            f"{self.source_name}: failed to fetch {url} after {self.max_retries} attempts: {last_exc}"
-        )

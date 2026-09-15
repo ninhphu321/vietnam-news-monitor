@@ -10,9 +10,10 @@ APScheduler>=3.10,<4
 # Windows venv activation, so we pin it explicitly rather than assume.
 tzdata>=2024.1
 
-# Kept for a future HTML-scraping fallback (spec section 13 priority:
-# RSS first, HTML scraping only if a source has no suitable RSS).
-# Currently unused by any of the 5 crawlers - see README for why.
+# HTML-scraping fallback (spec section 13 priority: RSS first, HTML
+# scraping only if a source has no suitable RSS) — used by CafeBiz,
+# Đầu tư Chứng khoán, Diễn đàn Doanh nghiệp, and Báo Đầu tư, none of
+# which have a working RSS feed for their business/economy category.
 beautifulsoup4>=4.12,<5
 
 # Dev / tests only
