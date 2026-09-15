@@ -9,11 +9,11 @@ from crawlers.nhandan import NhanDanCrawler
 from crawlers.thanhnien import ThanhNienCrawler
 from crawlers.tienphong import TienPhongCrawler
 from crawlers.tuoitre import TuoiTreCrawler
+from crawlers.vietnambiz import VietnamBizCrawler
 from crawlers.vietnamplus import VietnamPlusCrawler
 from crawlers.vietstock import VietstockCrawler
 from crawlers.vneconomy import VnEconomyCrawler
 from crawlers.vnexpress import VnExpressCrawler
-from crawlers.vov import VOVCrawler
 from crawlers.vtv import VTVCrawler
 from crawlers.znews import ZnewsCrawler
 from tests.conftest import load_fixture
@@ -28,11 +28,11 @@ CRAWLERS_AND_FIXTURES = [
     (VnEconomyCrawler, "vneconomy.rss", 2),
     (ZnewsCrawler, "znews.rss", 2),
     (TienPhongCrawler, "tienphong.rss", 2),
-    (VOVCrawler, "vov.rss", 2),
     (VietnamPlusCrawler, "vietnamplus.rss", 2),
     (NhanDanCrawler, "nhandan.rss", 2),
     (BaoChinhPhuCrawler, "baochinhphu.rss", 2),
     (VTVCrawler, "vtv.rss", 2),
+    (VietnamBizCrawler, "vietnambiz.rss", 2),
 ]
 
 
@@ -149,12 +149,19 @@ def test_vtv_parses_truncated_utc_offset():
     assert eu_item.published_at.hour == 19 and eu_item.published_at.minute == 46
 
 
-def test_vov_overrides_user_agent_regardless_of_config():
-    """Regression guard: VOV's WAF returns HTTP 403 for the app's normal
-    descriptive Chrome-style UA (verified against the live site during
-    audit, not suffix-specific) but allows a bare "Mozilla/5.0"."""
-    crawler = VOVCrawler(timeout=5, max_retries=1, user_agent="whatever config.user_agent says")
-    assert crawler.user_agent == "Mozilla/5.0"
+@responses.activate
+def test_vietnambiz_parses_gmt_plus_7_date_format():
+    """Regression guard: VietnamBiz's <pubDate> ends in "GMT+7" instead
+    of the RFC-822-correct "+0700" (e.g. "Tue, 15 Sep 2026 09:02:15
+    GMT+7") — verified against the live feed during audit, not just
+    this fixture. feedparser rejects it outright."""
+    crawler = VietnamBizCrawler(timeout=5, max_retries=1)
+    responses.add(responses.GET, crawler.feed_url, body=load_fixture("vietnambiz.rss"), status=200)
+    items = crawler.crawl()
+    assert len(items) == 2
+    assert all(i.published_at is not None and i.published_at.tzinfo is not None for i in items)
+    euro_item = next(i for i in items if "Euro" in i.title or "euro" in i.title)
+    assert euro_item.published_at.hour == 9 and euro_item.published_at.minute == 2
 
 
 def test_nhandan_uses_corrected_category_feed_not_the_wrong_id_guess():

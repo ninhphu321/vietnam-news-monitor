@@ -41,10 +41,10 @@ class TelegramError(Exception):
 # summary (how many articles, from how many sources).
 # ---------------------------------------------------------------------------
 
-# Curated so recognizable sources get a fitting icon (VOV = radio, VTV =
-# television, Chính phủ = a government building, VietnamPlus = a "+"...)
-# rather than arbitrary colors. A source not listed here (a new crawler
-# added later, before this dict is updated) falls back to a small pool
+# Curated so recognizable sources get a fitting icon (VTV = television,
+# Chính phủ = a government building, VietnamPlus = a "+"...) rather
+# than arbitrary colors. A source not listed here (a new crawler added
+# later, before this dict is updated) falls back to a small pool
 # picked by a stable hash of its name — never crashes, never blank.
 SOURCE_ICONS: Dict[str, str] = {
     "VnExpress": "🔵",
@@ -56,11 +56,11 @@ SOURCE_ICONS: Dict[str, str] = {
     "VnEconomy": "📈",
     "Znews": "⚡",
     "Tiền Phong": "🟣",
-    "VOV": "📻",
     "VietnamPlus": "➕",
     "Nhân Dân": "⭐",
     "Chính phủ": "🏛️",
     "VTV": "📺",
+    "VietnamBiz": "💱",
 }
 _FALLBACK_ICONS = ["🟢", "🔶", "🔷", "🟩", "🟦", "🟧"]
 

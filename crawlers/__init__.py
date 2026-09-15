@@ -12,11 +12,11 @@ from crawlers.nhandan import NhanDanCrawler
 from crawlers.thanhnien import ThanhNienCrawler
 from crawlers.tienphong import TienPhongCrawler
 from crawlers.tuoitre import TuoiTreCrawler
+from crawlers.vietnambiz import VietnamBizCrawler
 from crawlers.vietnamplus import VietnamPlusCrawler
 from crawlers.vietstock import VietstockCrawler
 from crawlers.vneconomy import VnEconomyCrawler
 from crawlers.vnexpress import VnExpressCrawler
-from crawlers.vov import VOVCrawler
 from crawlers.vtv import VTVCrawler
 from crawlers.znews import ZnewsCrawler
 
@@ -30,11 +30,11 @@ CRAWLER_CLASSES = [
     VnEconomyCrawler,
     ZnewsCrawler,
     TienPhongCrawler,
-    VOVCrawler,
     VietnamPlusCrawler,
     NhanDanCrawler,
     BaoChinhPhuCrawler,
     VTVCrawler,
+    VietnamBizCrawler,
 ]
 
 __all__ = ["CRAWLER_CLASSES"]
