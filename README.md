@@ -161,7 +161,7 @@ Dry run: crawl → parse → kiểm tra trùng với database hiện có → in 
 pytest
 ```
 
-109 test bao phủ: normalize title/URL (kể cả giải mã HTML entity lỗi của Thanh Niên/VietnamBiz), crawler parse RSS cho 14 nguồn (kèm test riêng cho 3 kiểu parse ngày phi chuẩn của Chính phủ/VTV/VietnamBiz) và crawler scrape HTML cho 4 nguồn còn lại (lọc khối "nổi bật" không có giờ ở CafeBiz, chống 1 bài xuất hiện nhiều lần với giờ khác nhau ở Đầu tư Chứng khoán, báo lỗi khi selector không khớp gì thay vì âm thầm "0 bài mới") (dùng fixture lấy từ dữ liệu thực tế lúc audit, mock qua thư viện `responses` — không cần mạng), dedup theo URL (không theo title), restart không mất/không gửi lại dữ liệu, format Telegram group-theo-nguồn + tách tin nóng + chia nhỏ khi vượt giới hạn 4096 ký tự, retry khi gửi Telegram lỗi, cô lập lỗi từng nguồn không làm crash app, giữ đúng thứ tự nguồn theo cấu hình, baseline seeding lần chạy đầu **và** baseline riêng cho nguồn mới thêm vào một DB đã có dữ liệu, toàn bộ luồng `run_cycle` (dry-run / gửi thành công / lỗi 1 phần vẫn gửi tin nguồn OK / tất cả lỗi / Telegram lỗi thì không đánh dấu sent), phát hiện nguồn "chết âm thầm" (ngưỡng giờ, cooldown cảnh báo, tự gỡ cảnh báo khi hồi phục), backup database (tạo bản có timestamp + tự xoá bản cũ), và **lịch quét cố định** — kiểm tra thời điểm bắn thật của `CronTrigger` (APScheduler) khớp đúng mỗi `CRAWL_INTERVAL_MINUTES` phút, xuyên suốt nửa đêm không hở/chồng giờ nào; hiển thị ngày kèm giờ (`dd/mm HH:MM`) cho batch trải dài nhiều ngày, và trang web tĩnh (`web/generate_site.py`) — gom bài theo đúng ngày kể cả khi thiếu `published_at`, sắp mới nhất lên đầu trong từng nguồn, escape HTML tiêu đề (chống XSS từ tiêu đề bài crawl được), luôn dọn sạch `site/` cũ trước khi sinh lại thay vì cộng dồn file rác, và cửa sổ 7-tab ngày (`_tab_window`) tự căn giữa quanh ngày đang xem, kể cả 2 trường hợp biên: ít hơn 7 ngày dữ liệu, và đang xem đúng ngày cũ nhất.
+111 test bao phủ: normalize title/URL (kể cả giải mã HTML entity lỗi của Thanh Niên/VietnamBiz), crawler parse RSS cho 14 nguồn (kèm test riêng cho 3 kiểu parse ngày phi chuẩn của Chính phủ/VTV/VietnamBiz) và crawler scrape HTML cho 4 nguồn còn lại (lọc khối "nổi bật" không có giờ ở CafeBiz, chống 1 bài xuất hiện nhiều lần với giờ khác nhau ở Đầu tư Chứng khoán, báo lỗi khi selector không khớp gì thay vì âm thầm "0 bài mới") (dùng fixture lấy từ dữ liệu thực tế lúc audit, mock qua thư viện `responses` — không cần mạng), dedup theo URL (không theo title), restart không mất/không gửi lại dữ liệu, format Telegram group-theo-nguồn + tách tin nóng + chia nhỏ khi vượt giới hạn 4096 ký tự, retry khi gửi Telegram lỗi, cô lập lỗi từng nguồn không làm crash app, giữ đúng thứ tự nguồn theo cấu hình, baseline seeding lần chạy đầu **và** baseline riêng cho nguồn mới thêm vào một DB đã có dữ liệu, toàn bộ luồng `run_cycle` (dry-run / gửi thành công / lỗi 1 phần vẫn gửi tin nguồn OK / tất cả lỗi / Telegram lỗi thì không đánh dấu sent), phát hiện nguồn "chết âm thầm" (ngưỡng giờ, cooldown cảnh báo, tự gỡ cảnh báo khi hồi phục), backup database (tạo bản có timestamp + tự xoá bản cũ), và **lịch quét cố định** — kiểm tra thời điểm bắn thật của `CronTrigger` (APScheduler) khớp đúng mỗi `CRAWL_INTERVAL_MINUTES` phút, xuyên suốt nửa đêm không hở/chồng giờ nào; hiển thị ngày kèm giờ (`dd/mm HH:MM`) cho batch trải dài nhiều ngày, và trang web tĩnh (`web/generate_site.py`) — gom bài theo đúng ngày kể cả khi thiếu `published_at`, sắp mới nhất lên đầu trong từng nguồn, escape HTML tiêu đề (chống XSS từ tiêu đề bài crawl được), luôn dọn sạch `site/` cũ trước khi sinh lại thay vì cộng dồn file rác, cửa sổ 7-tab ngày (`_tab_window`) tự căn giữa quanh ngày đang xem kể cả 2 trường hợp biên (ít hơn 7 ngày dữ liệu, đang xem đúng ngày cũ nhất), và nút "Quét ngay" — chỉ hiện khi đã cấu hình `NEWS_SCAN_WORKER_URL`, gọi đúng URL đó qua `fetch()`, và không bao giờ để lộ token trên trang.
 
 ## Chạy lần đầu / chạy thủ công
 
@@ -268,6 +268,34 @@ Ngoài Telegram, mỗi lần crawl cũng sinh ra 1 **trang web tĩnh** liệt k�
   rồi mở `site/index.html` bằng trình duyệt bất kỳ.
 - **Deploy:** [.github/workflows/news-crawl.yml](.github/workflows/news-crawl.yml) tự sinh lại `site/` và deploy lên **GitHub Pages** sau mỗi lần crawl, bằng action chính chủ của GitHub (`actions/upload-pages-artifact` + `actions/deploy-pages`) — không cần thêm nhánh riêng hay dịch vụ hosting nào khác.
 - **Cần bật 1 lần duy nhất:** Settings → Pages → Build and deployment → Source → chọn **"GitHub Actions"** (không chọn "Deploy from a branch"). Sau đó URL trang sẽ hiện ở đúng mục Settings → Pages này (dạng `https://<username>.github.io/<repo>/`), và cũng hiện trong output của mỗi lần chạy workflow (bước "Deploy to GitHub Pages").
+
+### Nút "Quét ngay" trên web
+
+Trang web có 1 nút để tự kích hoạt crawl ngay từ trình duyệt, không cần vào tab Actions bấm tay.
+
+**Vì sao không làm đơn giản bằng cách nhúng thẳng token vào trang:** kích hoạt crawl cần gọi GitHub API bằng 1 token có quyền ghi. Trang này là GitHub Pages build từ repo **public** — bất kỳ ai cũng xem được mã nguồn trang (View Source), nên nhúng token thẳng vào HTML/JS nghĩa là **công khai token đó cho cả Internet**, ai cũng lấy được và lạm dụng. Vì vậy nút này gọi tới 1 **Cloudflare Worker** trung gian (miễn phí) — Worker giữ token thật ở phía server (Cloudflare), trang web chỉ biết URL công khai của Worker, không bao giờ thấy token.
+
+Sơ đồ: `Nút trên web → gọi Worker (Cloudflare) → Worker gọi GitHub API bằng token riêng → GitHub chạy workflow_dispatch`.
+
+**Cách deploy Worker** (dùng dashboard Cloudflare, không cần cài gì ở máy):
+
+1. Tạo tài khoản [Cloudflare](https://dash.cloudflare.com) (miễn phí) nếu chưa có.
+2. Vào **Workers & Pages → Create → Create Worker**, đặt tên bất kỳ (ví dụ `news-monitor-scan-trigger`) → Deploy để tạo worker rỗng.
+3. Bấm **Edit code**, xoá hết code mẫu, dán toàn bộ nội dung [web/cloudflare-worker/worker.js](web/cloudflare-worker/worker.js) vào → **Save and Deploy**.
+4. Vào **Settings → Variables** của Worker, thêm các **biến thường**:
+   - `GITHUB_OWNER` = `ninhphu321`
+   - `GITHUB_REPO` = `vietnam-news-monitor`
+   - `GITHUB_WORKFLOW` = `news-crawl.yml`
+   - `GITHUB_BRANCH` = `main`
+   - `ALLOWED_ORIGIN` = `https://ninhphu321.github.io` (đúng domain trang GitHub Pages của bạn)
+   - `COOLDOWN_SECONDS` = `300` (không bắt buộc, mặc định 300 nếu bỏ trống)
+5. Thêm 1 **biến bí mật** (chọn "Encrypt"): `GITHUB_TOKEN` — giá trị là 1 **fine-grained personal access token** tạo tại GitHub → Settings → Developer settings → Personal access tokens → Fine-grained tokens, giới hạn **chỉ repo `vietnam-news-monitor`**, quyền **Actions: Read and write** (không cấp quyền nào khác). Dán token vào đây, **không paste vào bất kỳ đâu khác** (không vào file trong repo, không gửi cho ai kể cả Claude).
+6. *(Khuyến nghị, chống spam)* Tạo 1 **KV namespace** (Workers & Pages → KV → Create), đặt tên tuỳ ý, rồi vào lại Worker → Settings → Variables → **KV Namespace Bindings** → bind namespace đó với tên biến `SCAN_COOLDOWN`. Có bước này thì nút bị giới hạn tối đa 1 lần kích hoạt mỗi `COOLDOWN_SECONDS` giây cho **tất cả người xem** — tránh bị bấm dồn dập tốn phút chạy Actions. Bỏ qua bước này vẫn chạy được, chỉ là không có giới hạn.
+7. Copy URL Worker (dạng `https://news-monitor-scan-trigger.<subdomain>.workers.dev`, hiện ngay đầu trang Worker).
+8. Thêm URL đó vào repo dưới dạng **GitHub Actions variable** (không phải secret, vì URL này không nhạy cảm): Settings → Secrets and variables → Actions → tab **Variables** → **New repository variable** → tên `NEWS_SCAN_WORKER_URL`, giá trị là URL vừa copy.
+9. Chạy lại workflow 1 lần (Run workflow) để `site/` được sinh lại có nút — hoặc chờ lần cron kế tiếp.
+
+Nếu không muốn setup Worker, cứ để `NEWS_SCAN_WORKER_URL` trống — trang vẫn hoạt động bình thường, chỉ là không có nút "Quét ngay" (vào tab Actions bấm "Run workflow" như trước).
 
 ## Deploy VPS 24/7
 

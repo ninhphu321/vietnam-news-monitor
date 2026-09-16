@@ -1,6 +1,7 @@
 from datetime import date, datetime
 from zoneinfo import ZoneInfo
 
+from config import config
 from models import NewsItem
 from web.generate_site import _tab_window, build_site, group_by_date_and_source, render_day_page
 
@@ -134,3 +135,24 @@ def test_build_site_overwrites_stale_files_from_a_previous_run(tmp_path, db):
     build_site(db, out_dir=out_dir)
 
     assert not (out_dir / "stale-leftover.html").exists()
+
+
+def test_scan_button_hidden_when_worker_url_not_configured(monkeypatch):
+    """No Worker deployed -> nothing safe for the button to call, so it
+    must not render (never a dead/broken button on a fresh checkout)."""
+    monkeypatch.setattr(config, "scan_worker_url", "")
+    html = render_day_page(date(2026, 9, 14), {}, [date(2026, 9, 14)])
+    assert "Quét ngay" not in html
+
+
+def test_scan_button_shown_and_calls_the_configured_worker_url(monkeypatch):
+    monkeypatch.setattr(config, "scan_worker_url", "https://scan.example.workers.dev")
+    html = render_day_page(date(2026, 9, 14), {}, [date(2026, 9, 14)])
+
+    assert "Quét ngay" in html
+    # The URL must reach the page as a JS string literal the button's
+    # fetch() call actually uses, not just appear anywhere in the HTML.
+    assert 'fetch("https://scan.example.workers.dev"' in html
+    # The token that can actually trigger a crawl must never appear on
+    # this (public) page — only the Worker's own environment has it.
+    assert "GITHUB_TOKEN" not in html and "ghp_" not in html

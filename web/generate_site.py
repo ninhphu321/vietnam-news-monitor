@@ -9,6 +9,7 @@ run locally (`python -m web.generate_site`) to preview the archive
 against whatever `data/news.db` already exists.
 """
 
+import json
 import shutil
 from collections import defaultdict
 from datetime import date, datetime
@@ -94,6 +95,14 @@ header h1{margin:0 0 8px;font-family:"Archivo Black",Impact,sans-serif;font-weig
 header h1 .dot{color:var(--accent);}
 .subtitle{margin:0;color:var(--muted);font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:.8rem;
   text-transform:uppercase;letter-spacing:.03em;}
+.scan{margin-top:14px;}
+.scan button{font:inherit;font-weight:700;font-size:.82rem;color:var(--fg);background:var(--card);
+  border:2px solid var(--ink);box-shadow:3px 3px 0 var(--ink);padding:8px 18px;cursor:pointer;}
+.scan button:hover{background:var(--bg);}
+.scan button:active,.scan button:disabled{box-shadow:none;transform:translate(3px,3px);}
+.scan button:disabled{cursor:wait;opacity:.7;}
+.scan .status{display:block;margin-top:8px;font-family:"IBM Plex Mono",ui-monospace,monospace;
+  font-size:.75rem;color:var(--muted);min-height:1.2em;}
 nav.dates{position:sticky;top:0;z-index:10;background:var(--bg);border-bottom:3px solid var(--ink);}
 nav.dates .strip{display:flex;max-width:1200px;margin:0 auto;}
 nav.dates a{flex:1 1 0;text-align:center;padding:12px 4px;text-decoration:none;color:var(--fg);
@@ -169,6 +178,40 @@ def _time_label(article: dict) -> str:
     return article["published_at"].strftime("%H:%M")
 
 
+def _scan_button_html() -> str:
+    """The "Quét ngay" button, present only when NEWS_SCAN_WORKER_URL is
+    configured (see config.py / web/cloudflare-worker/). Without a
+    Worker deployed, there is nothing safe for the button to call, so
+    it's simply omitted rather than shown broken.
+
+    The Worker holds the GitHub token server-side — see
+    web/cloudflare-worker/worker.js's docstring for why a token that
+    can trigger a crawl must never be embedded in this (public) page.
+    """
+    if not config.scan_worker_url:
+        return ""
+    worker_url = json.dumps(config.scan_worker_url)  # safe JS string literal
+    return f"""<div class="scan">
+<button type="button" onclick="triggerScan(this)">🔄 Quét ngay</button>
+<span class="status" id="scan-status"></span>
+</div>
+<script>
+function triggerScan(btn) {{
+  var status = document.getElementById('scan-status');
+  btn.disabled = true;
+  status.textContent = 'Đang gửi yêu cầu...';
+  fetch({worker_url}, {{ method: 'POST' }})
+    .then(function(r) {{ return r.json().catch(function() {{ return {{}}; }}).then(function(data) {{ return {{ok: r.ok, status: r.status, data: data}}; }}); }})
+    .then(function(res) {{
+      if (res.ok) {{ status.textContent = '✅ ' + (res.data.message || 'Đã kích hoạt.'); }}
+      else {{ status.textContent = (res.status === 429 ? '⏳ ' : '❌ ') + (res.data.message || ('Lỗi ' + res.status)); }}
+    }})
+    .catch(function() {{ status.textContent = '❌ Không kết nối được tới worker.'; }})
+    .finally(function() {{ setTimeout(function() {{ btn.disabled = false; }}, 5000); }});
+}}
+</script>"""
+
+
 def render_day_page(day: date, sources: Dict[str, List[dict]], all_dates: List[date]) -> str:
     window = _tab_window(all_dates, day)
     tab_items = []
@@ -224,6 +267,7 @@ def render_day_page(day: date, sources: Dict[str, List[dict]], all_dates: List[d
 <header>
 <h1>Vietnam News<span class="dot">.</span>Monitor</h1>
 <p class="subtitle">Số ra ngày {day.strftime('%d/%m/%Y')} · {total} bài · {len(sources)} nguồn</p>
+{_scan_button_html()}
 </header>
 <nav class="dates">
 <div class="strip">{tabs_html}</div>

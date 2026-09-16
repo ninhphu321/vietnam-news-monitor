@@ -1,0 +1,29 @@
+# Wrangler config for the scan-trigger Worker (web/cloudflare-worker/worker.js).
+# Deploy with `wrangler deploy` from this directory, or paste worker.js
+# directly into the Cloudflare dashboard's Worker editor instead — the
+# dashboard needs no local Node/wrangler setup at all. Either way, set
+# GITHUB_TOKEN as a *secret* (never here) — see worker.js's module
+# docstring and README.md's V4 section for the full deploy steps.
+#
+# NEVER put GITHUB_TOKEN in this file: [vars] entries are plain text
+# and, if this file is committed, publicly readable in the repo.
+
+name = "news-monitor-scan-trigger"
+main = "worker.js"
+compatibility_date = "2024-01-01"
+
+[vars]
+GITHUB_OWNER = "ninhphu321"
+GITHUB_REPO = "vietnam-news-monitor"
+GITHUB_WORKFLOW = "news-crawl.yml"
+GITHUB_BRANCH = "main"
+COOLDOWN_SECONDS = "300"
+ALLOWED_ORIGIN = "https://ninhphu321.github.io"
+
+# Optional (shared cooldown across all visitors) — create with
+# `wrangler kv:namespace create SCAN_COOLDOWN` and paste the id here,
+# or bind it via the dashboard. Safe to leave commented out; worker.js
+# just skips the cooldown check when this binding isn't present.
+# [[kv_namespaces]]
+# binding = "SCAN_COOLDOWN"
+# id = "<id from `wrangler kv:namespace create`>"

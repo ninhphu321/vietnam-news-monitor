@@ -70,6 +70,14 @@ class Config:
     backup_dir: Path = field(default_factory=lambda: BASE_DIR / "backup")
     backup_keep_days: int = field(default_factory=lambda: _env_int("BACKUP_KEEP_DAYS", 14))
 
+    # Public URL of the Cloudflare Worker backing the site's "Quét ngay"
+    # button (see web/cloudflare-worker/). Not a secret itself — the
+    # GitHub token that actually triggers the crawl lives only in the
+    # Worker's own environment, never here. Empty by default so the
+    # button is simply omitted from the generated site until someone
+    # deploys a Worker and sets this (see README's V4 section).
+    scan_worker_url: str = field(default_factory=lambda: os.getenv("NEWS_SCAN_WORKER_URL", ""))
+
     user_agent: str = (
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
         "(KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36 "

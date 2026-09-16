@@ -101,6 +101,10 @@ jobs:
           git push --force origin "$COMMIT:refs/heads/$DB_BRANCH"
 
       - name: Generate static site (multi-day archive)
+        env:
+          # Public URL, not a secret — see web/cloudflare-worker/ and
+          # README's V4 section. Empty/unset just hides the button.
+          NEWS_SCAN_WORKER_URL: ${{ vars.NEWS_SCAN_WORKER_URL }}
         run: python -m web.generate_site
 
       - name: Upload site to GitHub Pages
