@@ -60,8 +60,11 @@ def test_render_day_page_includes_titles_links_and_date_nav():
     assert "https://x/1" in html
     assert "10:30" in html
     assert "14/09/2026" in html  # in the masthead subtitle
-    # Title is HTML-escaped, not injected raw (XSS guard for scraped titles).
-    assert "<script>" not in html
+    # Title is HTML-escaped, not injected raw (XSS guard for scraped
+    # titles) — checked against the exact injected substring rather than
+    # a bare "<script>" search, since the page legitimately has its own
+    # <script> block for the news-stream filter/sort interactions.
+    assert "Tiêu đề <script>" not in html
     assert "&lt;script&gt;" in html
     # Both dates appear as tabs (dd/mm, no year needed in a 7-day strip),
     # including days with no content shown here.
@@ -189,42 +192,39 @@ def _issue(**overrides):
     return Issue(**defaults)
 
 
-def test_trending_panel_hidden_when_no_topics():
+def test_top_issues_section_hidden_when_no_issues():
     html = render_day_page(date(2026, 9, 14), {}, [date(2026, 9, 14)], trending=[])
-    assert "Top 5 Issues" not in html
+    assert "Top Issues" not in html
 
 
-def test_trending_panel_renders_rank_score_why_hot_and_sample_links():
+def test_top_issues_card_renders_rank_score_why_hot_metrics_coverage_and_related_articles():
     html = render_day_page(date(2026, 9, 14), {}, [date(2026, 9, 14)], trending=[_issue()])
 
-    assert "Top 5 Issues" in html
-    assert "#1" in html
+    assert "Top Issues" in html
+    assert 'issue-rank">01<' in html
     assert "Eximbank" in html
-    assert "88" in html  # hot_score, rounded for display
+    assert "HOT 88" in html  # hot_score, rounded for display
+    assert "5 bài" in html and "3 nguồn" in html
+    # Why Hot is capped at 2 bullets on the compact card (design spec:
+    # keep the collapsed card around 180-220px tall).
     assert "3 nguồn báo cùng đề cập" in html
+    assert "xuất hiện 5 bài trong ngày" in html
+    # Metrics (the 4 HotScore components) are exposed for debuggability.
+    assert "Khối lượng" in html and "Tốc độ" in html
+    # Source coverage bars + the full related-article list live in the
+    # expanded detail body, which is present in the raw HTML regardless
+    # of the <details> open/closed state.
+    assert 'class="issue-detail"' in html
+    assert 'class="source-coverage"' in html
     assert "https://x/1" in html
-    assert "(VnExpress)" in html
+    assert ">VnExpress<" in html
 
 
-def test_trending_panel_expand_only_shown_when_more_than_representative_articles():
-    only_rep = _issue(article_count=1, representative_articles=[
-        {"title": "Bài duy nhất", "url": "https://x/1", "source": "VnExpress"},
-    ])
-    html_no_expand = render_day_page(date(2026, 9, 14), {}, [date(2026, 9, 14)], trending=[only_rep])
-    assert 'class="issue-detail"' not in html_no_expand
-
-    more_than_rep = _issue(article_count=5)  # representative_articles has just 1 sample
-    html_with_expand = render_day_page(date(2026, 9, 14), {}, [date(2026, 9, 14)], trending=[more_than_rep])
-    assert 'class="issue-detail"' in html_with_expand
-    assert "Lần đầu: 09:00" in html_with_expand
-    assert "Cập nhật gần nhất: 16:00" in html_with_expand
-
-
-def test_trending_panel_omitted_on_non_latest_day_pages(tmp_path, db, monkeypatch):
+def test_top_issues_omitted_on_non_latest_day_pages(tmp_path, db, monkeypatch):
     """Trending is computed relative to *today* (wall-clock "now") —
     showing it on an older archive day's page would misleadingly imply
     it reflects that day. build_site must only attach it to the latest
-    day (see _trending_panel_html's docstring)."""
+    day (see _top_issues_html's docstring)."""
     import web.generate_site as generate_site_module
 
     monkeypatch.setattr(generate_site_module, "top_issues", lambda articles, now: [_issue()])
@@ -237,5 +237,39 @@ def test_trending_panel_omitted_on_non_latest_day_pages(tmp_path, db, monkeypatc
 
     old_page = (out_dir / "2026-09-14.html").read_text(encoding="utf-8")
     latest_page = (out_dir / "2026-09-15.html").read_text(encoding="utf-8")
-    assert "Top 5 Issues" not in old_page
-    assert "Top 5 Issues" in latest_page
+    assert "Top Issues" not in old_page
+    assert "Top Issues" in latest_page
+
+
+def test_news_stream_tags_articles_belonging_to_a_top_issue():
+    """A row in the Unified News Stream whose URL matches one of the
+    issue's articles gets an Issue Tag linking to that issue's card
+    (spec: "Issue Tag → Issue Detail"); unrelated rows don't."""
+    tagged = _article("VnExpress", "Eximbank gia hạn đề cử nhân sự HĐQT", "https://x/1",
+                       datetime(2026, 9, 14, 9, 0, tzinfo=TZ))
+    untagged = _article("CafeF", "Tin không liên quan", "https://x/9",
+                         datetime(2026, 9, 14, 9, 0, tzinfo=TZ))
+    sources = {"VnExpress": [tagged], "CafeF": [untagged]}
+
+    html = render_day_page(date(2026, 9, 14), sources, [date(2026, 9, 14)], trending=[_issue()])
+
+    assert 'data-issue="eximbank-nhan-su"' in html
+    assert 'href="#issue-eximbank-nhan-su"' in html
+    assert 'data-issue=""' in html  # the untagged row
+
+
+def test_filters_list_present_sources_and_issues():
+    sources = {"VnExpress": [_article("VnExpress", "A", "u1", datetime(2026, 9, 14, 9, 0, tzinfo=TZ))]}
+    html = render_day_page(date(2026, 9, 14), sources, [date(2026, 9, 14)], trending=[_issue()])
+
+    assert '<option value="VnExpress">VnExpress</option>' in html
+    assert '<option value="eximbank-nhan-su">Eximbank · Nhân sự lãnh đạo</option>' in html
+
+
+def test_by_source_section_still_lists_every_source_and_headline():
+    sources = {"VnExpress": [_article("VnExpress", "Tiêu đề nguồn", "https://x/1",
+                                       datetime(2026, 9, 14, 10, 30, tzinfo=TZ))]}
+    html = render_day_page(date(2026, 9, 14), sources, [date(2026, 9, 14)])
+
+    assert 'id="sources"' in html
+    assert "Tiêu đề nguồn" in html
