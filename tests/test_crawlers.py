@@ -164,6 +164,24 @@ def test_vietnambiz_parses_gmt_plus_7_date_format():
     assert euro_item.published_at.hour == 9 and euro_item.published_at.minute == 2
 
 
+@responses.activate
+def test_tuoitre_parses_us_style_date_with_narrow_nbsp_before_ampm():
+    """Regression guard: Tuoi Tre's <pubDate> changed to e.g.
+    "9/16/2026 10:17:00 AM" — US month/day/year, 12-hour clock, and
+    a narrow no-break space (U+202F, not a plain space) before AM/PM —
+    verified against the live feed on 2026-09-16. feedparser's date
+    parser doesn't recognize this format, so every article was
+    published_at=None (showing as "--:--" on the website) before
+    TuoiTreCrawler's _extract_published_at override was added."""
+    crawler = TuoiTreCrawler(timeout=5, max_retries=1)
+    responses.add(responses.GET, crawler.feed_url, body=load_fixture("tuoitre.rss"), status=200)
+    items = crawler.crawl()
+    assert len(items) == 2
+    assert all(i.published_at is not None and i.published_at.tzinfo is not None for i in items)
+    an_giang = next(i for i in items if i.title.startswith("An Giang"))
+    assert an_giang.published_at.hour == 22 and an_giang.published_at.minute == 17  # 10:17 PM -> 22:17
+
+
 def test_nhandan_uses_corrected_category_feed_not_the_wrong_id_guess():
     """Regression guard: the ID 1041 guess for Nhan Dan's economy
     category returned HTTP 200 but was actually a mixed general-news

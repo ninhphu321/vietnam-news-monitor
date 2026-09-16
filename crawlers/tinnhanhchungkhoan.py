@@ -10,6 +10,12 @@ colon (e.g. "2026-09-15T07:13:33+0700"). Python's
 datetime.fromisoformat() rejects that exact format on Python < 3.11
 (it requires "+07:00"); strptime with %z handles both forms, so that
 is used instead.
+
+Audit (2026-09-16): a handful of listing items have no <time> in their
+`.story` container (verified live: "Công trình Giao thông Đồng Nai
+(DGT)..." was one such case). Their own article page has the same
+`<time datetime="...">` element, so those items now fall back to one
+extra request rather than staying published_at=None.
 """
 
 from datetime import datetime
@@ -65,7 +71,12 @@ class TinNhanhChungKhoanCrawler(BaseCrawler):
             raise CrawlerError(
                 f"{self.source_name}: no articles found — page structure may have changed"
             )
-        return list(items_by_url.values())
+
+        items = list(items_by_url.values())
+        for item in items:
+            if item.published_at is None:
+                item.published_at = self._fetch_published_at(item.url)
+        return items
 
     def _parse_time(self, raw: Optional[str]) -> Optional[datetime]:
         if not raw:
@@ -75,3 +86,22 @@ class TinNhanhChungKhoanCrawler(BaseCrawler):
         except ValueError:
             return None
         return dt.astimezone(self.tz)
+
+    def _fetch_published_at(self, article_url: str) -> Optional[datetime]:
+        """Fallback for listing items with no <time> in their `.story`
+        container: visit the article's own page for the same kind of
+        <time datetime="..."> element. Best-effort — any failure just
+        leaves this one article's time as None, never raises."""
+        try:
+            raw = self._fetch(article_url)
+        except CrawlerError:
+            return None
+        try:
+            soup = BeautifulSoup(raw, "html.parser")
+        except Exception:  # noqa: BLE001 - a parser bug must not crash the app
+            return None
+
+        time_el = soup.select_one("time")
+        if time_el is None:
+            return None
+        return self._parse_time(time_el.get("datetime"))

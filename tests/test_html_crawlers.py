@@ -50,6 +50,11 @@ def test_tinnhanhchungkhoan_parses_items_and_dedupes_thumbnail_link():
     responses.add(
         responses.GET, crawler.source_url, body=load_fixture("tinnhanhchungkhoan.html"), status=200
     )
+    responses.add(
+        responses.GET,
+        "https://www.tinnhanhchungkhoan.vn/vietabank-vab-chuan-bi-chao-ban-post397598.html",
+        body=load_fixture("tinnhanhchungkhoan_article_with_time.html"), status=200,
+    )
 
     items = crawler.crawl()
 
@@ -57,16 +62,72 @@ def test_tinnhanhchungkhoan_parses_items_and_dedupes_thumbnail_link():
     ai_item = next(i for i in items if i.title.startswith("Cổ phiếu AI"))
     assert ai_item.published_at is not None
     assert ai_item.published_at.hour == 7 and ai_item.published_at.minute == 13
-    # VietABank item has no <time> in this fixture -> None, not guessed.
+    # VietABank has no <time> in the listing fixture, but its (mocked)
+    # article page does -> falls back to that instead of staying None.
+    vab_item = next(i for i in items if i.title.startswith("VietABank"))
+    assert vab_item.published_at is not None
+    assert vab_item.published_at.hour == 19 and vab_item.published_at.minute == 3
+
+
+@responses.activate
+def test_tinnhanhchungkhoan_article_page_fetch_failure_leaves_time_none():
+    crawler = TinNhanhChungKhoanCrawler(timeout=5, max_retries=1)
+    responses.add(
+        responses.GET, crawler.source_url, body=load_fixture("tinnhanhchungkhoan.html"), status=200
+    )
+    responses.add(
+        responses.GET,
+        "https://www.tinnhanhchungkhoan.vn/vietabank-vab-chuan-bi-chao-ban-post397598.html",
+        status=500,
+    )
+
+    items = crawler.crawl()
+
     vab_item = next(i for i in items if i.title.startswith("VietABank"))
     assert vab_item.published_at is None
 
 
 @responses.activate
-def test_diendandoanhnghiep_parses_items_missing_time_as_none():
+def test_diendandoanhnghiep_falls_back_to_article_page_when_listing_has_no_time():
+    """"Hóa giải rủi ro dự án BT" has no `.b-grid__time` in the listing
+    (the fixture's other item, "Tăng tính minh bạch", already has one
+    and so must NOT trigger an extra request — only registering that
+    one article's URL with `responses` and letting the other go
+    unmocked proves that)."""
     crawler = DienDanDoanhNghiepCrawler(timeout=5, max_retries=1)
     responses.add(
         responses.GET, crawler.source_url, body=load_fixture("diendandoanhnghiep.html"), status=200
+    )
+    responses.add(
+        responses.GET,
+        "https://diendandoanhnghiep.vn/hoa-giai-rui-ro-du-an-bt-10184400.html",
+        body=load_fixture("diendandoanhnghiep_article_with_time.html"), status=200,
+    )
+
+    items = crawler.crawl()
+
+    assert len(items) == 2
+    hoa_giai = next(i for i in items if i.title == "Hóa giải rủi ro dự án BT")
+    assert hoa_giai.published_at is not None
+    assert hoa_giai.published_at.day == 15 and hoa_giai.published_at.hour == 15 and hoa_giai.published_at.minute == 5
+    minh_bach = next(i for i in items if i.title.startswith("Tăng tính"))
+    assert minh_bach.published_at.day == 14 and minh_bach.published_at.hour == 11
+
+
+@responses.activate
+def test_diendandoanhnghiep_article_page_fetch_failure_leaves_time_none():
+    """A single article's detail-page fetch failing (network error,
+    layout change, whatever) must not crash the whole source — it just
+    keeps that one article's published_at=None, same as before this
+    fallback existed."""
+    crawler = DienDanDoanhNghiepCrawler(timeout=5, max_retries=1)
+    responses.add(
+        responses.GET, crawler.source_url, body=load_fixture("diendandoanhnghiep.html"), status=200
+    )
+    responses.add(
+        responses.GET,
+        "https://diendandoanhnghiep.vn/hoa-giai-rui-ro-du-an-bt-10184400.html",
+        status=500,
     )
 
     items = crawler.crawl()
@@ -74,22 +135,50 @@ def test_diendandoanhnghiep_parses_items_missing_time_as_none():
     assert len(items) == 2
     hoa_giai = next(i for i in items if i.title == "Hóa giải rủi ro dự án BT")
     assert hoa_giai.published_at is None
-    minh_bach = next(i for i in items if i.title.startswith("Tăng tính"))
-    assert minh_bach.published_at.day == 14 and minh_bach.published_at.hour == 11
 
 
 @responses.activate
-def test_baodautu_always_has_no_published_at():
-    """Documented limitation (see module docstring): this category
-    page's listing never shows a date anywhere, for any article."""
+def test_baodautu_visits_each_article_page_for_its_time():
+    """The category listing itself never shows a date (see module
+    docstring), but each article's own page does, in a `.post-time`
+    element — the crawler now visits each one to fill published_at in,
+    at the cost of one extra request per article."""
     crawler = BaoDauTuCrawler(timeout=5, max_retries=1)
     responses.add(responses.GET, crawler.source_url, body=load_fixture("baodautu.html"), status=200)
+    responses.add(
+        responses.GET,
+        "https://baodautu.vn/chung-khoan-phien-149-co-phieu-ho-gelex-nam-san-d702026.html",
+        body=load_fixture("baodautu_article_with_time.html"), status=200,
+    )
+    responses.add(
+        responses.GET,
+        "https://baodautu.vn/ninh-van-bay-vi-pham-hang-loat-quy-dinh-d701869.html",
+        body=load_fixture("baodautu_article_no_time.html"), status=200,
+    )
+    responses.add(
+        responses.GET,
+        "https://baodautu.vn/loat-co-phieu-chiu-tac-dong-trong-ky-co-cau-etf-d701551.html",
+        status=500,
+    )
 
     items = crawler.crawl()
 
     assert len(items) == 3
-    assert all(i.published_at is None for i in items)
     assert all(i.url.startswith("http") for i in items)
+    by_title_prefix = {i.title[:10]: i for i in items}
+
+    gelex = by_title_prefix["Chứng khoá"]
+    assert gelex.published_at is not None
+    assert gelex.published_at.day == 14 and gelex.published_at.hour == 10 and gelex.published_at.minute == 30
+
+    # Article page fetched OK but has no ".post-time" -> None, not a guess.
+    ninh_van_bay = by_title_prefix["Ninh Vân B"]
+    assert ninh_van_bay.published_at is None
+
+    # Article page fetch failed outright (HTTP 500) -> still None, and
+    # crucially does NOT take down the rest of the crawl.
+    loat_co_phieu = by_title_prefix["Loạt cổ ph"]
+    assert loat_co_phieu.published_at is None
 
 
 @responses.activate
