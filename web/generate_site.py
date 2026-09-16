@@ -117,14 +117,19 @@ nav.picker{display:flex;justify-content:center;padding:8px 16px;gap:8px;align-it
   font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:.75rem;color:var(--muted);}
 nav.picker select{font:inherit;color:var(--fg);background:var(--card);border:2px solid var(--ink);
   border-radius:0;padding:4px 8px;}
-.trending{max-width:1200px;margin:24px auto 0;padding:0 16px;}
-.trending h2{font-family:"Archivo Black",Impact,sans-serif;font-weight:400;font-size:1.05rem;
-  text-transform:uppercase;letter-spacing:.02em;margin:0 0 12px;}
+details.trending{max-width:1200px;margin:24px auto 0;padding:0 16px 20px;}
+details.trending summary{display:flex;align-items:center;gap:10px;cursor:pointer;list-style:none;
+  user-select:none;padding:14px 16px;background:var(--card);border:2px solid var(--ink);
+  box-shadow:var(--shadow);font-weight:800;font-size:1.02rem;text-transform:uppercase;letter-spacing:.02em;}
+details.trending summary::-webkit-details-marker{display:none;}
+details.trending summary .chevron{margin-left:auto;font-size:.8rem;color:var(--muted);
+  transition:transform .15s ease;}
+details.trending[open] summary .chevron{transform:rotate(180deg);}
+details.trending[open] summary{margin-bottom:14px;}
 .trend-grid{display:flex;flex-direction:column;gap:10px;}
 .trend-card{display:flex;gap:14px;background:var(--card);border:2px solid var(--ink);
   box-shadow:var(--shadow);padding:12px 16px;align-items:flex-start;}
-.trend-rank{font-family:"Archivo Black",Impact,sans-serif;font-weight:400;font-size:1.6rem;
-  color:var(--accent);flex:0 0 auto;line-height:1.1;}
+.trend-rank{font-weight:900;font-size:1.5rem;color:var(--accent);flex:0 0 auto;line-height:1.2;}
 .trend-body{flex:1 1 auto;min-width:0;}
 .trend-label{font-weight:700;font-size:1rem;margin-bottom:2px;}
 .trend-meta{font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:.72rem;color:var(--muted);margin-bottom:6px;}
@@ -252,7 +257,11 @@ def _trending_panel_html(topics: List[TrendingTopic]) -> str:
             f'<div class="trend-meta">🔥 {t.score:.0f} điểm · {t.article_count} bài · {t.source_count} nguồn</div>'
             f'<ul class="trend-links">{links}</ul></div></div>'
         )
-    return f'<section class="trending"><h2>🔥 Sự kiện nổi bật</h2><div class="trend-grid">{"".join(cards)}</div></section>'
+    return (
+        '<details class="trending" open>'
+        '<summary>🔥 Sự kiện nổi bật<span class="chevron">▾</span></summary>'
+        f'<div class="trend-grid">{"".join(cards)}</div></details>'
+    )
 
 
 def render_day_page(
@@ -321,8 +330,8 @@ def render_day_page(
 <div class="strip">{tabs_html}</div>
 {picker_html}
 </nav>
-{_trending_panel_html(trending or [])}
 <main>{body_html}</main>
+{_trending_panel_html(trending or [])}
 <footer><p>Tự động cập nhật mỗi {config.crawl_interval_minutes} phút qua GitHub Actions.</p></footer>
 </body>
 </html>
