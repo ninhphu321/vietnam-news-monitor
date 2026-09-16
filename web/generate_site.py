@@ -29,14 +29,17 @@ SITE_DIR = Path(__file__).resolve().parent.parent / "site"
 # after, alphabetically, rather than silently dropped.
 _SOURCE_ORDER = [cls.source_name for cls in CRAWLER_CLASSES]
 
-# Bold, flat "stamp ink" colors instead of the pastel-gradient palette
-# every other bento/SaaS template reaches for — one per source, picked
-# by a deterministic hash (same trick as telegram._icon_for) rather
-# than list position, so a source keeps its color even if
-# CRAWLER_CLASSES gets reordered.
+# Deep, muted jewel tones rather than bright flat/primary colors — a
+# row of 6-7 saturated hues side by side (the first cut of this
+# palette) read as loud/carnival rather than professional. Lower
+# saturation + darker value keeps each source distinguishable while
+# sitting quietly next to its neighbors. One per source, picked by a
+# deterministic hash (same trick as telegram._icon_for) rather than
+# list position, so a source keeps its color even if CRAWLER_CLASSES
+# gets reordered.
 _ACCENT_PALETTE = [
-    "#e63f2e", "#b45309", "#1f6feb", "#1a936f", "#7c3aed",
-    "#c2410c", "#0f766e", "#be185d", "#0369a1", "#4d7c0f",
+    "#8c3a2b", "#8a6a1f", "#2b5a8c", "#2f6b4f", "#5b4a8a",
+    "#8a4a2f", "#2f6b66", "#8a3a5a", "#2f5566", "#5c6b2f",
 ]
 
 
@@ -104,15 +107,19 @@ nav.picker{display:flex;justify-content:center;padding:8px 16px;gap:8px;align-it
 nav.picker select{font:inherit;color:var(--fg);background:var(--card);border:2px solid var(--ink);
   border-radius:0;padding:4px 8px;}
 main{margin:0;padding:24px 16px 40px;display:flex;align-items:flex-start;gap:18px;overflow-x:auto;}
-details.source{flex:0 0 300px;background:var(--card);border:2px solid var(--ink);box-shadow:var(--shadow);}
-details.source summary{display:flex;align-items:center;gap:8px;padding:10px 14px;cursor:pointer;
-  font-size:.98rem;font-weight:700;color:#fff;background:var(--src-color,var(--accent));
-  list-style:none;user-select:none;}
+details.source{flex:0 0 300px;background:var(--card);border:2px solid var(--ink);box-shadow:var(--shadow);
+  border-top:5px solid var(--src-color,var(--accent));}
+details.source summary{display:flex;align-items:center;gap:10px;padding:12px 14px;cursor:pointer;
+  font-size:.95rem;font-weight:700;color:var(--fg);background:var(--card);
+  border-bottom:1px solid var(--muted);list-style:none;user-select:none;}
+details.source[open] summary{border-bottom-color:var(--ink);}
 details.source summary::-webkit-details-marker{display:none;}
-details.source summary .icon{font-size:1.15rem;}
+details.source summary .icon{display:inline-flex;align-items:center;justify-content:center;
+  width:28px;height:28px;flex:0 0 28px;font-size:1.05rem;background:var(--src-color,var(--accent));
+  color:#fff;border-radius:6px;}
 details.source summary .count{margin-left:auto;font-family:"IBM Plex Mono",ui-monospace,monospace;
-  font-weight:700;font-size:.72rem;background:rgba(0,0,0,.22);padding:2px 8px;}
-details.source summary .chevron{font-size:.7rem;transition:transform .15s ease;}
+  font-weight:700;font-size:.72rem;color:var(--muted);border:1px solid var(--muted);padding:2px 8px;}
+details.source summary .chevron{font-size:.7rem;color:var(--muted);transition:transform .15s ease;}
 details.source[open] summary .chevron{transform:rotate(180deg);}
 details.source .list-wrap{max-height:min(65vh,600px);overflow-y:auto;padding:6px 14px 4px;}
 details.source ul{list-style:none;margin:0;padding:0;}
