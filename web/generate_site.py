@@ -15,12 +15,14 @@ from collections import defaultdict
 from datetime import date, datetime
 from html import escape
 from pathlib import Path
-from typing import Dict, List
+from typing import Dict, List, Optional
+from zoneinfo import ZoneInfo
 
 from config import config
 from crawlers import CRAWLER_CLASSES
 from database import Database
 from telegram import _icon_for
+from web.trending import TrendingTopic, top_trending
 
 SITE_DIR = Path(__file__).resolve().parent.parent / "site"
 
@@ -115,6 +117,22 @@ nav.picker{display:flex;justify-content:center;padding:8px 16px;gap:8px;align-it
   font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:.75rem;color:var(--muted);}
 nav.picker select{font:inherit;color:var(--fg);background:var(--card);border:2px solid var(--ink);
   border-radius:0;padding:4px 8px;}
+.trending{max-width:1200px;margin:24px auto 0;padding:0 16px;}
+.trending h2{font-family:"Archivo Black",Impact,sans-serif;font-weight:400;font-size:1.05rem;
+  text-transform:uppercase;letter-spacing:.02em;margin:0 0 12px;}
+.trend-grid{display:flex;flex-direction:column;gap:10px;}
+.trend-card{display:flex;gap:14px;background:var(--card);border:2px solid var(--ink);
+  box-shadow:var(--shadow);padding:12px 16px;align-items:flex-start;}
+.trend-rank{font-family:"Archivo Black",Impact,sans-serif;font-weight:400;font-size:1.6rem;
+  color:var(--accent);flex:0 0 auto;line-height:1.1;}
+.trend-body{flex:1 1 auto;min-width:0;}
+.trend-label{font-weight:700;font-size:1rem;margin-bottom:2px;}
+.trend-meta{font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:.72rem;color:var(--muted);margin-bottom:6px;}
+.trend-links{list-style:none;margin:0;padding:0;}
+.trend-links li{font-size:.85rem;padding:2px 0;}
+.trend-links a{color:var(--fg);text-decoration:none;}
+.trend-links a:hover{color:var(--accent);text-decoration:underline;}
+.trend-links .src{color:var(--muted);font-size:.75rem;}
 main{margin:0;padding:24px 16px 40px;display:flex;align-items:flex-start;gap:18px;overflow-x:auto;}
 details.source{flex:0 0 300px;background:var(--card);border:2px solid var(--ink);box-shadow:var(--shadow);
   border-top:5px solid var(--src-color,var(--accent));}
@@ -212,7 +230,37 @@ function triggerScan(btn) {{
 </script>"""
 
 
-def render_day_page(day: date, sources: Dict[str, List[dict]], all_dates: List[date]) -> str:
+def _trending_panel_html(topics: List[TrendingTopic]) -> str:
+    """The "🔥 Sự kiện nổi bật" (top-5 hot topics) panel — only rendered
+    on the latest day's page (see build_site), since "trending right
+    now" computed relative to the archive's real timestamp would be
+    meaningless/misleading on an older day's page. Omitted entirely
+    when nothing currently clears the trending thresholds (see
+    web/trending.py) rather than shown empty."""
+    if not topics:
+        return ""
+    cards = []
+    for rank, t in enumerate(topics, start=1):
+        links = "".join(
+            f'<li><a href="{escape(a["url"])}" target="_blank" rel="noopener">{escape(a["title"])}</a> '
+            f'<span class="src">({escape(a["source"])})</span></li>'
+            for a in t.sample_articles
+        )
+        cards.append(
+            f'<div class="trend-card"><div class="trend-rank">#{rank}</div>'
+            f'<div class="trend-body"><div class="trend-label">{escape(t.label)}</div>'
+            f'<div class="trend-meta">🔥 {t.score:.0f} điểm · {t.article_count} bài · {t.source_count} nguồn</div>'
+            f'<ul class="trend-links">{links}</ul></div></div>'
+        )
+    return f'<section class="trending"><h2>🔥 Sự kiện nổi bật</h2><div class="trend-grid">{"".join(cards)}</div></section>'
+
+
+def render_day_page(
+    day: date,
+    sources: Dict[str, List[dict]],
+    all_dates: List[date],
+    trending: Optional[List[TrendingTopic]] = None,
+) -> str:
     window = _tab_window(all_dates, day)
     tab_items = []
     for d in window:
@@ -273,6 +321,7 @@ def render_day_page(day: date, sources: Dict[str, List[dict]], all_dates: List[d
 <div class="strip">{tabs_html}</div>
 {picker_html}
 </nav>
+{_trending_panel_html(trending or [])}
 <main>{body_html}</main>
 <footer><p>Tự động cập nhật mỗi {config.crawl_interval_minutes} phút qua GitHub Actions.</p></footer>
 </body>
@@ -285,19 +334,26 @@ def build_site(db: Database, out_dir: Path = SITE_DIR) -> None:
     by_date = group_by_date_and_source(articles)
     all_dates = sorted(by_date.keys(), reverse=True)
 
+    # Computed once against wall-clock "now" (not tied to any one
+    # archive day), and only ever shown on the latest day's page — see
+    # _trending_panel_html's docstring for why.
+    now = datetime.now(ZoneInfo(config.timezone))
+    trending = top_trending(articles, now)
+
     if out_dir.exists():
         shutil.rmtree(out_dir)
     out_dir.mkdir(parents=True)
 
+    latest = all_dates[0] if all_dates else date.today()
     for day in all_dates:
         (out_dir / f"{day.isoformat()}.html").write_text(
-            render_day_page(day, by_date[day], all_dates), encoding="utf-8"
+            render_day_page(day, by_date[day], all_dates, trending=(trending if day == latest else None)),
+            encoding="utf-8",
         )
 
-    latest = all_dates[0] if all_dates else date.today()
     latest_sources = by_date.get(latest, {})
     (out_dir / "index.html").write_text(
-        render_day_page(latest, latest_sources, all_dates), encoding="utf-8"
+        render_day_page(latest, latest_sources, all_dates, trending=trending), encoding="utf-8"
     )
 
     # Tells GitHub Pages not to run this through Jekyll (irrelevant here

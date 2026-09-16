@@ -4,6 +4,7 @@ from zoneinfo import ZoneInfo
 from config import config
 from models import NewsItem
 from web.generate_site import _tab_window, build_site, group_by_date_and_source, render_day_page
+from web.trending import TrendingTopic
 
 TZ = ZoneInfo("Asia/Ho_Chi_Minh")
 
@@ -156,3 +157,54 @@ def test_scan_button_shown_and_calls_the_configured_worker_url(monkeypatch):
     # The token that can actually trigger a crawl must never appear on
     # this (public) page — only the Worker's own environment has it.
     assert "GITHUB_TOKEN" not in html and "ghp_" not in html
+
+
+def test_trending_panel_hidden_when_no_topics():
+    html = render_day_page(date(2026, 9, 14), {}, [date(2026, 9, 14)], trending=[])
+    assert "Sự kiện nổi bật" not in html
+
+
+def test_trending_panel_renders_rank_score_and_sample_links():
+    topic = TrendingTopic(
+        label="Eximbank",
+        score=88.5,
+        article_count=5,
+        source_count=3,
+        sources=["VnExpress", "CafeF", "Tuổi Trẻ"],
+        sample_articles=[
+            {"title": "Eximbank gia hạn đề cử nhân sự HĐQT", "url": "https://x/1", "source": "VnExpress"},
+        ],
+    )
+    html = render_day_page(date(2026, 9, 14), {}, [date(2026, 9, 14)], trending=[topic])
+
+    assert "Sự kiện nổi bật" in html
+    assert "#1" in html
+    assert "Eximbank" in html
+    assert "88" in html  # score, rounded for display
+    assert "https://x/1" in html
+    assert "(VnExpress)" in html
+
+
+def test_trending_panel_omitted_on_non_latest_day_pages(tmp_path, db, monkeypatch):
+    """Trending is computed relative to wall-clock "now" — showing it
+    on an older archive day's page would misleadingly imply it reflects
+    that day, not today. build_site must only attach it to the latest
+    day (see _trending_panel_html's docstring)."""
+    import web.generate_site as generate_site_module
+
+    fake_topic = TrendingTopic(
+        label="Eximbank", score=90.0, article_count=5, source_count=3,
+        sources=["A", "B", "C"], sample_articles=[],
+    )
+    monkeypatch.setattr(generate_site_module, "top_trending", lambda articles, now: [fake_topic])
+
+    db.insert_if_new(NewsItem("VnExpress", "Old day article", "https://x/1", datetime(2026, 9, 14, 10, 0, tzinfo=TZ)))
+    db.insert_if_new(NewsItem("VnExpress", "Latest day article", "https://x/2", datetime(2026, 9, 15, 10, 0, tzinfo=TZ)))
+
+    out_dir = tmp_path / "site"
+    build_site(db, out_dir=out_dir)
+
+    old_page = (out_dir / "2026-09-14.html").read_text(encoding="utf-8")
+    latest_page = (out_dir / "2026-09-15.html").read_text(encoding="utf-8")
+    assert "Sự kiện nổi bật" not in old_page
+    assert "Sự kiện nổi bật" in latest_page
