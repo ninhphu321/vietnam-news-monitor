@@ -98,6 +98,7 @@ class RSSCrawlerBase(BaseCrawler):
 
     def crawl(self) -> List[NewsItem]:
         raw = self._fetch(self.feed_url)
+        raw = self._preprocess_raw(raw)
         parsed = feedparser.parse(raw)
 
         if parsed.bozo and not parsed.entries:
@@ -123,6 +124,13 @@ class RSSCrawlerBase(BaseCrawler):
                 )
             )
         return items
+
+    def _preprocess_raw(self, raw: bytes) -> bytes:
+        """Hook for a subclass to fix up the raw feed bytes before
+        they're handed to feedparser — e.g. a feed whose XML prolog
+        declares the wrong encoding (see VietnamBizCrawler). No-op by
+        default."""
+        return raw
 
     def _extract_published_at(self, entry) -> Optional[datetime]:
         struct = getattr(entry, "published_parsed", None) or getattr(

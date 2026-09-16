@@ -13,6 +13,15 @@ GMT+7"), which feedparser's date parser rejects outright (verified:
 published_parsed is None for every entry). VietnamBiz's offset is
 always this same GMT+7 (Vietnam time), so it's safe to strip it and
 attach self.tz directly.
+
+Audit (2026-09-16): the feed started (or was always, missed at first
+audit) failing outright with "not well-formed (invalid token)" —
+root cause is the XML prolog declaring `encoding="utf-16"` while the
+actual bytes are UTF-8 (verified: no null bytes between ASCII
+characters, which real UTF-16 would have). Python's expat parser
+trusts the declared encoding and chokes on the mismatch. Since the
+bytes are genuinely UTF-8, the fix is just correcting that one
+declared attribute before parsing, not decoding/re-encoding anything.
 """
 
 import re
@@ -22,12 +31,16 @@ from typing import Optional
 from crawlers.base import RSSCrawlerBase
 
 _GMT7_SUFFIX = re.compile(r"^(.*)\s+GMT\+7$")
+_WRONG_ENCODING_DECL = re.compile(rb"encoding=[\"']utf-16[\"']", re.IGNORECASE)
 
 
 class VietnamBizCrawler(RSSCrawlerBase):
     source_name = "VietnamBiz"
     source_url = "https://vietnambiz.vn/tai-chinh"
     feed_url = "https://vietnambiz.vn/tai-chinh.rss"
+
+    def _preprocess_raw(self, raw: bytes) -> bytes:
+        return _WRONG_ENCODING_DECL.sub(b'encoding="utf-8"', raw, count=1)
 
     def _extract_published_at(self, entry) -> Optional[datetime]:
         parsed = super()._extract_published_at(entry)

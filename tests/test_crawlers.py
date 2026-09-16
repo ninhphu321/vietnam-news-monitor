@@ -182,6 +182,21 @@ def test_tuoitre_parses_us_style_date_with_narrow_nbsp_before_ampm():
     assert an_giang.published_at.hour == 22 and an_giang.published_at.minute == 17  # 10:17 PM -> 22:17
 
 
+@responses.activate
+def test_vietnambiz_fixes_mislabeled_utf16_encoding_declaration():
+    """Regression guard: VietnamBiz's feed declares `encoding="utf-16"`
+    in its XML prolog while the actual bytes are UTF-8 (verified
+    against the live feed on 2026-09-16) — Python's expat parser
+    trusts the declaration and fails outright ("not well-formed
+    (invalid token)") without VietnamBizCrawler's _preprocess_raw
+    override correcting that one attribute first."""
+    crawler = VietnamBizCrawler(timeout=5, max_retries=1)
+    responses.add(responses.GET, crawler.feed_url, body=load_fixture("vietnambiz.rss"), status=200)
+    items = crawler.crawl()
+    assert len(items) == 2
+    assert all(i.published_at is not None for i in items)
+
+
 def test_nhandan_uses_corrected_category_feed_not_the_wrong_id_guess():
     """Regression guard: the ID 1041 guess for Nhan Dan's economy
     category returned HTTP 200 but was actually a mixed general-news
