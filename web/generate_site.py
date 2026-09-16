@@ -199,6 +199,14 @@ details.issue-card:target>*:not(summary){display:block!important;}
   background:var(--surface);border:1px solid var(--border);border-radius:999px;padding:7px 14px;cursor:pointer;}
 .pill.active{color:var(--accent);background:var(--accent-soft);border-color:var(--accent-soft);}
 
+/* ---- Pagination (News Stream shows PAGE_SIZE rows at a time) ---- */
+.pagination{display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:6px;margin:20px 0 4px;}
+.page-btn{font:inherit;font-family:var(--mono);font-size:12px;font-weight:500;color:var(--text-2);
+  background:var(--surface);border:1px solid var(--border);border-radius:999px;min-width:32px;
+  padding:6px 10px;cursor:pointer;}
+.page-btn.active{color:var(--accent);background:var(--accent-soft);border-color:var(--accent-soft);}
+.page-ellipsis{color:var(--muted);font-family:var(--mono);font-size:12px;padding:0 2px;}
+
 /* ---- Unified news stream ---- */
 .news-stream-list{display:flex;flex-direction:column;}
 .news-row{display:flex;align-items:center;gap:16px;min-height:64px;padding:8px 0;border-bottom:1px solid var(--divider);}
@@ -520,34 +528,90 @@ def _archive_html(day: date, all_dates: List[date]) -> str:
     )
 
 
-_INTERACTION_SCRIPT = """
-function rowsList() { return document.querySelectorAll('#news-stream-list .news-row'); }
-function applyFilters() {
+_NEWS_PAGE_SIZE = 15
+
+_INTERACTION_SCRIPT = f"""
+var PAGE_SIZE = {_NEWS_PAGE_SIZE};
+var currentPage = 1;
+
+function rowsList() {{ return document.querySelectorAll('#news-stream-list .news-row'); }}
+function matchingRows() {{
+  return Array.prototype.filter.call(rowsList(), function (row) {{ return !row.classList.contains('filtered-out'); }});
+}}
+
+function applyFilters() {{
   var q = (document.getElementById('search-news').value || '').trim().toLowerCase();
   var src = document.getElementById('filter-source').value;
   var iss = document.getElementById('filter-issue').value;
-  rowsList().forEach(function (row) {
+  rowsList().forEach(function (row) {{
     var ok = true;
     if (src && row.dataset.source !== src) ok = false;
     if (iss && row.dataset.issue !== iss) ok = false;
     if (ok && q && row.textContent.toLowerCase().indexOf(q) === -1) ok = false;
-    row.style.display = ok ? '' : 'none';
-  });
-}
-function setSort(btn, mode) {
-  document.querySelectorAll('.sort-toggle .pill').forEach(function (b) { b.classList.remove('active'); });
+    row.classList.toggle('filtered-out', !ok);
+  }});
+  currentPage = 1;
+  renderPage();
+}}
+
+function setSort(btn, mode) {{
+  document.querySelectorAll('.sort-toggle .pill').forEach(function (b) {{ b.classList.remove('active'); }});
   btn.classList.add('active');
   var container = document.getElementById('news-stream-list');
   var arr = Array.prototype.slice.call(rowsList());
-  arr.sort(function (a, b) {
-    if (mode === 'trending') {
+  arr.sort(function (a, b) {{
+    if (mode === 'trending') {{
       var bh = parseFloat(b.dataset.hot) || 0, ah = parseFloat(a.dataset.hot) || 0;
       if (bh !== ah) return bh - ah;
-    }
+    }}
     return parseInt(b.dataset.ts, 10) - parseInt(a.dataset.ts, 10);
-  });
-  arr.forEach(function (row) { container.appendChild(row); });
-}
+  }});
+  arr.forEach(function (row) {{ container.appendChild(row); }});
+  currentPage = 1;
+  renderPage();
+}}
+
+// Shows only the current page's slice of rows that still pass the
+// active filters (so pagination and filtering compose correctly —
+// e.g. filtering down to 8 matches collapses to a single page), then
+// (re)draws the numbered page buttons below the list.
+function renderPage() {{
+  var matching = matchingRows();
+  var totalPages = Math.max(1, Math.ceil(matching.length / PAGE_SIZE));
+  if (currentPage > totalPages) currentPage = totalPages;
+  var start = (currentPage - 1) * PAGE_SIZE;
+  rowsList().forEach(function (row) {{ row.style.display = 'none'; }});
+  matching.slice(start, start + PAGE_SIZE).forEach(function (row) {{ row.style.display = ''; }});
+  renderPagination(totalPages);
+}}
+
+function goToPage(p) {{
+  currentPage = p;
+  renderPage();
+  document.getElementById('news').scrollIntoView({{behavior: 'smooth', block: 'start'}});
+}}
+
+// Windowed page numbers (1 … currentPage-2..currentPage+2 … last) so a
+// 400+ article day doesn't render 30 raw page buttons in a row.
+function renderPagination(totalPages) {{
+  var container = document.getElementById('news-pagination');
+  if (totalPages <= 1) {{ container.innerHTML = ''; return; }}
+  var pages = [];
+  for (var p = 1; p <= totalPages; p++) {{
+    if (p === 1 || p === totalPages || Math.abs(p - currentPage) <= 2) {{
+      pages.push(p);
+    }} else if (pages[pages.length - 1] !== '...') {{
+      pages.push('...');
+    }}
+  }}
+  container.innerHTML = pages.map(function (p) {{
+    if (p === '...') return '<span class="page-ellipsis">…</span>';
+    var cls = 'page-btn' + (p === currentPage ? ' active' : '');
+    return '<button type="button" class="' + cls + '" onclick="goToPage(' + p + ')">' + p + '</button>';
+  }}).join('');
+}}
+
+renderPage();
 """
 
 
@@ -584,6 +648,7 @@ def render_day_page(
         '<section id="news" class="news-stream"><h2 class="section-title">All news</h2>'
         f'{_filters_html(ordered_sources, issues)}'
         f'<div id="news-stream-list" class="news-stream-list">{_news_stream_html(all_articles, issue_lookup)}</div>'
+        '<div id="news-pagination" class="pagination"></div>'
         '</section>'
     )
 

@@ -273,3 +273,17 @@ def test_by_source_section_still_lists_every_source_and_headline():
 
     assert 'id="sources"' in html
     assert "Tiêu đề nguồn" in html
+
+
+def test_news_stream_has_a_pagination_container_and_client_side_page_size():
+    """All News shows 15 rows at a time (user request: too many articles
+    at once) — every row is still in the DOM (search/filter need the
+    full set), and JS slices + paginates client-side rather than the
+    server pre-splitting into separate pages."""
+    from web.generate_site import _NEWS_PAGE_SIZE
+
+    html = render_day_page(date(2026, 9, 14), {}, [date(2026, 9, 14)])
+
+    assert 'id="news-pagination" class="pagination"' in html
+    assert f"var PAGE_SIZE = {_NEWS_PAGE_SIZE};" in html
+    assert _NEWS_PAGE_SIZE == 15
