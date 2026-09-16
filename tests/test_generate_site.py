@@ -4,7 +4,7 @@ from zoneinfo import ZoneInfo
 from config import config
 from models import NewsItem
 from web.generate_site import _tab_window, build_site, group_by_date_and_source, render_day_page
-from web.trending import TrendingTopic
+from web.issues import Issue
 
 TZ = ZoneInfo("Asia/Ho_Chi_Minh")
 
@@ -159,44 +159,75 @@ def test_scan_button_shown_and_calls_the_configured_worker_url(monkeypatch):
     assert "GITHUB_TOKEN" not in html and "ghp_" not in html
 
 
-def test_trending_panel_hidden_when_no_topics():
-    html = render_day_page(date(2026, 9, 14), {}, [date(2026, 9, 14)], trending=[])
-    assert "Sự kiện nổi bật" not in html
-
-
-def test_trending_panel_renders_rank_score_and_sample_links():
-    topic = TrendingTopic(
-        label="Eximbank",
-        score=88.5,
+def _issue(**overrides):
+    defaults = dict(
+        issue_id="eximbank-nhan-su",
+        issue_title="Eximbank · Nhân sự lãnh đạo",
+        entities=["eximbank"],
+        topics=["nhân sự lãnh đạo"],
         article_count=5,
-        source_count=3,
+        unique_source_count=3,
+        first_seen_at=datetime(2026, 9, 14, 9, 0, tzinfo=TZ),
+        last_seen_at=datetime(2026, 9, 14, 16, 0, tzinfo=TZ),
+        velocity=1.2,
+        acceleration=1.5,
+        volume_score=100.0,
+        source_score=100.0,
+        velocity_score=80.0,
+        novelty_score=60.0,
+        hot_score=88.5,
         sources=["VnExpress", "CafeF", "Tuổi Trẻ"],
-        sample_articles=[
+        why_hot=["3 nguồn báo cùng đề cập", "xuất hiện 5 bài trong ngày"],
+        representative_articles=[
+            {"title": "Eximbank gia hạn đề cử nhân sự HĐQT", "url": "https://x/1", "source": "VnExpress"},
+        ],
+        all_articles=[
             {"title": "Eximbank gia hạn đề cử nhân sự HĐQT", "url": "https://x/1", "source": "VnExpress"},
         ],
     )
-    html = render_day_page(date(2026, 9, 14), {}, [date(2026, 9, 14)], trending=[topic])
+    defaults.update(overrides)
+    return Issue(**defaults)
 
-    assert "Sự kiện nổi bật" in html
+
+def test_trending_panel_hidden_when_no_topics():
+    html = render_day_page(date(2026, 9, 14), {}, [date(2026, 9, 14)], trending=[])
+    assert "Top 5 Issues" not in html
+
+
+def test_trending_panel_renders_rank_score_why_hot_and_sample_links():
+    html = render_day_page(date(2026, 9, 14), {}, [date(2026, 9, 14)], trending=[_issue()])
+
+    assert "Top 5 Issues" in html
     assert "#1" in html
     assert "Eximbank" in html
-    assert "88" in html  # score, rounded for display
+    assert "88" in html  # hot_score, rounded for display
+    assert "3 nguồn báo cùng đề cập" in html
     assert "https://x/1" in html
     assert "(VnExpress)" in html
 
 
+def test_trending_panel_expand_only_shown_when_more_than_representative_articles():
+    only_rep = _issue(article_count=1, representative_articles=[
+        {"title": "Bài duy nhất", "url": "https://x/1", "source": "VnExpress"},
+    ])
+    html_no_expand = render_day_page(date(2026, 9, 14), {}, [date(2026, 9, 14)], trending=[only_rep])
+    assert 'class="issue-detail"' not in html_no_expand
+
+    more_than_rep = _issue(article_count=5)  # representative_articles has just 1 sample
+    html_with_expand = render_day_page(date(2026, 9, 14), {}, [date(2026, 9, 14)], trending=[more_than_rep])
+    assert 'class="issue-detail"' in html_with_expand
+    assert "Lần đầu: 09:00" in html_with_expand
+    assert "Cập nhật gần nhất: 16:00" in html_with_expand
+
+
 def test_trending_panel_omitted_on_non_latest_day_pages(tmp_path, db, monkeypatch):
-    """Trending is computed relative to wall-clock "now" — showing it
-    on an older archive day's page would misleadingly imply it reflects
-    that day, not today. build_site must only attach it to the latest
+    """Trending is computed relative to *today* (wall-clock "now") —
+    showing it on an older archive day's page would misleadingly imply
+    it reflects that day. build_site must only attach it to the latest
     day (see _trending_panel_html's docstring)."""
     import web.generate_site as generate_site_module
 
-    fake_topic = TrendingTopic(
-        label="Eximbank", score=90.0, article_count=5, source_count=3,
-        sources=["A", "B", "C"], sample_articles=[],
-    )
-    monkeypatch.setattr(generate_site_module, "top_trending", lambda articles, now: [fake_topic])
+    monkeypatch.setattr(generate_site_module, "top_issues", lambda articles, now: [_issue()])
 
     db.insert_if_new(NewsItem("VnExpress", "Old day article", "https://x/1", datetime(2026, 9, 14, 10, 0, tzinfo=TZ)))
     db.insert_if_new(NewsItem("VnExpress", "Latest day article", "https://x/2", datetime(2026, 9, 15, 10, 0, tzinfo=TZ)))
@@ -206,5 +237,5 @@ def test_trending_panel_omitted_on_non_latest_day_pages(tmp_path, db, monkeypatc
 
     old_page = (out_dir / "2026-09-14.html").read_text(encoding="utf-8")
     latest_page = (out_dir / "2026-09-15.html").read_text(encoding="utf-8")
-    assert "Sự kiện nổi bật" not in old_page
-    assert "Sự kiện nổi bật" in latest_page
+    assert "Top 5 Issues" not in old_page
+    assert "Top 5 Issues" in latest_page

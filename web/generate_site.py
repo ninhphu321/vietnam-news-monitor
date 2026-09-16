@@ -22,7 +22,7 @@ from config import config
 from crawlers import CRAWLER_CLASSES
 from database import Database
 from telegram import _icon_for
-from web.trending import TrendingTopic, top_trending
+from web.issues import Issue, top_issues
 
 SITE_DIR = Path(__file__).resolve().parent.parent / "site"
 
@@ -126,18 +126,31 @@ details.trending summary .chevron{margin-left:auto;font-size:.8rem;color:var(--m
   transition:transform .15s ease;}
 details.trending[open] summary .chevron{transform:rotate(180deg);}
 details.trending[open] summary{margin-bottom:14px;}
+.trending-note{max-width:1200px;margin:0 0 14px;color:var(--muted);font-size:.78rem;font-style:italic;}
 .trend-grid{display:flex;flex-direction:column;gap:10px;}
-.trend-card{display:flex;gap:14px;background:var(--card);border:2px solid var(--ink);
-  box-shadow:var(--shadow);padding:12px 16px;align-items:flex-start;}
+details.issue-card{background:var(--card);border:2px solid var(--ink);box-shadow:var(--shadow);}
+details.issue-card>summary{display:flex;gap:14px;align-items:flex-start;padding:12px 16px;
+  cursor:pointer;list-style:none;user-select:none;}
+details.issue-card>summary::-webkit-details-marker{display:none;}
+details.issue-card .chevron{margin-left:auto;font-size:.75rem;color:var(--muted);flex:0 0 auto;
+  transition:transform .15s ease;padding-top:.3em;}
+details.issue-card[open] .chevron{transform:rotate(180deg);}
 .trend-rank{font-weight:900;font-size:1.5rem;color:var(--accent);flex:0 0 auto;line-height:1.2;}
 .trend-body{flex:1 1 auto;min-width:0;}
 .trend-label{font-weight:700;font-size:1rem;margin-bottom:2px;}
 .trend-meta{font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:.72rem;color:var(--muted);margin-bottom:6px;}
+.why-hot{list-style:none;margin:0 0 6px;padding:0;}
+.why-hot li{font-size:.82rem;padding:1px 0;}
+.why-hot li::before{content:"→ ";color:var(--accent);}
 .trend-links{list-style:none;margin:0;padding:0;}
 .trend-links li{font-size:.85rem;padding:2px 0;}
 .trend-links a{color:var(--fg);text-decoration:none;}
 .trend-links a:hover{color:var(--accent);text-decoration:underline;}
 .trend-links .src{color:var(--muted);font-size:.75rem;}
+.issue-detail{padding:0 16px 14px 16px;border-top:1px dashed var(--muted);margin-top:8px;}
+.issue-timing{font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:.72rem;color:var(--muted);
+  padding:10px 0 8px;}
+.issue-sources{font-size:.8rem;color:var(--muted);margin:0 0 10px;}
 main{margin:0;padding:24px 16px 40px;display:flex;align-items:flex-start;gap:18px;overflow-x:auto;}
 details.source{flex:0 0 300px;background:var(--card);border:2px solid var(--ink);box-shadow:var(--shadow);
   border-top:5px solid var(--src-color,var(--accent));}
@@ -235,32 +248,59 @@ function triggerScan(btn) {{
 </script>"""
 
 
-def _trending_panel_html(topics: List[TrendingTopic]) -> str:
-    """The "🔥 Sự kiện nổi bật" (top-5 hot topics) panel — only rendered
-    on the latest day's page (see build_site), since "trending right
-    now" computed relative to the archive's real timestamp would be
-    meaningless/misleading on an older day's page. Omitted entirely
-    when nothing currently clears the trending thresholds (see
-    web/trending.py) rather than shown empty."""
-    if not topics:
+def _issue_links_html(articles: List[dict]) -> str:
+    return "".join(
+        f'<li><a href="{escape(a["url"])}" target="_blank" rel="noopener">{escape(a["title"])}</a> '
+        f'<span class="src">({escape(a["source"])})</span></li>'
+        for a in articles
+    )
+
+
+def _issue_card_html(rank: int, issue: Issue) -> str:
+    why_hot = "".join(f"<li>{escape(b)}</li>" for b in issue.why_hot)
+    top_links = _issue_links_html(issue.representative_articles)
+
+    # The full article list + exact timing/source breakdown is only
+    # worth its own expand toggle when there's more to see than the
+    # (already-shown) top 3 — spec section 12's "click vào Issue để
+    # xem toàn bộ bài liên quan".
+    detail_html = ""
+    if issue.article_count > len(issue.representative_articles):
+        all_links = _issue_links_html(issue.all_articles)
+        detail_html = (
+            '<div class="issue-detail">'
+            f'<div class="issue-timing">Lần đầu: {issue.first_seen_at.strftime("%H:%M")}'
+            f' · Cập nhật gần nhất: {issue.last_seen_at.strftime("%H:%M")}</div>'
+            f'<div class="issue-sources">Nguồn: {escape(", ".join(issue.sources))}</div>'
+            f'<ul class="trend-links">{all_links}</ul></div>'
+        )
+
+    return (
+        f'<details class="issue-card"><summary><span class="trend-rank">#{rank}</span>'
+        f'<div class="trend-body"><div class="trend-label">{escape(issue.issue_title)}</div>'
+        f'<div class="trend-meta">🔥 {issue.hot_score:.0f} điểm · {issue.article_count} bài'
+        f' · {issue.unique_source_count} nguồn</div>'
+        f'<ul class="why-hot">{why_hot}</ul>'
+        f'<ul class="trend-links">{top_links}</ul></div>'
+        f'<span class="chevron">▾</span></summary>{detail_html}</details>'
+    )
+
+
+def _trending_panel_html(issues: List[Issue]) -> str:
+    """The "🔥 Top 5 Issues hôm nay" panel — only rendered on the latest
+    day's page (see build_site), since it is scored against *today*
+    (Asia/Ho_Chi_Minh) and would be meaningless attached to an older
+    archive day's page. Omitted entirely when nothing currently clears
+    the issue thresholds (see web/issues.py) rather than shown empty."""
+    if not issues:
         return ""
-    cards = []
-    for rank, t in enumerate(topics, start=1):
-        links = "".join(
-            f'<li><a href="{escape(a["url"])}" target="_blank" rel="noopener">{escape(a["title"])}</a> '
-            f'<span class="src">({escape(a["source"])})</span></li>'
-            for a in t.sample_articles
-        )
-        cards.append(
-            f'<div class="trend-card"><div class="trend-rank">#{rank}</div>'
-            f'<div class="trend-body"><div class="trend-label">{escape(t.label)}</div>'
-            f'<div class="trend-meta">🔥 {t.score:.0f} điểm · {t.article_count} bài · {t.source_count} nguồn</div>'
-            f'<ul class="trend-links">{links}</ul></div></div>'
-        )
+    cards = "".join(_issue_card_html(rank, issue) for rank, issue in enumerate(issues, start=1))
     return (
         '<details class="trending" open>'
-        '<summary>🔥 Sự kiện nổi bật<span class="chevron">▾</span></summary>'
-        f'<div class="trend-grid">{"".join(cards)}</div></details>'
+        '<summary>🔥 Top 5 Issues hôm nay<span class="chevron">▾</span></summary>'
+        '<p class="trending-note">Trong phạm vi các nguồn báo mà hệ thống đang theo dõi — '
+        'không phải xếp hạng mức độ quan trọng khách quan.</p>'
+        f'<div class="trend-grid">{cards}</div></details>'
     )
 
 
@@ -268,7 +308,7 @@ def render_day_page(
     day: date,
     sources: Dict[str, List[dict]],
     all_dates: List[date],
-    trending: Optional[List[TrendingTopic]] = None,
+    trending: Optional[List[Issue]] = None,
 ) -> str:
     window = _tab_window(all_dates, day)
     tab_items = []
@@ -344,10 +384,11 @@ def build_site(db: Database, out_dir: Path = SITE_DIR) -> None:
     all_dates = sorted(by_date.keys(), reverse=True)
 
     # Computed once against wall-clock "now" (not tied to any one
-    # archive day), and only ever shown on the latest day's page — see
-    # _trending_panel_html's docstring for why.
+    # archive day), scoped to *today* only (spec section 9), and only
+    # ever shown on the latest day's page — see _trending_panel_html's
+    # docstring for why.
     now = datetime.now(ZoneInfo(config.timezone))
-    trending = top_trending(articles, now)
+    trending = top_issues(articles, now)
 
     if out_dir.exists():
         shutil.rmtree(out_dir)
