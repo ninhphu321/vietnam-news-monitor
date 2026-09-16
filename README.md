@@ -1,12 +1,12 @@
 # Vietnam News Monitor
 
-Theo dõi 18 chuyên mục kinh tế/tài chính của báo Việt Nam (gồm cả báo nhà nước/thông tấn chính thống), phát hiện bài mới, chống gửi trùng, và đẩy title (kèm link) + thời gian về Telegram — **group theo từng nguồn báo (icon riêng để phân biệt nhanh), tách riêng tin nóng lên đầu**. Quét mỗi 20 phút/lần, cả ngày lẫn đêm (không phân biệt khung giờ).
+Theo dõi 19 chuyên mục kinh tế/tài chính của báo Việt Nam (gồm cả báo nhà nước/thông tấn chính thống), phát hiện bài mới, chống gửi trùng, và đẩy title (kèm link) + thời gian về Telegram — **group theo từng nguồn báo (icon riêng để phân biệt nhanh), tách riêng tin nóng lên đầu**. Quét mỗi 20 phút/lần, cả ngày lẫn đêm (không phân biệt khung giờ).
 
 Xem đầy đủ yêu cầu gốc trong `PROJECT SPEC V2` đã cung cấp. README này chỉ tập trung vào cách chạy.
 
 ## Nguồn báo
 
-### Đang hoạt động (18 nguồn)
+### Đang hoạt động (19 nguồn)
 
 Tất cả đã audit thực tế (không giả định RSS/selector cũ còn đúng) vào ngày 14-15/09/2026:
 
@@ -27,7 +27,7 @@ Tất cả đã audit thực tế (không giả định RSS/selector cũ còn đ
 | 📺 | VTV | `vtv.vn/kinh-te.htm` | `vtv.vn/rss/kinh-te.rss` — **lưu ý:** `pubDate` dùng offset giờ rút gọn `+07` thay vì `+0700` chuẩn, cũng khiến `feedparser` không parse được, `VTVCrawler` có logic parse riêng. Feed khá lớn (~500 bài lưu trữ mỗi lần crawl, không phải lỗi category). |
 | 💱 | VietnamBiz | `vietnambiz.vn/tai-chinh` | `vietnambiz.vn/tai-chinh.rss` — **lưu ý:** `pubDate` dùng `"GMT+7"` thay vì `+0700` chuẩn (một quirk khác với `+07` của VTV), cũng khiến `feedparser` không parse được, `VietnamBizCrawler` có logic parse riêng. Cũng dính lỗi double-encode HTML entity giống Thanh Niên trong `<title>` — đã tự được vá bởi fix chung, không cần thêm gì. **Audit 2026-09-16:** feed từng báo lỗi "not well-formed" toàn bộ — nguyên nhân là XML prolog khai `encoding="utf-16"` trong khi nội dung thực là UTF-8, khiến parser XML (expat) đọc sai ngay từ đầu. `VietnamBizCrawler._preprocess_raw` sửa lại đúng khai báo trước khi đưa cho `feedparser`. |
 
-Vì vậy 14/18 crawler dùng chung `RSSCrawlerBase` (`crawlers/base.py`) nhưng mỗi site vẫn là **1 file riêng** trong `crawlers/` — nếu sau này RSS của 1 site đổi cấu trúc hoặc ngừng hoạt động, chỉ sửa đúng file đó mà không ảnh hưởng các site còn lại. 4 site (Chính phủ, VTV, VietnamBiz, Tuổi Trẻ) cần override nhỏ (`_extract_published_at` cho định dạng ngày lạ) — vẫn kế thừa toàn bộ phần còn lại từ `RSSCrawlerBase`, không viết lại từ đầu.
+Vì vậy 14/19 crawler dùng chung `RSSCrawlerBase` (`crawlers/base.py`) nhưng mỗi site vẫn là **1 file riêng** trong `crawlers/` — nếu sau này RSS của 1 site đổi cấu trúc hoặc ngừng hoạt động, chỉ sửa đúng file đó mà không ảnh hưởng các site còn lại. 4 site (Chính phủ, VTV, VietnamBiz, Tuổi Trẻ) cần override nhỏ (`_extract_published_at` cho định dạng ngày lạ) — vẫn kế thừa toàn bộ phần còn lại từ `RSSCrawlerBase`, không viết lại từ đầu.
 
 Một chi tiết đáng chú ý khi audit V1: CafeF và Thanh Niên trả `pubDate` với năm 2 chữ số (`"Mon, 14 Sep 26 08:00:00 +0700"`). `feedparser` tự parse đúng thành năm 2026 qua `published_parsed`, nên không cần tự viết logic parse ngày riêng cho từng site. Thanh Niên còn có thêm 1 lỗi double-encode HTML entity trong `<title>` (vd. `n&agrave;y` thay vì `này`) — đã vá bằng `html.unescape()` trong `utils.normalize_title`.
 
@@ -43,6 +43,12 @@ Một chi tiết đáng chú ý khi audit V1: CafeF và Thanh Niên trả `pubDa
 | 💼 | Báo Đầu tư | `baodautu.vn/dau-tu-tai-chinh-d6/` | RSS luôn trả kênh rỗng bất kể slug (xem bảng dưới). Trang chuyên mục **không hiển thị giờ đăng ở bất kỳ đâu** trong toàn bộ danh sách (mọi cỡ thẻ). Audit 2026-09-16: trang chi tiết từng bài lại có (`.post-time`) — nên giờ crawler fetch thêm mỗi trang bài để lấy giờ thật, đổi lấy N+1 request/lượt quét thay vì 1 (chấp nhận theo yêu cầu, vì thiếu giờ ảnh hưởng nhiều hơn phần traffic tăng thêm). |
 
 Cả 4 crawler đều tự phát hiện khi selector không còn khớp gì cả (0 bài) và báo lỗi thay vì âm thầm báo "0 bài mới" mãi mãi — HTML không có "chuẩn" như RSS để biết chắc site có đổi cấu trúc hay không, nên đây là tín hiệu thay thế.
+
+### 1 nguồn qua JSON API ẩn (không phải RSS, không phải scrape HTML)
+
+| Icon | Nguồn | Trang | Ghi chú audit |
+|---|---|---|---|
+| 🛡️ | FiLi | `fili.vn/ngan-hang-bao-hiem.htm` | Audit 2026-09-16: trang chuyên mục là **AngularJS SPA** — HTML thô không có sẵn danh sách bài (`ng-repeat` rỗng, dữ liệu load bằng JS). Dùng browser thật để bắt network request thì thấy trang tự gọi `POST /_Partials/ListPageArticle` trả về JSON sạch — đáng tin cậy hơn scrape HTML vì không có markup để mà đổi vỡ. 2 quirk khi ghép request: (1) `channelid` không phải ID chuyên mục (734) mà là chuỗi `",734,757,3113,758,"` gồm ID cha + toàn bộ ID chuyên mục con — gửi mỗi `734` thì luôn ra 0 bài; (2) `PublishTime` ở định dạng JSON date của ASP.NET (`"/Date(1789558294227)/"`, mili-giây từ epoch UTC), không phải chuỗi ISO. `crawlers/fili.py` xử lý cả 2. Dùng `BaseCrawler._post_json()` (mới thêm, dùng chung nếu sau này có nguồn JSON API khác) thay vì `_fetch()` GET-only. |
 
 ### Chưa triển khai — lý do cụ thể
 
@@ -153,7 +159,7 @@ Các biến khác (`CRAWL_INTERVAL_MINUTES`, `REQUEST_TIMEOUT`, `MAX_RETRIES`, `
 python main.py --dry-run
 ```
 
-Dry run: crawl → parse → kiểm tra trùng với database hiện có → in ra terminal. **Không ghi database, không gửi Telegram.** Dùng lệnh này để kiểm tra 18 crawler còn hoạt động tốt không, bất cứ lúc nào.
+Dry run: crawl → parse → kiểm tra trùng với database hiện có → in ra terminal. **Không ghi database, không gửi Telegram.** Dùng lệnh này để kiểm tra 19 crawler còn hoạt động tốt không, bất cứ lúc nào.
 
 ## Chạy test tự động
 
@@ -161,7 +167,7 @@ Dry run: crawl → parse → kiểm tra trùng với database hiện có → in 
 pytest
 ```
 
-115 test bao phủ: normalize title/URL (kể cả giải mã HTML entity lỗi của Thanh Niên/VietnamBiz), crawler parse RSS cho 14 nguồn (kèm test riêng cho 4 kiểu parse ngày phi chuẩn của Chính phủ/VTV/VietnamBiz/Tuổi Trẻ, và test riêng cho việc VietnamBiz tự sửa khai báo encoding sai `utf-16`→`utf-8` trước khi parse XML) và crawler scrape HTML cho 4 nguồn còn lại (lọc khối "nổi bật" không có giờ ở CafeBiz, chống 1 bài xuất hiện nhiều lần với giờ khác nhau ở Đầu tư Chứng khoán, báo lỗi khi selector không khớp gì thay vì âm thầm "0 bài mới", fallback fetch trang chi tiết khi listing thiếu giờ ở Đầu tư Chứng khoán/Diễn đàn Doanh nghiệp/Báo Đầu tư — cả khi thành công lẫn khi trang chi tiết lỗi/không parse được) (dùng fixture lấy từ dữ liệu thực tế lúc audit, mock qua thư viện `responses` — không cần mạng), dedup theo URL (không theo title), restart không mất/không gửi lại dữ liệu, format Telegram group-theo-nguồn + tách tin nóng + chia nhỏ khi vượt giới hạn 4096 ký tự, retry khi gửi Telegram lỗi, cô lập lỗi từng nguồn không làm crash app, giữ đúng thứ tự nguồn theo cấu hình, baseline seeding lần chạy đầu **và** baseline riêng cho nguồn mới thêm vào một DB đã có dữ liệu, toàn bộ luồng `run_cycle` (dry-run / gửi thành công / lỗi 1 phần vẫn gửi tin nguồn OK / tất cả lỗi / Telegram lỗi thì không đánh dấu sent), phát hiện nguồn "chết âm thầm" (ngưỡng giờ, cooldown cảnh báo, tự gỡ cảnh báo khi hồi phục), backup database (tạo bản có timestamp + tự xoá bản cũ), và **lịch quét cố định** — kiểm tra thời điểm bắn thật của `CronTrigger` (APScheduler) khớp đúng mỗi `CRAWL_INTERVAL_MINUTES` phút, xuyên suốt nửa đêm không hở/chồng giờ nào; hiển thị ngày kèm giờ (`dd/mm HH:MM`) cho batch trải dài nhiều ngày, và trang web tĩnh (`web/generate_site.py`) — gom bài theo đúng ngày kể cả khi thiếu `published_at`, sắp mới nhất lên đầu trong từng nguồn, escape HTML tiêu đề (chống XSS từ tiêu đề bài crawl được), luôn dọn sạch `site/` cũ trước khi sinh lại thay vì cộng dồn file rác, cửa sổ 7-tab ngày (`_tab_window`) tự căn giữa quanh ngày đang xem kể cả 2 trường hợp biên (ít hơn 7 ngày dữ liệu, đang xem đúng ngày cũ nhất), và nút "Quét ngay" — chỉ hiện khi đã cấu hình `NEWS_SCAN_WORKER_URL`, gọi đúng URL đó qua `fetch()`, và không bao giờ để lộ token trên trang.
+120 test bao phủ: normalize title/URL (kể cả giải mã HTML entity lỗi của Thanh Niên/VietnamBiz), crawler parse RSS cho 14 nguồn (kèm test riêng cho 4 kiểu parse ngày phi chuẩn của Chính phủ/VTV/VietnamBiz/Tuổi Trẻ, và test riêng cho việc VietnamBiz tự sửa khai báo encoding sai `utf-16`→`utf-8` trước khi parse XML) và crawler scrape HTML cho 4 nguồn còn lại (lọc khối "nổi bật" không có giờ ở CafeBiz, chống 1 bài xuất hiện nhiều lần với giờ khác nhau ở Đầu tư Chứng khoán, báo lỗi khi selector không khớp gì thay vì âm thầm "0 bài mới", fallback fetch trang chi tiết khi listing thiếu giờ ở Đầu tư Chứng khoán/Diễn đàn Doanh nghiệp/Báo Đầu tư — cả khi thành công lẫn khi trang chi tiết lỗi/không parse được) (dùng fixture lấy từ dữ liệu thực tế lúc audit, mock qua thư viện `responses` — không cần mạng), dedup theo URL (không theo title), restart không mất/không gửi lại dữ liệu, format Telegram group-theo-nguồn + tách tin nóng + chia nhỏ khi vượt giới hạn 4096 ký tự, retry khi gửi Telegram lỗi, cô lập lỗi từng nguồn không làm crash app, giữ đúng thứ tự nguồn theo cấu hình, baseline seeding lần chạy đầu **và** baseline riêng cho nguồn mới thêm vào một DB đã có dữ liệu, toàn bộ luồng `run_cycle` (dry-run / gửi thành công / lỗi 1 phần vẫn gửi tin nguồn OK / tất cả lỗi / Telegram lỗi thì không đánh dấu sent), phát hiện nguồn "chết âm thầm" (ngưỡng giờ, cooldown cảnh báo, tự gỡ cảnh báo khi hồi phục), backup database (tạo bản có timestamp + tự xoá bản cũ), và **lịch quét cố định** — kiểm tra thời điểm bắn thật của `CronTrigger` (APScheduler) khớp đúng mỗi `CRAWL_INTERVAL_MINUTES` phút, xuyên suốt nửa đêm không hở/chồng giờ nào; hiển thị ngày kèm giờ (`dd/mm HH:MM`) cho batch trải dài nhiều ngày, và trang web tĩnh (`web/generate_site.py`) — gom bài theo đúng ngày kể cả khi thiếu `published_at`, sắp mới nhất lên đầu trong từng nguồn, escape HTML tiêu đề (chống XSS từ tiêu đề bài crawl được), luôn dọn sạch `site/` cũ trước khi sinh lại thay vì cộng dồn file rác, cửa sổ 7-tab ngày (`_tab_window`) tự căn giữa quanh ngày đang xem kể cả 2 trường hợp biên (ít hơn 7 ngày dữ liệu, đang xem đúng ngày cũ nhất), nút "Quét ngay" — chỉ hiện khi đã cấu hình `NEWS_SCAN_WORKER_URL`, gọi đúng URL đó qua `fetch()`, và không bao giờ để lộ token trên trang, và crawler FiLi (JSON API) — parse đúng định dạng ngày ASP.NET `/Date(...)/`, gửi đúng `channelid` dạng chuỗi nhiều ID (không phải ID chuyên mục đơn), và báo lỗi thay vì âm thầm trả rỗng khi response API đổi cấu trúc hoặc trả 0 bài.
 
 ## Chạy lần đầu / chạy thủ công
 
@@ -375,7 +381,7 @@ Toàn bộ crawler đã được audit và test bằng dữ liệu **thực tế
 
 Ngoài ra, toàn bộ luồng end-to-end (crawl → dedup → Telegram → sent_at, bao gồm baseline seeding, baseline riêng cho nguồn mới, phát hiện bài mới thật sự, không gửi trùng lần 2, restart không mất dữ liệu, và báo lỗi khi 1 nguồn fail) đã được xác minh bằng cách chạy `main.py --run-once` thật với Telegram Bot API thật (không mock) trong lúc phát triển.
 
-**Việc bạn cần tự làm định kỳ:** chạy `python main.py --dry-run` để xác nhận 18 crawler vẫn lấy đúng dữ liệu tại thời điểm bạn dùng — RSS/HTML thường ổn định nhưng không có gì đảm bảo 100% một site sẽ không đổi cấu trúc trong tương lai (xem case Tiền Phong ở trên: 1 category ID sai vẫn trả HTTP 200 bình thường; 4 crawler HTML tự báo lỗi nếu selector không còn khớp gì).
+**Việc bạn cần tự làm định kỳ:** chạy `python main.py --dry-run` để xác nhận 19 crawler vẫn lấy đúng dữ liệu tại thời điểm bạn dùng — RSS/HTML thường ổn định nhưng không có gì đảm bảo 100% một site sẽ không đổi cấu trúc trong tương lai (xem case Tiền Phong ở trên: 1 category ID sai vẫn trả HTTP 200 bình thường; 4 crawler HTML tự báo lỗi nếu selector không còn khớp gì).
 
 ## Kiến trúc
 
@@ -409,7 +415,8 @@ news-monitor/
 │   ├── cafebiz.py           # V3 (scrape HTML)
 │   ├── tinnhanhchungkhoan.py # V3 (scrape HTML)
 │   ├── diendandoanhnghiep.py # V3 (scrape HTML)
-│   └── baodautu.py          # V3 (scrape HTML, fetch thêm trang chi tiết để lấy giờ)
+│   ├── baodautu.py          # V3 (scrape HTML, fetch thêm trang chi tiết để lấy giờ)
+│   └── fili.py              # V4 (JSON API ẩn phía sau SPA Angular)
 ├── data/news.db         # SQLite (tự tạo khi chạy, không commit)
 ├── logs/app.log         # Log (tự tạo khi chạy, không commit)
 └── tests/
@@ -417,7 +424,7 @@ news-monitor/
 
 ### Luồng xử lý mỗi chu kỳ (`scheduler.run_cycle`)
 
-1. Crawl cả 18 nguồn, lỗi 1 nguồn không làm hỏng nguồn khác (`crawl_all`).
+1. Crawl cả 19 nguồn, lỗi 1 nguồn không làm hỏng nguồn khác (`crawl_all`).
 2. Với mỗi bài lấy được: normalize title/URL, `INSERT OR IGNORE` vào SQLite theo URL (dedup) — **insert xảy ra trước khi thử gửi Telegram**, nên nếu app crash hoặc Telegram lỗi giữa chừng, bài viết vẫn còn trong DB với `sent_at = NULL` và sẽ được thử gửi lại ở chu kỳ sau (không mất dữ liệu, không tạo bản ghi trùng).
 3. Lấy toàn bộ bài chưa gửi (`get_pending`), group theo nguồn theo đúng thứ tự khai báo trong `CRAWLER_CLASSES` (không sort theo thời gian toàn cục — spec V2 mục 12).
 4. Chọn đúng 1 trong 4 kịch bản, luôn ưu tiên gửi **1 batch Telegram / chu kỳ** (spec V2 mục 15):

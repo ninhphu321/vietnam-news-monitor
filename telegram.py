@@ -65,6 +65,7 @@ SOURCE_ICONS: Dict[str, str] = {
     "Đầu tư Chứng khoán": "📉",
     "Diễn đàn Doanh nghiệp": "🏢",
     "Báo Đầu tư": "💼",
+    "FiLi": "🛡️",
 }
 _FALLBACK_ICONS = ["🟢", "🔶", "🔷", "🟩", "🟦", "🟧"]
 

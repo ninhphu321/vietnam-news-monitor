@@ -11,6 +11,7 @@ from crawlers.cafebiz import CafeBizCrawler
 from crawlers.cafef import CafeFCrawler
 from crawlers.dantri import DanTriCrawler
 from crawlers.diendandoanhnghiep import DienDanDoanhNghiepCrawler
+from crawlers.fili import FiliCrawler
 from crawlers.nhandan import NhanDanCrawler
 from crawlers.thanhnien import ThanhNienCrawler
 from crawlers.tienphong import TienPhongCrawler
@@ -43,6 +44,7 @@ CRAWLER_CLASSES = [
     TinNhanhChungKhoanCrawler,
     DienDanDoanhNghiepCrawler,
     BaoDauTuCrawler,
+    FiliCrawler,
 ]
 
 __all__ = ["CRAWLER_CLASSES"]

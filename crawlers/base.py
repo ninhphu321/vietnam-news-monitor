@@ -86,6 +86,33 @@ class BaseCrawler(ABC):
             f"{self.source_name}: failed to fetch {url} after {self.max_retries} attempts: {last_exc}"
         )
 
+    def _post_json(self, url: str, payload: dict) -> dict:
+        """POST `payload` as JSON and return the parsed JSON response —
+        the equivalent of `_fetch` for sources whose article listing is
+        a backend JSON API rather than RSS/HTML (see crawlers/fili.py).
+        Same retry/timeout policy as `_fetch`."""
+        headers = {"User-Agent": self.user_agent, "Content-Type": "application/json;charset=UTF-8"}
+        last_exc: Optional[Exception] = None
+        for attempt in range(1, self.max_retries + 1):
+            try:
+                resp = requests.post(url, json=payload, headers=headers, timeout=self.timeout)
+                resp.raise_for_status()
+                return resp.json()
+            except (requests.RequestException, ValueError) as exc:
+                last_exc = exc
+                logger.warning(
+                    "%s: POST attempt %d/%d failed: %s",
+                    self.source_name,
+                    attempt,
+                    self.max_retries,
+                    exc,
+                )
+                if attempt < self.max_retries:
+                    time.sleep(min(2**attempt, 10))
+        raise CrawlerError(
+            f"{self.source_name}: failed to POST {url} after {self.max_retries} attempts: {last_exc}"
+        )
+
 
 class RSSCrawlerBase(BaseCrawler):
     """Shared RSS-based crawl implementation.
