@@ -127,6 +127,29 @@ def test_build_site_writes_one_file_per_date_plus_index(tmp_path, db):
     assert "Day2" in (out_dir / "index.html").read_text(encoding="utf-8")
 
 
+def test_build_site_points_archived_days_back_to_the_latest_day(tmp_path, db):
+    """A bookmarked/shared link to an old dated page (e.g. "2026-09-14.html")
+    stays frozen on that day forever by design (it's the archive) — the
+    page must carry a banner pointing back to whichever day is actually
+    latest, so a user landing there isn't stuck without knowing how to
+    get to today's news. The latest day's own page (and index.html, its
+    mirror) must NOT show that banner about itself."""
+    db.insert_if_new(NewsItem("VnExpress", "Day1", "https://x/1", datetime(2026, 9, 14, 10, 0, tzinfo=TZ)))
+    db.insert_if_new(NewsItem("VnExpress", "Day2", "https://x/2", datetime(2026, 9, 15, 10, 0, tzinfo=TZ)))
+
+    out_dir = tmp_path / "site"
+    build_site(db, out_dir=out_dir)
+
+    old_page = (out_dir / "2026-09-14.html").read_text(encoding="utf-8")
+    latest_page = (out_dir / "2026-09-15.html").read_text(encoding="utf-8")
+    index_page = (out_dir / "index.html").read_text(encoding="utf-8")
+
+    assert 'class="latest-banner"' in old_page
+    assert 'href="2026-09-15.html"' in old_page
+    assert 'class="latest-banner"' not in latest_page
+    assert 'class="latest-banner"' not in index_page
+
+
 def test_build_site_overwrites_stale_files_from_a_previous_run(tmp_path, db):
     """Regression guard: build_site must fully replace out_dir, not just
     add to it — an article deleted/renamed between runs (shouldn't

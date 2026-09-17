@@ -134,6 +134,13 @@ a{color:inherit;}
 .scan .status{display:block;margin-top:4px;font-family:var(--mono);font-size:10px;color:var(--muted);
   position:absolute;white-space:nowrap;}
 
+/* ---- Archived-day notice (points back to the newest day) ---- */
+.latest-banner{max-width:1320px;margin:16px auto 0;padding:10px 24px;background:var(--accent-soft);
+  color:var(--accent);font-size:13px;text-align:center;}
+.latest-banner a{color:var(--accent);font-weight:600;text-decoration:underline;}
+@media (max-width:1024px){.latest-banner{padding:10px 20px;}}
+@media (max-width:640px){.latest-banner{padding:10px 16px;}}
+
 /* ---- Section scaffolding ---- */
 main{padding:32px 0 40px;}
 section{scroll-margin-top:calc(var(--header-h) + 12px);margin:0 auto 40px;max-width:1320px;padding:0 24px;}
@@ -615,11 +622,28 @@ renderPage();
 """
 
 
+def _latest_banner_html(latest_href: Optional[str]) -> str:
+    """A small notice on every archived (non-latest) day page pointing
+    back to the newest day. Without this, a bookmarked/shared link to a
+    specific dated URL (e.g. "2026-09-16.html") stays frozen on that
+    day forever by design (it's the archive feature) — a user landing
+    on it right after midnight, before switching to the fresh
+    "index.html"/root URL themselves, has no way to tell they're not
+    already on the latest day, or how to get there."""
+    if not latest_href:
+        return ""
+    return (
+        '<div class="latest-banner">Bạn đang xem tin lưu trữ, không phải ngày mới nhất — '
+        f'<a href="{escape(latest_href)}">xem tin mới nhất →</a></div>'
+    )
+
+
 def render_day_page(
     day: date,
     sources: Dict[str, List[dict]],
     all_dates: List[date],
     trending: Optional[List[Issue]] = None,
+    latest_href: Optional[str] = None,
 ) -> str:
     now = datetime.now(ZoneInfo(config.timezone))
     is_latest = trending is not None
@@ -662,6 +686,7 @@ def render_day_page(
 </head>
 <body>
 {header_html}
+{_latest_banner_html(latest_href)}
 <main>
 {_today_overview_html(total, len(sources), issues, now, is_latest)}
 {_top_issues_html(issues)}
@@ -694,8 +719,13 @@ def build_site(db: Database, out_dir: Path = SITE_DIR) -> None:
 
     latest = all_dates[0] if all_dates else date.today()
     for day in all_dates:
+        is_latest = day == latest
         (out_dir / f"{day.isoformat()}.html").write_text(
-            render_day_page(day, by_date[day], all_dates, trending=(trending if day == latest else None)),
+            render_day_page(
+                day, by_date[day], all_dates,
+                trending=(trending if is_latest else None),
+                latest_href=(None if is_latest else f"{latest.isoformat()}.html"),
+            ),
             encoding="utf-8",
         )
 
