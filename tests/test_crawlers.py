@@ -5,15 +5,19 @@ from crawlers.baochinhphu import BaoChinhPhuCrawler
 from crawlers.base import CrawlerError
 from crawlers.cafef import CafeFCrawler
 from crawlers.dantri import DanTriCrawler
+from crawlers.nguoiquansat import NguoiQuanSatCrawler
 from crawlers.nhandan import NhanDanCrawler
+from crawlers.sggp import SGGPCrawler
 from crawlers.thanhnien import ThanhNienCrawler
 from crawlers.tienphong import TienPhongCrawler
 from crawlers.tuoitre import TuoiTreCrawler
 from crawlers.vietnambiz import VietnamBizCrawler
+from crawlers.vietnamnet import VietnamNetCrawler
 from crawlers.vietnamplus import VietnamPlusCrawler
 from crawlers.vietstock import VietstockCrawler
 from crawlers.vneconomy import VnEconomyCrawler
 from crawlers.vnexpress import VnExpressCrawler
+from crawlers.vnexpress_intl import VnExpressIntlCrawler
 from crawlers.vtv import VTVCrawler
 from crawlers.znews import ZnewsCrawler
 from tests.conftest import load_fixture
@@ -33,6 +37,10 @@ CRAWLERS_AND_FIXTURES = [
     (BaoChinhPhuCrawler, "baochinhphu.rss", 2),
     (VTVCrawler, "vtv.rss", 2),
     (VietnamBizCrawler, "vietnambiz.rss", 2),
+    (VietnamNetCrawler, "vietnamnet.rss", 2),
+    (NguoiQuanSatCrawler, "nguoiquansat.rss", 2),
+    (SGGPCrawler, "sggp.rss", 2),
+    (VnExpressIntlCrawler, "vnexpress_intl.rss", 2),
 ]
 
 

@@ -66,6 +66,10 @@ SOURCE_ICONS: Dict[str, str] = {
     "Diễn đàn Doanh nghiệp": "🏢",
     "Báo Đầu tư": "💼",
     "FiLi": "🛡️",
+    "VietnamNet": "🌐",
+    "Người Quan Sát": "🔭",
+    "SGGP": "🌆",
+    "VnExpress Intl": "🌏",
 }
 _FALLBACK_ICONS = ["🟢", "🔶", "🔷", "🟩", "🟦", "🟧"]
 
@@ -332,6 +336,28 @@ def format_stale_sources_warning(
     for source, last_new in stale:
         lines.append(f"• {_esc(source)} (bài mới gần nhất: {last_new.strftime('%d/%m/%Y %H:%M')})")
     lines += ["", f"⏰ {now.strftime('%d/%m/%Y %H:%M')}"]
+    return "\n".join(lines)
+
+
+def format_crisis_alert(alert, now: datetime) -> str:
+    """Early-warning message for one brand (see web/brandwatch.py). The
+    matched keywords and every headline are listed so the reader can judge
+    for themselves — the tone label is a headline-only estimate."""
+    head = "🚨 <b>KHẨN" if alert.level == "khẩn" else "⚠️ <b>LEO THANG"
+    lines = [
+        f"{head} — {_esc(alert.brand)}</b>",
+        "",
+        f"{len(alert.sources)} báo ({_esc(', '.join(alert.sources))}) cùng đăng tin tiêu cực "
+        f"trong {alert.window_minutes} phút qua.",
+        f"Từ khoá: {_esc(', '.join(alert.keywords))}",
+        "",
+    ]
+    for a in alert.articles[:8]:
+        lines.append(
+            f"• <a href=\"{_esc(a['url'])}\">{_esc(a['title'])}</a> ({_esc(a['source'])}, {a['ts'].strftime('%H:%M')})"
+        )
+    lines += ["", "<i>Nhãn tiêu cực chỉ là ước lượng từ tiêu đề — cần người xác nhận.</i>",
+              f"⏰ {now.strftime('%d/%m/%Y %H:%M')}"]
     return "\n".join(lines)
 
 
