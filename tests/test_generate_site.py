@@ -310,3 +310,68 @@ def test_news_stream_has_a_pagination_container_and_client_side_page_size():
     assert 'id="news-pagination" class="pagination"' in html
     assert f"var PAGE_SIZE = {_NEWS_PAGE_SIZE};" in html
     assert _NEWS_PAGE_SIZE == 15
+
+
+
+def test_home_pages_link_to_the_analytics_tab_but_do_not_embed_it():
+    """Analytics lives on its own page (analytics.html): the home page
+    only carries a nav link, never the analytics section itself."""
+    html = render_day_page(date(2026, 9, 14), {}, [date(2026, 9, 14)], has_analytics=True)
+    assert 'href="analytics.html"' in html
+    assert 'id="analytics"' not in html
+    assert "Ai đưa tin trước" not in html
+
+    no_data = render_day_page(date(2026, 9, 14), {}, [date(2026, 9, 14)])
+    assert 'href="analytics.html"' not in no_data
+
+
+def test_build_site_writes_analytics_tab_and_data_exports(tmp_path, db):
+    import json
+
+    db.insert_if_new(NewsItem("VnExpress", "Old day", "https://x/1", datetime(2026, 9, 14, 10, 0, tzinfo=TZ)))
+    db.insert_if_new(NewsItem("CafeF", "Latest & day", "https://x/2", datetime(2026, 9, 15, 10, 0, tzinfo=TZ)))
+    out_dir = tmp_path / "site"
+    build_site(db, out_dir=out_dir)
+
+    analytics = (out_dir / "analytics.html").read_text(encoding="utf-8")
+    assert 'id="analytics"' in analytics and "Ai đưa tin trước" in analytics
+    assert 'href="index.html"' in analytics
+
+    for page in ("index.html", "2026-09-14.html", "2026-09-15.html"):
+        text = (out_dir / page).read_text(encoding="utf-8")
+        assert 'href="analytics.html"' in text and 'id="analytics"' not in text
+
+    assert "issues" in json.loads((out_dir / "issues.json").read_text(encoding="utf-8"))
+    assert "daily" in json.loads((out_dir / "stats.json").read_text(encoding="utf-8"))
+    feed = (out_dir / "feed.xml").read_text(encoding="utf-8")
+    assert "<rss" in feed and "Latest &amp; day" in feed
+
+
+def test_build_site_writes_brands_tab_with_share_of_voice_and_export(tmp_path, db):
+    import json
+
+    for i, src in enumerate(["CafeF", "VnExpress", "Dân Trí"]):
+        db.insert_if_new(NewsItem(src, f"Techcombank vinh danh lần {i}", f"https://x/t{i}",
+                                  datetime(2026, 9, 15, 10, i, tzinfo=TZ)))
+    out_dir = tmp_path / "site"
+    build_site(db, out_dir=out_dir)
+
+    brands = (out_dir / "brands.html").read_text(encoding="utf-8")
+    assert "Share of voice" in brands and "Techcombank" in brands and "Cảnh báo khủng hoảng" in brands
+    assert 'href="analytics.html"' in brands and 'class="active"' in brands
+    data = json.loads((out_dir / "brands.json").read_text(encoding="utf-8"))
+    assert {"share_of_voice_7d", "share_of_voice_30d", "crisis_alerts", "watchlist"} <= set(data)
+
+    home = (out_dir / "index.html").read_text(encoding="utf-8")
+    assert 'href="brands.html"' in home and 'id="filter-brand"' in home
+    assert 'data-brand="|Techcombank|"' in home
+    assert 'class="sent pos"' in home   # "vinh danh" -> positive dot
+
+
+def test_news_rows_show_a_negative_dot_with_the_triggering_keywords(tmp_path, db):
+    db.insert_if_new(NewsItem("CafeF", "Sacombank bị phạt vì vi phạm", "https://x/1",
+                              datetime(2026, 9, 15, 10, 0, tzinfo=TZ)))
+    out_dir = tmp_path / "site"
+    build_site(db, out_dir=out_dir)
+    home = (out_dir / "index.html").read_text(encoding="utf-8")
+    assert 'class="sent neg"' in home and "bị phạt" in home

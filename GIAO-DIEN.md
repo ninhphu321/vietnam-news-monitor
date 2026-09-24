@@ -21,7 +21,7 @@ rồi mở `site/index.html`.
 ```
 ┌───────────────────────────────────────────────────────────┐
 │ HEADER (sticky, 72px) — masthead · ô tìm kiếm ·            │
-│         nav (TODAY/ISSUES/NEWS/SOURCES/ARCHIVE) ·          │
+│         nav (TODAY/ISSUES/NEWS/SOURCES/ANALYTICS↗/ARCHIVE) │
 │         trạng thái LIVE + giờ cập nhật · nút "Quét ngay"   │
 ├───────────────────────────────────────────────────────────┤
 │ TODAY OVERVIEW — 1 dải ngang: tổng bài · tổng nguồn ·      │
@@ -30,7 +30,7 @@ rồi mở `site/index.html`.
 │ TOP ISSUES — lưới 2 cột (desktop), 5 thẻ issue gọn         │
 ├───────────────────────────────────────────────────────────┤
 │ ALL NEWS (mặc định, quan trọng nhất) — bộ lọc + dòng chảy  │
-│           tin hợp nhất từ toàn bộ 19 nguồn, mới nhất trước │
+│           tin hợp nhất từ toàn bộ 23 nguồn, mới nhất trước │
 ├───────────────────────────────────────────────────────────┤
 │ BY SOURCE — bảng Kanban cũ, lùi xuống thành mục phụ        │
 ├───────────────────────────────────────────────────────────┤
@@ -90,3 +90,7 @@ Giữ nguyên logic bảng Kanban cũ — mỗi nguồn 1 cột, cuộn ngang tr
 - **Font chính:** Inter (headline, nav, body, nút). **Font phụ:** IBM Plex Mono (giờ, số liệu, nhãn nguồn/issue). Đã kiểm tra trước khi dùng: Inter có bộ subset Unicode riêng cho tiếng Việt trong response CSS2 thật của Google Fonts (`U+1EA0-1EF9`...) — rút kinh nghiệm từ lỗi font "Archivo Black" ở bản v1 (không có dấu tiếng Việt, từng gây lỗi hiển thị, xem lịch sử sửa lỗi trong README).
 - **Không dark mode** ở bản v2.0 này — đặc tả thiết kế chỉ đưa ra bảng màu sáng (light theme); bản v1 từng có dark mode tự động theo hệ điều hành nhưng bị bỏ khi viết lại theo đúng token màu được chỉ định. Có thể bổ sung lại sau nếu cần, dùng chung tông màu editorial này.
 - **Không có JS layout framework nào** — toàn bộ tương tác (đóng/mở, lọc, sắp xếp, tìm kiếm) là vanilla JS/`<details>`/CSS `:target`, không thêm thư viện hay build tool.
+
+## Tab Analytics (trang riêng `analytics.html`)
+
+Link `ANALYTICS` trên thanh nav mở trang riêng (không nhúng vào trang chủ để trang chủ luôn nhẹ và tập trung vào đọc tin). Trang có header riêng (`HOME` / `ANALYTICS`, nav luôn hiện kể cả trên mobile) và lưới thẻ gập/mở `<details>` cùng phong cách với Top Issues: Ai đưa tin trước, Lịch sử Top Issues, Khoảng trống đưa tin, Độ trễ thu thập, Nhịp đăng bài theo giờ, Xu hướng 30 ngày, Khối lượng tin theo thời gian, Tin đăng lặp, Đồng xuất hiện, Hồ sơ chủ đề từng nguồn. Cuối phần mô tả có link tới dữ liệu thô `issues.json`, `stats.json`, `feed.xml`.

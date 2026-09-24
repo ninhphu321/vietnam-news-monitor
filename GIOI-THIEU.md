@@ -1,17 +1,17 @@
 # 📰 Vietnam News Monitor
 
-Hệ thống tự động theo dõi tin tức kinh tế/tài chính từ **19 đầu báo Việt Nam**, gửi tin mới về Telegram theo thời gian thực, đồng thời có 1 trang web tổng hợp lưu lại toàn bộ lịch sử để tra cứu. Chạy **hoàn toàn tự động, 24/7, miễn phí** — không cần VPS, không cần server riêng.
+Hệ thống tự động theo dõi tin tức kinh tế/tài chính từ **23 đầu báo Việt Nam**, gửi tin mới về Telegram theo thời gian thực, đồng thời có 1 trang web tổng hợp lưu lại toàn bộ lịch sử để tra cứu. Chạy **hoàn toàn tự động, 24/7, miễn phí** — không cần VPS, không cần server riêng.
 
 ---
 
 ## Tính năng chính
 
-### 🔍 Thu thập tin từ 19 nguồn báo
-Quét đồng thời 19 chuyên mục kinh tế/tài chính, mỗi nguồn có cách lấy dữ liệu riêng tuỳ theo hạ tầng thực tế của từng trang:
+### 🔍 Thu thập tin từ 23 nguồn báo
+Quét đồng thời 23 chuyên mục kinh tế/tài chính, mỗi nguồn có cách lấy dữ liệu riêng tuỳ theo hạ tầng thực tế của từng trang:
 
 | Cách lấy dữ liệu | Số nguồn | Ví dụ |
 |---|---|---|
-| RSS feed chuẩn | 14 | VnExpress, CafeF, Tuổi Trẻ, Vietstock, Dân Trí, Znews... |
+| RSS feed chuẩn | 18 | VnExpress, CafeF, Tuổi Trẻ, Vietstock, VietnamNet, Người Quan Sát... |
 | Scrape HTML (không có RSS) | 4 | CafeBiz, Đầu tư Chứng khoán, Diễn đàn Doanh nghiệp, Báo Đầu tư |
 | JSON API ẩn sau ứng dụng web (SPA) | 1 | FiLi |
 
@@ -73,7 +73,7 @@ GitHub Pages (trang web) + nhánh db-state (lưu database)
 
 ## Chất lượng & kiểm thử
 
-143 test tự động (`pytest`), chạy offline bằng dữ liệu fixture lấy từ audit thực tế — bao phủ toàn bộ crawler, logic chống trùng, format Telegram, sinh trang web, và thuật toán phát hiện issue.
+201 test tự động (`pytest`), chạy offline bằng dữ liệu fixture lấy từ audit thực tế — bao phủ toàn bộ crawler, logic chống trùng, format Telegram, sinh trang web, và thuật toán phát hiện issue.
 
 ---
 

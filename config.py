@@ -78,6 +78,24 @@ class Config:
     # deploys a Worker and sets this (see README's V4 section).
     scan_worker_url: str = field(default_factory=lambda: os.getenv("NEWS_SCAN_WORKER_URL", ""))
 
+    # Public URL of the deployed site — used as the RSS feed's <link>.
+    site_url: str = field(
+        default_factory=lambda: os.getenv("NEWS_SITE_URL", "https://ninhphu321.github.io/vietnam-news-monitor/")
+    )
+
+    # Brand monitoring / crisis alerts (see web/brandwatch.py). Alert when
+    # strong-negative headlines about ONE brand come from >= N distinct
+    # outlets within the window; then stay quiet for the cooldown.
+    watchlist_path: Path = field(
+        default_factory=lambda: Path(os.getenv("WATCHLIST_PATH", str(BASE_DIR / "watchlist.json")))
+    )
+    crisis_min_sources: int = field(default_factory=lambda: _env_int("CRISIS_MIN_SOURCES", 3))
+    crisis_window_minutes: int = field(default_factory=lambda: _env_int("CRISIS_WINDOW_MINUTES", 60))
+    crisis_cooldown_hours: int = field(default_factory=lambda: _env_int("CRISIS_COOLDOWN_HOURS", 3))
+
+    archive_dir: Path = field(default_factory=lambda: BASE_DIR / "data" / "archive")
+    archive_keep_days: int = field(default_factory=lambda: _env_int("ARCHIVE_KEEP_DAYS", 90))
+
     user_agent: str = (
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
         "(KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36 "

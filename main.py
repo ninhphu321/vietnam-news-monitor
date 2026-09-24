@@ -4,6 +4,7 @@
     python main.py --run-once    # crawl immediately, once, then exit
     python main.py --dry-run     # crawl + dedup-check + print, no DB writes, no Telegram
     python main.py --backup-now  # timestamped SQLite backup, then exit (no crawl)
+    python main.py --archive-old # export articles older than ARCHIVE_KEEP_DAYS to data/archive/*.jsonl.gz
 
 See README.md for full setup instructions.
 """
@@ -12,6 +13,7 @@ import argparse
 import logging
 import sys
 
+from archive import archive_old_articles
 from config import config
 from database import Database
 from logger import setup_logging
@@ -41,6 +43,18 @@ def parse_args(argv=None) -> argparse.Namespace:
         "or touch Telegram. The scheduler also does this automatically every day at "
         "03:00 (see start_scheduler) — this flag is for on-demand/manual backups.",
     )
+    mode.add_argument(
+        "--archive-old",
+        action="store_true",
+        help="Export articles older than ARCHIVE_KEEP_DAYS (default 90) into monthly gzip "
+        "files under data/archive/. Export only, unless --delete-archived is also given.",
+    )
+    parser.add_argument(
+        "--delete-archived",
+        action="store_true",
+        help="With --archive-old: also delete the archived rows from the database "
+        "(they then disappear from the site's archive pages).",
+    )
     return parser.parse_args(argv)
 
 
@@ -50,7 +64,13 @@ def main(argv=None) -> int:
     setup_logging(config.log_path, config.log_level)
 
     try:
-        if args.backup_now:
+        if args.archive_old:
+            written = archive_old_articles(
+                config.db_path, config.archive_dir, config.archive_keep_days, config.timezone,
+                delete=args.delete_archived,
+            )
+            print(f"Archived {sum(written.values())} article(s) into {len(written)} monthly file(s).")
+        elif args.backup_now:
             run_backup(config)
         elif args.dry_run:
             db = Database(config.db_path, config.timezone)

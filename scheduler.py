@@ -11,7 +11,7 @@ can never drift apart.
 """
 
 import logging
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 from typing import Dict, List, Optional, Tuple
 from zoneinfo import ZoneInfo
 
@@ -25,6 +25,10 @@ from crawlers.base import CrawlerError
 from database import Database
 from models import NewsItem
 import telegram
+from web.analytics import daily_stats_rows
+from web.brands import load_watchlist
+from web.brandwatch import LEVEL_URGENT, crisis_alerts, tag_articles
+from web.issues import top_issues
 
 logger = logging.getLogger(__name__)
 
@@ -221,6 +225,84 @@ def run_backup(cfg: Config) -> None:
         logger.error("Database backup failed: %s", exc)
 
 
+STATS_REFRESH_DAYS = 3
+
+
+def snapshot_data(db: Database, now: datetime) -> None:
+    """Persist derived data that would otherwise be lost or recomputed
+    from scratch: today's Top Issues (-> issue_history) and per-day
+    source/topic counts (-> daily_stats). Runs in the crawl job — NOT in
+    the site build — because the CI workflow pushes news.db to the
+    db-state branch *before* it builds the site; anything written during
+    the build would never be saved. Best-effort: a failure here is logged
+    and must never affect crawling or Telegram delivery."""
+    try:
+        articles = db.get_all_articles()
+
+        issues = top_issues(articles, now)
+        db.record_issues(
+            now.date().isoformat(),
+            [
+                {
+                    "issue_id": i.issue_id, "title": i.issue_title, "rank": rank,
+                    "hot_score": i.hot_score, "article_count": i.article_count,
+                    "source_count": i.unique_source_count,
+                    "first_seen_at": i.first_seen_at.isoformat(), "last_seen_at": i.last_seen_at.isoformat(),
+                }
+                for rank, i in enumerate(issues, start=1)
+            ],
+            now,
+        )
+
+        # First run on an existing DB backfills every historical day; after
+        # that only the last few days are recomputed (older days are final).
+        if db.daily_stats_is_empty():
+            only_days = None
+        else:
+            only_days = {(now - timedelta(days=d)).date() for d in range(STATS_REFRESH_DAYS)}
+        rows = daily_stats_rows(articles, only_days)
+        days = only_days if only_days is not None else {date.fromisoformat(r[0]) for r in rows}
+        db.replace_daily_stats([d.isoformat() for d in days], rows)
+    except Exception:  # noqa: BLE001 - secondary feature, see docstring
+        logger.exception("Data snapshot (issue_history/daily_stats) failed; continuing.")
+
+
+def check_crisis(db: Database, cfg: Config, now: datetime) -> None:
+    """Page (via Telegram) when strong-negative headlines about one brand
+    appear in >= cfg.crisis_min_sources outlets within
+    cfg.crisis_window_minutes. One alert per brand per cooldown window;
+    an "urgent" alert may override the cooldown of an earlier "escalating"
+    one. Best-effort like the other secondary checks: never raises."""
+    try:
+        index, watch = load_watchlist(cfg.watchlist_path)
+        tagged = tag_articles(db.get_all_articles(), index, watch)
+        alerts = crisis_alerts(
+            tagged, now, watch, index,
+            window_minutes=cfg.crisis_window_minutes, min_sources=cfg.crisis_min_sources,
+        )
+        for alert in alerts:
+            last = db.get_crisis_alert(alert.brand)
+            if last is not None:
+                last_level, last_at = last
+                cooling = now - last_at < timedelta(hours=cfg.crisis_cooldown_hours)
+                upgraded = alert.level == LEVEL_URGENT and last_level != LEVEL_URGENT
+                if cooling and not upgraded:
+                    continue
+            try:
+                telegram.send_message(
+                    cfg.telegram_bot_token, cfg.telegram_chat_id,
+                    telegram.format_crisis_alert(alert, now),
+                    cfg.request_timeout, cfg.max_retries,
+                )
+            except telegram.TelegramError as exc:
+                logger.error("Failed to send crisis alert for %s: %s", alert.brand, exc)
+                continue
+            db.set_crisis_alert(alert.brand, alert.level, now)
+            logger.warning("Crisis alert sent: %s (%s, %d outlet(s))", alert.brand, alert.level, len(alert.sources))
+    except Exception:  # noqa: BLE001 - secondary feature, see docstring
+        logger.exception("Crisis check failed; continuing.")
+
+
 def run_cycle(db: Database, cfg: Config, dry_run: bool = False) -> None:
     tz = ZoneInfo(cfg.timezone)
     now = datetime.now(tz)
@@ -241,6 +323,8 @@ def run_cycle(db: Database, cfg: Config, dry_run: bool = False) -> None:
     for item in all_crawled:
         if db.insert_if_new(item):
             newly_inserted.append(item)
+
+    snapshot_data(db, now)
 
     # get_pending() already includes rows from this cycle's inserts (they
     # were just written with sent_at NULL), so it's the single source of
@@ -306,6 +390,8 @@ def run_cycle(db: Database, cfg: Config, dry_run: bool = False) -> None:
 
     if sent_urls:
         db.mark_sent(sent_urls, sent_at=now)
+
+    check_crisis(db, cfg, now)
 
     # Best-effort, secondary check — must never affect the primary
     # crawl/send outcome above, success or failure.

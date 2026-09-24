@@ -23,7 +23,7 @@ Design choices worth noting:
 import sqlite3
 from datetime import datetime
 from pathlib import Path
-from typing import List, Optional, Set
+from typing import Dict, Iterable, List, Optional, Set, Tuple
 from zoneinfo import ZoneInfo
 
 from models import NewsItem
@@ -44,6 +44,43 @@ CREATE TABLE IF NOT EXISTS news (
 CREATE TABLE IF NOT EXISTS source_health (
     source TEXT PRIMARY KEY,
     last_alerted_at TEXT NOT NULL
+);
+
+-- Last crisis alert sent per brand, so one ongoing story pages once
+-- (cooldown) instead of on every 20-minute cycle.
+CREATE TABLE IF NOT EXISTS crisis_alerts (
+    brand TEXT PRIMARY KEY,
+    level TEXT NOT NULL,
+    last_alerted_at TEXT NOT NULL
+);
+
+-- Pre-aggregated per-day counts (kind = 'source' | 'topic'). Purely
+-- derived from `news`, so it can always be rebuilt; it exists so trend
+-- charts and exports don't have to rescan every article on each build.
+CREATE TABLE IF NOT EXISTS daily_stats (
+    day TEXT NOT NULL,
+    kind TEXT NOT NULL,
+    name TEXT NOT NULL,
+    articles INTEGER NOT NULL,
+    PRIMARY KEY (day, kind, name)
+);
+
+-- One row per (day, issue) that made that day's Top Issues at any
+-- point. Issues are recomputed from scratch each cycle and would
+-- otherwise vanish at midnight — this is what lets the site say "this
+-- issue has been hot N days in a row". Values are the latest cycle's.
+CREATE TABLE IF NOT EXISTS issue_history (
+    day TEXT NOT NULL,
+    issue_id TEXT NOT NULL,
+    title TEXT NOT NULL,
+    rank INTEGER NOT NULL,
+    hot_score REAL NOT NULL,
+    article_count INTEGER NOT NULL,
+    source_count INTEGER NOT NULL,
+    first_seen_at TEXT,
+    last_seen_at TEXT,
+    updated_at TEXT NOT NULL,
+    PRIMARY KEY (day, issue_id)
 );
 """
 
@@ -217,3 +254,81 @@ class Database:
     def clear_stale_alert(self, source: str) -> None:
         with self._connect() as conn:
             conn.execute("DELETE FROM source_health WHERE source = ?", (source,))
+
+    def get_crisis_alert(self, brand: str) -> Optional[Tuple[str, datetime]]:
+        """(level, when) of the last alert for `brand`, or None."""
+        with self._connect() as conn:
+            row = conn.execute(
+                "SELECT level, last_alerted_at FROM crisis_alerts WHERE brand = ?", (brand,)
+            ).fetchone()
+        return (row["level"], datetime.fromisoformat(row["last_alerted_at"])) if row else None
+
+    def set_crisis_alert(self, brand: str, level: str, when: datetime) -> None:
+        with self._connect() as conn:
+            conn.execute(
+                """
+                INSERT INTO crisis_alerts (brand, level, last_alerted_at) VALUES (?, ?, ?)
+                ON CONFLICT(brand) DO UPDATE SET level = excluded.level,
+                                                 last_alerted_at = excluded.last_alerted_at
+                """,
+                (brand, level, when.isoformat()),
+            )
+
+    # ------------------------------------------------------------------
+    # Data infrastructure: daily_stats + issue_history
+    # ------------------------------------------------------------------
+    def daily_stats_is_empty(self) -> bool:
+        with self._connect() as conn:
+            return conn.execute("SELECT COUNT(*) AS c FROM daily_stats").fetchone()["c"] == 0
+
+    def replace_daily_stats(self, days: Iterable[str], rows: Iterable[Tuple[str, str, str, int]]) -> None:
+        """Atomically replace every daily_stats row for `days` (ISO dates)
+        with `rows` = (day, kind, name, articles). Replace-not-upsert so a
+        source/topic that dropped to zero for a day doesn't keep a stale
+        count."""
+        days = list(days)
+        with self._connect() as conn:
+            conn.executemany("DELETE FROM daily_stats WHERE day = ?", [(d,) for d in days])
+            conn.executemany(
+                "INSERT INTO daily_stats (day, kind, name, articles) VALUES (?, ?, ?, ?)", list(rows)
+            )
+
+    def get_daily_stats(self, since_day: Optional[str] = None) -> List[dict]:
+        with self._connect() as conn:
+            rows = conn.execute(
+                "SELECT day, kind, name, articles FROM daily_stats WHERE day >= ? ORDER BY day, kind, name",
+                (since_day or "0000-00-00",),
+            ).fetchall()
+        return [dict(r) for r in rows]
+
+    def record_issues(self, day: str, issues: Iterable[dict], when: datetime) -> None:
+        """Upsert today's Top Issues. `issues` are plain dicts (issue_id,
+        title, rank, hot_score, article_count, source_count,
+        first_seen_at, last_seen_at) so this layer doesn't import web/."""
+        with self._connect() as conn:
+            conn.executemany(
+                """
+                INSERT INTO issue_history
+                    (day, issue_id, title, rank, hot_score, article_count, source_count,
+                     first_seen_at, last_seen_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(day, issue_id) DO UPDATE SET
+                    title = excluded.title, rank = excluded.rank, hot_score = excluded.hot_score,
+                    article_count = excluded.article_count, source_count = excluded.source_count,
+                    first_seen_at = excluded.first_seen_at, last_seen_at = excluded.last_seen_at,
+                    updated_at = excluded.updated_at
+                """,
+                [
+                    (day, i["issue_id"], i["title"], i["rank"], i["hot_score"], i["article_count"],
+                     i["source_count"], i.get("first_seen_at"), i.get("last_seen_at"), when.isoformat())
+                    for i in issues
+                ],
+            )
+
+    def get_issue_history(self, since_day: Optional[str] = None) -> List[dict]:
+        with self._connect() as conn:
+            rows = conn.execute(
+                "SELECT * FROM issue_history WHERE day >= ? ORDER BY day DESC, rank ASC",
+                (since_day or "0000-00-00",),
+            ).fetchall()
+        return [dict(r) for r in rows]
