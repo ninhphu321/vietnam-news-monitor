@@ -19,7 +19,7 @@ source", "Avoid: Emoji").
 import json
 import shutil
 from collections import Counter, defaultdict
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from html import escape
 from pathlib import Path
 from typing import Dict, List, Optional
@@ -34,6 +34,7 @@ from web.brandwatch import (BrandStat, CrisisAlert, Tagged, crisis_alerts, share
                             tag_articles, tags_by_url)
 from web.exports import brands_json, feed_xml, issues_json, stats_json
 from web.issues import Issue, top_issues
+from web.theme import STYLE, icon, render_shell
 
 SITE_DIR = Path(__file__).resolve().parent.parent / "site"
 
@@ -75,250 +76,8 @@ def _tab_window(all_dates: List[date], day: date, size: int = TAB_WINDOW_SIZE) -
 # "Archivo Black" (used in an earlier revision of this site), which
 # had no Vietnamese coverage at all and silently mis-rendered
 # diacritics — see README.md's history of that bug.
-STYLE = """
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;700&display=swap');
-:root{
-  color-scheme:light;
-  --bg:#F5F3EE;
-  --surface:#FFFFFF;
-  --surface-2:#FAF9F6;
+# STYLE, icons and the app shell live in web/theme.py
 
-  --text:#111111;
-  --text-2:#6B6B6B;
-  --muted:#9A978F;
-
-  --border:#DDD9D0;
-  --divider:#ECE8E1;
-
-  --accent:#1F4B45;
-  --accent-soft:#E8F0EE;
-  --live:#C84C3A;
-
-  --radius:16px;
-  --shadow:0 1px 2px rgba(0,0,0,.04);
-  --sans:"Inter",-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
-  --mono:"IBM Plex Mono",ui-monospace,monospace;
-  --header-h:72px;
-}
-*{box-sizing:border-box;}
-html{scroll-behavior:smooth;}
-body{margin:0;background:var(--bg);color:var(--text);font-family:var(--sans);line-height:1.55;font-size:14px;}
-h2{margin:0;}
-a{color:inherit;}
-
-.page{max-width:1320px;margin:0 auto;padding:0 24px;}
-@media (max-width:1024px){.page{padding:0 20px;}}
-@media (max-width:640px){.page{padding:0 16px;}}
-
-/* ---- Header ---- */
-.site-header{position:sticky;top:0;z-index:20;height:var(--header-h);background:var(--surface);
-  border-bottom:1px solid var(--border);display:flex;align-items:center;gap:24px;
-  max-width:1320px;margin:0 auto;padding:0 24px;}
-@media (max-width:1024px){.site-header{padding:0 20px;}}
-@media (max-width:640px){.site-header{padding:0 16px;gap:12px;}}
-.masthead{font-weight:700;font-size:20px;letter-spacing:.01em;white-space:nowrap;flex:0 0 auto;}
-.masthead .dot{color:var(--accent);}
-.search-input{flex:1 1 240px;min-width:0;font:inherit;font-size:13px;color:var(--text);
-  background:var(--surface-2);border:1px solid var(--border);border-radius:999px;padding:8px 16px;}
-.search-input::placeholder{color:var(--muted);}
-.main-nav{display:flex;gap:20px;flex:0 0 auto;}
-.main-nav a{font-family:var(--mono);font-size:12px;font-weight:500;letter-spacing:.04em;
-  text-decoration:none;color:var(--text-2);white-space:nowrap;}
-.main-nav a:hover{color:var(--text);}
-.header-meta{display:flex;align-items:center;gap:8px;flex:0 0 auto;font-family:var(--mono);
-  font-size:11px;font-weight:500;color:var(--text-2);white-space:nowrap;}
-.live-dot{width:6px;height:6px;border-radius:50%;background:var(--live);display:inline-block;}
-@media (max-width:900px){.main-nav:not(.always),.header-meta{display:none;}}
-.main-nav a.active{color:var(--text);}
-.masthead a{color:inherit;text-decoration:none;}
-.page-title-note{max-width:1320px;margin:0 auto;padding:24px 24px 0;}
-
-/* ---- Scan button (kept from earlier revision; unrelated to design v2.0) ---- */
-.scan{flex:0 0 auto;}
-.scan button{font:inherit;font-weight:600;font-size:12px;color:var(--text);background:var(--surface);
-  border:1px solid var(--border);border-radius:999px;box-shadow:var(--shadow);padding:7px 16px;cursor:pointer;}
-.scan button:hover{background:var(--surface-2);}
-.scan button:disabled{cursor:wait;opacity:.6;}
-.scan .status{display:block;margin-top:4px;font-family:var(--mono);font-size:10px;color:var(--muted);
-  position:absolute;white-space:nowrap;}
-
-/* ---- Archived-day notice (points back to the newest day) ---- */
-.latest-banner{max-width:1320px;margin:16px auto 0;padding:10px 24px;background:var(--accent-soft);
-  color:var(--accent);font-size:13px;text-align:center;}
-.latest-banner a{color:var(--accent);font-weight:600;text-decoration:underline;}
-@media (max-width:1024px){.latest-banner{padding:10px 20px;}}
-@media (max-width:640px){.latest-banner{padding:10px 16px;}}
-
-/* ---- Section scaffolding ---- */
-main{padding:32px 0 40px;}
-section{scroll-margin-top:calc(var(--header-h) + 12px);margin:0 auto 40px;max-width:1320px;padding:0 24px;}
-@media (max-width:1024px){section{padding:0 20px;}}
-@media (max-width:640px){section{padding:0 16px;}}
-.section-title{font-size:26px;font-weight:650;line-height:1.15;margin-bottom:4px;letter-spacing:-.01em;}
-.section-note{color:var(--muted);font-size:12px;font-style:italic;margin:4px 0 16px;}
-
-/* ---- Today overview ---- */
-.today-overview .overview-strip{display:flex;flex-wrap:wrap;align-items:baseline;gap:10px;
-  margin-top:12px;padding:16px 20px;background:var(--surface);border:1px solid var(--border);
-  border-radius:var(--radius);box-shadow:var(--shadow);font-size:14px;color:var(--text-2);}
-.overview-strip strong{font-family:var(--mono);font-weight:700;color:var(--text);font-size:15px;}
-.dot-sep{color:var(--muted);}
-
-/* ---- Top issues ---- */
-.issues-grid{display:grid;grid-template-columns:1fr;gap:12px;margin-top:16px;}
-@media (min-width:900px){.issues-grid{grid-template-columns:1fr 1fr;}}
-details.issue-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);
-  box-shadow:var(--shadow);}
-details.issue-card>summary{display:flex;gap:14px;align-items:flex-start;padding:18px 20px;
-  cursor:pointer;list-style:none;user-select:none;min-height:150px;}
-details.issue-card>summary::-webkit-details-marker{display:none;}
-/* Clicking an Issue Tag in the news stream jumps to "#issue-{id}" —
-   force the detail body visible even without the native [open]
-   attribute, so the drill-down works with zero JS. */
-details.issue-card:target>*:not(summary){display:block!important;}
-.issue-rank{font-family:var(--mono);font-weight:700;font-size:20px;color:var(--muted);flex:0 0 auto;}
-.issue-summary{flex:1 1 auto;min-width:0;}
-.issue-title-row{display:flex;justify-content:space-between;align-items:baseline;gap:10px;}
-.issue-title{font-size:22px;font-weight:650;line-height:1.2;letter-spacing:-.01em;}
-.issue-score{flex:0 0 auto;font-family:var(--mono);font-weight:700;font-size:12px;color:var(--accent);
-  background:var(--accent-soft);border-radius:999px;padding:3px 10px;white-space:nowrap;}
-.issue-stats{font-family:var(--mono);font-size:12px;font-weight:500;color:var(--text-2);margin:6px 0 8px;}
-.why-hot-compact{list-style:none;margin:0;padding:0;}
-.why-hot-compact li{font-size:13px;color:var(--text-2);padding:1px 0;}
-.why-hot-compact li::before{content:"— ";color:var(--muted);}
-.issue-detail{padding:0 20px 20px;border-top:1px solid var(--divider);}
-.issue-metrics{display:flex;flex-wrap:wrap;gap:20px;padding:16px 0;}
-.metric{display:flex;flex-direction:column;gap:2px;}
-.metric-label{font-size:11px;color:var(--muted);}
-.metric-value{font-family:var(--mono);font-size:16px;font-weight:700;color:var(--text);}
-.source-coverage{display:flex;flex-direction:column;gap:8px;padding:8px 0 16px;}
-.coverage-row{display:flex;align-items:center;gap:10px;}
-.coverage-src{flex:0 0 140px;font-size:12px;color:var(--text-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-.coverage-track{flex:1 1 auto;height:6px;background:var(--surface-2);border-radius:999px;overflow:hidden;}
-.coverage-fill{height:100%;background:var(--accent);border-radius:999px;}
-.coverage-count{flex:0 0 24px;text-align:right;font-family:var(--mono);font-size:12px;color:var(--text-2);}
-.related-articles{display:flex;flex-direction:column;}
-.related-row{display:flex;align-items:baseline;gap:12px;padding:8px 0;border-top:1px solid var(--divider);font-size:13px;}
-.related-row:first-child{border-top:none;}
-.related-row .src{font-family:var(--mono);font-size:11px;color:var(--text-2);flex:0 0 120px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-.related-row a{flex:1 1 auto;min-width:0;text-decoration:none;color:var(--text);}
-.related-row a:hover{color:var(--accent);text-decoration:underline;}
-
-/* ---- Filters ---- */
-.filters{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:16px 0;position:sticky;
-  top:var(--header-h);z-index:10;background:var(--bg);padding:8px 0;}
-.pill-select{font:inherit;font-family:var(--mono);font-size:12px;font-weight:500;color:var(--text);
-  background:var(--surface);border:1px solid var(--border);border-radius:999px;padding:7px 14px;cursor:pointer;}
-.sort-toggle{display:flex;gap:6px;}
-.pill{font:inherit;font-family:var(--mono);font-size:12px;font-weight:500;color:var(--text-2);
-  background:var(--surface);border:1px solid var(--border);border-radius:999px;padding:7px 14px;cursor:pointer;}
-.pill.active{color:var(--accent);background:var(--accent-soft);border-color:var(--accent-soft);}
-
-/* ---- Pagination (News Stream shows PAGE_SIZE rows at a time) ---- */
-.pagination{display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:6px;margin:20px 0 4px;}
-.page-btn{font:inherit;font-family:var(--mono);font-size:12px;font-weight:500;color:var(--text-2);
-  background:var(--surface);border:1px solid var(--border);border-radius:999px;min-width:32px;
-  padding:6px 10px;cursor:pointer;}
-.page-btn.active{color:var(--accent);background:var(--accent-soft);border-color:var(--accent-soft);}
-.page-ellipsis{color:var(--muted);font-family:var(--mono);font-size:12px;padding:0 2px;}
-
-/* ---- Unified news stream ---- */
-.news-stream-list{display:flex;flex-direction:column;}
-.news-row{display:flex;align-items:center;gap:16px;min-height:64px;padding:8px 0;border-bottom:1px solid var(--divider);}
-.news-row .ts{flex:0 0 44px;font-family:var(--mono);font-size:11px;font-weight:500;color:var(--muted);}
-.news-row .src{flex:0 0 150px;font-family:var(--mono);font-size:12px;font-weight:500;color:var(--text-2);
-  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-.news-row .headline{flex:1 1 auto;min-width:0;font-size:16px;font-weight:500;line-height:1.35;
-  text-decoration:none;color:var(--text);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
-.news-row .headline:hover{color:var(--accent);}
-.news-row:hover{background:var(--surface-2);}
-.news-row .issue-tag{flex:0 0 auto;max-width:200px;font-family:var(--mono);font-size:11px;font-weight:500;
-  color:var(--accent);background:var(--accent-soft);border-radius:999px;padding:3px 10px;
-  text-decoration:none;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-@media (max-width:640px){
-  .news-row .src{flex-basis:90px;}
-  .news-row .issue-tag{display:none;}
-}
-
-/* ---- By source (secondary Kanban view) ---- */
-.source-board{display:flex;align-items:flex-start;gap:16px;overflow-x:auto;margin-top:16px;}
-@media (max-width:900px){.source-board{flex-direction:column;overflow-x:visible;}}
-details.source-col{flex:0 0 300px;background:var(--surface);border:1px solid var(--border);
-  border-radius:var(--radius);box-shadow:var(--shadow);}
-@media (max-width:900px){details.source-col{flex-basis:auto;width:100%;}}
-details.source-col>summary{display:flex;align-items:center;gap:10px;padding:12px 16px;cursor:pointer;
-  font-size:14px;font-weight:600;color:var(--text);border-bottom:1px solid var(--divider);
-  list-style:none;user-select:none;}
-details.source-col>summary::-webkit-details-marker{display:none;}
-details.source-col .count{margin-left:auto;font-family:var(--mono);font-weight:500;font-size:11px;
-  color:var(--text-2);border:1px solid var(--border);border-radius:999px;padding:2px 9px;}
-details.source-col .chevron{font-size:10px;color:var(--muted);transition:transform .15s ease;}
-details.source-col[open] .chevron{transform:rotate(180deg);}
-.source-list-wrap{max-height:min(65vh,600px);overflow-y:auto;padding:4px 16px;}
-.source-list-wrap ul{list-style:none;margin:0;padding:0;}
-.source-list-wrap li{display:flex;gap:10px;padding:9px 0;border-bottom:1px solid var(--divider);}
-.source-list-wrap li:last-child{border-bottom:none;}
-.source-list-wrap a{color:var(--text);text-decoration:none;font-size:13px;line-height:1.4;}
-.source-list-wrap a:hover{color:var(--accent);text-decoration:underline;}
-.source-list-wrap .time{color:var(--muted);font-family:var(--mono);font-size:11px;white-space:nowrap;padding-top:2px;}
-
-/* ---- Archive ---- */
-.date-tabs{display:flex;flex-wrap:wrap;gap:6px;margin-top:12px;}
-.date-tabs a{font-family:var(--mono);font-size:12px;font-weight:500;text-decoration:none;color:var(--text-2);
-  background:var(--surface);border:1px solid var(--border);border-radius:999px;padding:6px 14px;}
-.date-tabs a:hover{color:var(--text);}
-.date-tabs a.active{color:var(--accent);background:var(--accent-soft);border-color:var(--accent-soft);}
-.date-picker{margin-top:10px;font-family:var(--mono);font-size:12px;color:var(--muted);}
-.date-picker select{font:inherit;color:var(--text);background:var(--surface);border:1px solid var(--border);
-  border-radius:999px;padding:5px 12px;}
-
-/* ---- Analytics ---- */
-.an-grid{display:grid;grid-template-columns:1fr;gap:12px;margin-top:16px;}
-@media (min-width:1000px){.an-grid{grid-template-columns:1fr 1fr;}}
-details.an-block{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);
-  box-shadow:var(--shadow);min-width:0;}
-details.an-block>summary{padding:14px 20px;cursor:pointer;list-style:none;user-select:none;font-weight:650;font-size:16px;}
-details.an-block>summary::-webkit-details-marker{display:none;}
-details.an-block[open]>summary{border-bottom:1px solid var(--divider);}
-.an-body{padding:14px 20px 18px;overflow-x:auto;}
-.an-note{color:var(--muted);font-size:12px;font-style:italic;margin:0 0 10px;}
-.an-note.gap{margin-top:14px;}
-.an-empty{color:var(--muted);font-size:13px;}
-table.an-table{width:100%;border-collapse:collapse;font-size:13px;}
-.an-table th{text-align:left;font-family:var(--mono);font-size:11px;font-weight:500;color:var(--muted);
-  padding:4px 8px 6px 0;border-bottom:1px solid var(--divider);white-space:nowrap;}
-.an-table td{padding:6px 8px 6px 0;border-bottom:1px solid var(--divider);vertical-align:top;}
-.an-table td.num,.an-table th.num{text-align:right;font-family:var(--mono);}
-.an-table tr:last-child td{border-bottom:none;}
-.an-list{list-style:none;margin:0;padding:0;font-size:13px;}
-.an-list li{padding:6px 0;border-bottom:1px solid var(--divider);}
-.an-list li:last-child{border-bottom:none;}
-.an-list .dim,.dim{color:var(--text-2);}
-.an-bars{display:flex;align-items:flex-end;gap:3px;height:80px;margin:6px 0 4px;}
-.an-bars .bar{flex:1 1 0;background:var(--accent);border-radius:3px 3px 0 0;min-height:2px;}
-.an-axis{display:flex;justify-content:space-between;font-family:var(--mono);font-size:10px;color:var(--muted);}
-td.heat,th.heat{font-family:var(--mono);text-align:center;}
-
-/* ---- Brand monitoring ---- */
-.news-row .sent{flex:0 0 8px;width:8px;height:8px;border-radius:50%;}
-.news-row .sent.neg{background:var(--live);}
-.news-row .sent.pos{background:var(--accent);}
-.news-row .brand-tag{flex:0 0 auto;font-family:var(--mono);font-size:11px;color:var(--text-2);
-  border:1px solid var(--border);border-radius:999px;padding:2px 8px;white-space:nowrap;}
-@media (max-width:640px){.news-row .brand-tag{display:none;}}
-.role-tag{font-family:var(--mono);font-size:10px;border-radius:999px;padding:1px 7px;margin-left:6px;
-  background:var(--accent-soft);color:var(--accent);}
-.role-tag.comp{background:var(--surface-2);color:var(--text-2);border:1px solid var(--border);}
-.crisis-list{list-style:none;margin:0;padding:0;}
-.crisis-item{border:1px solid var(--live);border-radius:var(--radius);padding:14px 18px;margin-bottom:10px;background:var(--surface);}
-.crisis-item .lvl{font-family:var(--mono);font-size:11px;font-weight:700;color:var(--live);text-transform:uppercase;}
-.crisis-ok{color:var(--text-2);font-size:14px;padding:6px 0;}
-.sov-bar{min-width:90px;}
-.delta-up{color:var(--accent);} .delta-down{color:var(--live);}
-
-.empty{text-align:center;color:var(--muted);padding:60px 0;}
-footer{text-align:center;color:var(--muted);font-family:var(--mono);font-size:11px;padding:16px 16px 40px;}
-""".strip()
 
 
 def _display_date(article: dict) -> date:
@@ -369,8 +128,8 @@ def _scan_button_html() -> str:
         return ""
     worker_url = json.dumps(config.scan_worker_url)  # safe JS string literal
     return f"""<div class="scan">
-<button type="button" onclick="triggerScan(this)">Quét ngay</button>
-<span class="status" id="scan-status"></span>
+<button type="button" class="btn primary" onclick="triggerScan(this)">{icon("refresh")}Quét ngay</button>
+<span class="status" id="scan-status" role="status" aria-live="polite"></span>
 </div>
 <script>
 function triggerScan(btn) {{
@@ -383,7 +142,7 @@ function triggerScan(btn) {{
       if (res.ok) {{ status.textContent = res.data.message || 'Đã kích hoạt.'; }}
       else {{ status.textContent = res.data.message || ('Lỗi ' + res.status); }}
     }})
-    .catch(function() {{ status.textContent = 'Không kết nối được tới worker.'; }})
+    .catch(function() {{ status.textContent = 'Không kết nối được tới worker. Thử lại sau.'; }})
     .finally(function() {{ setTimeout(function() {{ btn.disabled = false; }}, 5000); }});
 }}
 </script>"""
@@ -404,15 +163,15 @@ def _issue_lookup(issues: List[Issue]) -> Dict[str, Issue]:
 def _news_row_html(article: dict, issue_lookup: Dict[str, Issue], brand_tags: Optional[Dict[str, Tagged]] = None) -> str:
     issue = issue_lookup.get(article["url"])
     tagged = (brand_tags or {}).get(article["url"])
-    brand_attr, extra_html = "", ""
+    brand_attr, meta_html = "", ""
     if tagged is not None:
         brand_attr = "|" + "|".join(escape(b) for b in tagged.brands) + "|"
         label = tagged.sentiment.label
         if label in ("tiêu cực", "tích cực"):
             cls = "neg" if label == "tiêu cực" else "pos"
             why = escape(", ".join(tagged.sentiment.reasons))
-            extra_html += f'<span class="sent {cls}" title="{escape(label)} (ước lượng): {why}"></span>'
-        extra_html += "".join(f'<span class="brand-tag">{escape(b)}</span>' for b in tagged.brands[:2])
+            meta_html += f'<span class="sent {cls}" role="img" aria-label="{escape(label)}" title="{escape(label)} (ước lượng): {why}"></span>'
+        meta_html += "".join(f'<span class="brand-tag">{escape(b)}</span>' for b in tagged.brands[:2])
     issue_id = escape(issue.issue_id) if issue else ""
     hot = f"{issue.hot_score:.1f}" if issue else "0"
     ts = _sort_key(article)
@@ -422,10 +181,11 @@ def _news_row_html(article: dict, issue_lookup: Dict[str, Issue], brand_tags: Op
     return (
         f'<div class="news-row" data-source="{escape(article["source"])}" '
         f'data-issue="{issue_id}" data-brand="{brand_attr}" data-hot="{hot}" data-ts="{int(ts.timestamp())}">'
-        f'<span class="ts">{_time_label(article)}</span>'
         f'<span class="src">{escape(article["source"])}</span>'
-        f'<a class="headline" href="{escape(article["url"])}" target="_blank" rel="noopener">{escape(article["title"])}</a>'
-        f'{extra_html}{tag_html}</div>'
+        f'<div class="hl"><a class="headline" href="{escape(article["url"])}" target="_blank" rel="noopener">{escape(article["title"])}</a>'
+        f'<div class="hl-meta">{meta_html}</div></div>'
+        f'{tag_html}'
+        f'<span class="ts">{_time_label(article)}</span></div>'
     )
 
 
@@ -438,21 +198,36 @@ def _news_stream_html(articles: List[dict], issue_lookup: Dict[str, Issue],
 
 
 def _filters_html(sources_present: List[str], issues: List[Issue], brands: Optional[List[str]] = None) -> str:
-    brand_select = ""
-    if brands:
-        options = "".join(f'<option value="{escape(b)}">{escape(b)}</option>' for b in brands)
-        brand_select = (f'<select class="pill-select" id="filter-brand" onchange="applyFilters()">'
-                        f'<option value="">Tất cả thương hiệu</option>{options}</select>\n')
+    """Search + filter fields. On desktop the fields sit inline next to the
+    search box; on mobile the same fields become a bottom sheet opened by
+    the "Bộ lọc" button (no duplicated DOM, so filter state is shared)."""
     source_options = "".join(f'<option value="{escape(s)}">{escape(s)}</option>' for s in sources_present)
     issue_options = "".join(
         f'<option value="{escape(i.issue_id)}">{escape(i.issue_title)}</option>' for i in issues
     )
-    return f"""<div class="filters">
-<select class="pill-select" id="filter-source" onchange="applyFilters()"><option value="">Tất cả nguồn</option>{source_options}</select>
-<select class="pill-select" id="filter-issue" onchange="applyFilters()"><option value="">Tất cả issue</option>{issue_options}</select>
-{brand_select}<div class="sort-toggle">
+    brand_field = ""
+    if brands:
+        options = "".join(f'<option value="{escape(b)}">{escape(b)}</option>' for b in brands)
+        brand_field = (
+            '<div class="field"><label for="filter-brand">Thương hiệu</label>'
+            f'<select id="filter-brand" class="pill-select" onchange="applyFilters()">'
+            f'<option value="">Tất cả thương hiệu</option>{options}</select></div>'
+        )
+    return f"""<div class="toolbar">
+<div class="search-box">{icon("search")}<input type="search" id="search-news" class="search-input" placeholder="Tìm kiếm tiêu đề..." aria-label="Tìm kiếm tiêu đề" oninput="applyFilters()"></div>
+<button type="button" class="btn filter-btn" data-open-sheet aria-haspopup="dialog">{icon("filter")}Bộ lọc</button>
+<div class="filter-sheet" role="dialog" aria-label="Bộ lọc tin">
+<div class="sheet-head"><span>Bộ lọc</span><button type="button" class="icon-btn" data-close-sheet aria-label="Đóng bộ lọc">{icon("x")}</button></div>
+<div class="fields">
+<div class="field"><label for="filter-source">Nguồn</label><select id="filter-source" class="pill-select" onchange="applyFilters()"><option value="">Tất cả nguồn</option>{source_options}</select></div>
+<div class="field"><label for="filter-issue">Issue</label><select id="filter-issue" class="pill-select" onchange="applyFilters()"><option value="">Tất cả issue</option>{issue_options}</select></div>
+{brand_field}
+<div class="field"><label>Sắp xếp</label><div class="sort-toggle">
 <button type="button" class="pill active" data-sort="newest" onclick="setSort(this,'newest')">Mới nhất</button>
 <button type="button" class="pill" data-sort="trending" onclick="setSort(this,'trending')">Đang hot</button>
+</div></div>
+</div>
+<div class="sheet-foot"><button type="button" class="btn" onclick="resetFilters()">Đặt lại</button><button type="button" class="btn primary" data-close-sheet>Áp dụng</button></div>
 </div>
 </div>"""
 
@@ -528,8 +303,8 @@ def _issue_card_html(rank: int, issue: Issue) -> str:
     )
 
 
-def _top_issues_html(issues: List[Issue]) -> str:
-    """The "TOP ISSUES" section — only rendered on the latest day's page
+def _top_issues_html(issues: List[Issue], width_class: str = "col-8") -> str:
+    """The "TOP ISSUES" panel — only rendered on the latest day's page
     (see build_site), since it is scored against *today* (Asia/Ho_Chi_Minh)
     and would be meaningless attached to an older archive day's page.
     Omitted entirely when nothing currently clears the issue thresholds
@@ -538,25 +313,44 @@ def _top_issues_html(issues: List[Issue]) -> str:
         return ""
     cards = "".join(_issue_card_html(rank, issue) for rank, issue in enumerate(issues, start=1))
     return (
-        '<section id="issues" class="top-issues">'
-        '<h2 class="section-title">Top Issues hôm nay</h2>'
-        '<p class="section-note">Trong phạm vi các nguồn báo mà hệ thống đang theo dõi — '
+        f'<section id="issues" class="panel {width_class}" aria-labelledby="issues-title">'
+        '<h2 class="panel-title" id="issues-title">Top Issues hôm nay</h2>'
+        '<p class="panel-note">Trong phạm vi các nguồn báo mà hệ thống đang theo dõi — '
         'không phải xếp hạng mức độ quan trọng khách quan.</p>'
         f'<div class="issues-grid">{cards}</div></section>'
     )
 
 
-def _today_overview_html(total: int, n_sources: int, issues: List[Issue], now: datetime, is_latest: bool) -> str:
-    title = "Today overview" if is_latest else "Overview"
-    stats = [f'<span><strong>{total}</strong> bài viết</span>', f'<span><strong>{n_sources}</strong> nguồn</span>']
-    if issues:
-        stats.append(f'<span><strong>{len(issues)}</strong> issue nổi bật</span>')
-    stats.append(f'<span>Cập nhật lúc {now.strftime("%H:%M")}</span>')
-    strip = '<span class="dot-sep">·</span>'.join(stats)
-    return (
-        f'<section id="overview" class="today-overview"><h2 class="section-title">{title}</h2>'
-        f'<div class="overview-strip">{strip}</div></section>'
-    )
+def _kpi_card(label: str, value: str, sub: str = "") -> str:
+    return (f'<div class="kpi"><div class="kpi-label">{escape(label)}</div>'
+            f'<div class="kpi-value">{value}</div><div class="kpi-sub">{sub}</div></div>')
+
+
+def _kpi_grid(cards: List[str]) -> str:
+    return f'<div class="kpi-grid">{"".join(cards)}</div>'
+
+
+def _delta_sub(cur: int, prev: Optional[int], suffix: str) -> str:
+    if prev is None:
+        return ""
+    if prev == 0:
+        return f"{suffix}" if cur == 0 else f'<span class="up">mới</span> {suffix}'
+    pct = (cur - prev) / prev * 100
+    cls = "up" if pct >= 0 else "down"
+    return f'<span class="{cls}">{pct:+.0f}%</span> {suffix}'
+
+
+def _today_overview_html(total: int, n_sources: int, issues: List[Issue], now: datetime, is_latest: bool,
+                         prev_total: Optional[int] = None) -> str:
+    cards = [
+        _kpi_card("Bài viết" + (" hôm nay" if is_latest else ""), f"{total:,}".replace(",", "."),
+                  _delta_sub(total, prev_total, "so với hôm qua cùng giờ") if is_latest else ""),
+        _kpi_card("Nguồn có bài", str(n_sources), f"trong {len(_SOURCE_ORDER)} nguồn theo dõi"),
+    ]
+    if is_latest:
+        cards.append(_kpi_card("Issue nổi bật", str(len(issues)), "đối tượng + chủ đề hot hôm nay"))
+    cards.append(_kpi_card("Cập nhật", now.strftime("%H:%M"), f"mỗi {config.crawl_interval_minutes} phút"))
+    return _kpi_grid(cards)
 
 
 def _by_source_html(sources: Dict[str, List[dict]]) -> str:
@@ -568,17 +362,18 @@ def _by_source_html(sources: Dict[str, List[dict]]) -> str:
             f'<a href="{escape(a["url"])}" target="_blank" rel="noopener">{escape(a["title"])}</a></li>'
             for a in items
         )
-        # <details>/<summary> keeps per-column collapse/expand with zero
-        # JS, same as before; the header just no longer carries a
-        # per-source accent color or icon (spec: "No colorful columns").
         columns.append(
             f'<details class="source-col" open>'
             f'<summary><span class="source-name">{escape(source)}</span>'
-            f'<span class="count">{len(items)}</span><span class="chevron">▾</span></summary>'
+            f'<span class="count">{len(items)}</span><span class="chevron" aria-hidden="true">▾</span></summary>'
             f'<div class="source-list-wrap"><ul>{rows}</ul></div></details>'
         )
-    body = "".join(columns) if columns else '<p class="empty">Không có bài nào.</p>'
-    return f'<section id="sources" class="by-source"><h2 class="section-title">By source</h2><div class="source-board">{body}</div></section>'
+    body = "".join(columns) if columns else '<div class="state"><b>Không có bài nào.</b></div>'
+    return (
+        '<section id="sources" class="section" aria-labelledby="sources-title">'
+        '<div class="section-head"><h2 class="section-title" id="sources-title">Theo nguồn</h2></div>'
+        f'<div class="source-board">{body}</div></section>'
+    )
 
 
 def _an_table(headers, rows, num_cols=()):
@@ -607,7 +402,7 @@ def _an_bars(values, label_left: str, label_right: str) -> str:
 
 def _heat_cell(value: float, peak: float, label: str) -> str:
     alpha = 0.0 if peak <= 0 else min(value / peak, 1.0) * 0.55
-    return f'<td class="heat" style="background:rgba(31,75,69,{alpha:.2f})">{label}</td>'
+    return f'<td class="heat" style="background:rgba(37,99,235,{alpha:.2f})">{label}</td>'
 
 
 def _an_first_movers(an: Analytics) -> str:
@@ -772,7 +567,7 @@ def _analytics_body(an: Analytics, streaks: List[IssueStreak], trend) -> str:
     if an.mix_matrix:
         blocks.append(_an_topic_mix(an))
     return (
-        '<section id="analytics" class="analytics"><h2 class="section-title">Analytics</h2>'
+        '<section id="analytics" class="section">'
         '<p class="section-note">Số liệu tính thuần từ các bài đã thu thập — không dùng AI, không dữ liệu ngoài. '
         'Dữ liệu thô: <a href="issues.json">issues.json</a> · <a href="stats.json">stats.json</a> · '
         '<a href="feed.xml">feed.xml</a></p>'
@@ -780,19 +575,7 @@ def _analytics_body(an: Analytics, streaks: List[IssueStreak], trend) -> str:
     )
 
 
-def _tab_header(active: str, now: datetime) -> str:
-    def link(key, href, label):
-        cls = ' class="active"' if key == active else ""
-        return f'<a href="{href}"{cls}>{label}</a>'
-    return f"""<header class="site-header">
-<div class="masthead"><a href="index.html">Vietnam News<span class="dot">.</span>Monitor</a></div>
-<nav class="main-nav always" style="margin-left:auto">
-{link("home", "index.html", "HOME")}
-{link("brands", "brands.html", "BRANDS")}
-{link("analytics", "analytics.html", "ANALYTICS")}
-</nav>
-<div class="header-meta"><span class="live-dot"></span>LIVE&nbsp;·&nbsp;{now.strftime("%H:%M")}</div>
-</header>"""
+
 
 
 def _role_tag(role: str) -> str:
@@ -885,53 +668,16 @@ def _brands_body(stats7: List[BrandStat], stats30: List[BrandStat], alerts: List
                             f'<ul class="an-list">{neg_html}</ul>'))
 
     return (
-        '<section id="brands" class="analytics"><h2 class="section-title">Brands</h2>'
+        '<section id="brands" class="section">'
         f'{setup}<p class="section-note">Dữ liệu thô: <a href="brands.json">brands.json</a></p>'
         f'<div class="an-grid">{"".join(blocks)}</div></section>'
     )
 
 
-def render_brands_page(stats7, stats30, alerts, watch, index, now: datetime, window_minutes: int) -> str:
-    return f"""<!DOCTYPE html>
-<html lang="vi">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Brands — Vietnam News Monitor</title>
-<style>{STYLE}</style>
-</head>
-<body>
-{_tab_header("brands", now)}
-<main>
-{_brands_body(stats7, stats30, alerts, watch, index, window_minutes)}
-</main>
-<footer><p>Sắc thái tin là ước lượng bằng từ khoá từ tiêu đề — cần người xác nhận trước khi hành động.</p></footer>
-</body>
-</html>
-"""
 
 
-def render_analytics_page(an: Analytics, streaks: List[IssueStreak], trend, now: datetime) -> str:
-    """The separate "ANALYTICS" tab (analytics.html) — kept off the home
-    page on purpose so the home page stays a fast news reader."""
-    return f"""<!DOCTYPE html>
-<html lang="vi">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Analytics — Vietnam News Monitor</title>
-<link rel="alternate" type="application/rss+xml" title="Vietnam News Monitor" href="feed.xml">
-<style>{STYLE}</style>
-</head>
-<body>
-{_tab_header("analytics", now)}
-<main>
-{_analytics_body(an, streaks, trend)}
-</main>
-<footer><p>Tự động cập nhật mỗi {config.crawl_interval_minutes} phút qua GitHub Actions.</p></footer>
-</body>
-</html>
-"""
+
+
 
 
 def _archive_html(day: date, all_dates: List[date]) -> str:
@@ -948,10 +694,12 @@ def _archive_html(day: date, all_dates: List[date]) -> str:
             f'<option value="{d.isoformat()}.html"{" selected" if d == day else ""}>{d.strftime("%d/%m/%Y")}</option>'
             for d in all_dates
         )
-        picker_html = f'<div class="date-picker">Ngày khác: <select onchange="location.href=this.value">{options}</select></div>'
+        picker_html = (f'<div class="date-picker"><label for="date-picker">Ngày khác:</label> '
+                       f'<select id="date-picker" onchange="location.href=this.value">{options}</select></div>')
 
     return (
-        f'<section id="archive" class="archive"><h2 class="section-title">Archive</h2>'
+        '<section id="archive" class="section" aria-labelledby="archive-title">'
+        '<div class="section-head"><h2 class="section-title" id="archive-title">Lưu trữ</h2></div>'
         f'<div class="date-tabs">{tabs_html}</div>{picker_html}</section>'
     )
 
@@ -1013,7 +761,21 @@ function renderPage() {{
   var start = (currentPage - 1) * PAGE_SIZE;
   rowsList().forEach(function (row) {{ row.style.display = 'none'; }});
   matching.slice(start, start + PAGE_SIZE).forEach(function (row) {{ row.style.display = ''; }});
+  var empty = document.getElementById('news-empty');
+  if (empty) empty.hidden = matching.length > 0;
+  var count = document.getElementById('news-count');
+  if (count) count.textContent = matching.length + ' tin';
   renderPagination(totalPages);
+}}
+
+function resetFilters() {{
+  ['search-news', 'filter-source', 'filter-issue', 'filter-brand'].forEach(function (id) {{
+    var el = document.getElementById(id);
+    if (el) el.value = '';
+  }});
+  var newest = document.querySelector('.sort-toggle .pill[data-sort="newest"]');
+  if (newest) setSort(newest, 'newest');
+  applyFilters();
 }}
 
 function goToPage(p) {{
@@ -1062,6 +824,40 @@ def _latest_banner_html(latest_href: Optional[str]) -> str:
     )
 
 
+
+
+
+def _median_lag(an: Analytics) -> str:
+    if not an.lag_rows:
+        return "—"
+    import statistics
+    return f"{statistics.median(r.median_min for r in an.lag_rows):.0f} phút"
+
+
+def _page_head(title: str, description: str, actions: str = "") -> str:
+    actions_html = f'<div class="page-actions">{actions}</div>' if actions else ""
+    return (f'<div class="page-head"><div><h1>{escape(title)}</h1><p>{escape(description)}</p></div>'
+            f'{actions_html}</div>')
+
+
+def _sources_panel(sources: Dict[str, List[dict]], width_class: str) -> str:
+    """Side panel: which outlets published most on the viewed day."""
+    ranked = sorted(((name, len(items)) for name, items in sources.items()), key=lambda kv: -kv[1])[:8]
+    if not ranked:
+        return ""
+    peak = ranked[0][1] or 1
+    rows = "".join(
+        f'<div class="bar-row"><span class="name">{escape(name)}</span>'
+        f'<div class="coverage-track"><div class="coverage-fill" style="width:{n / peak * 100:.0f}%"></div></div>'
+        f'<span class="val">{n}</span></div>'
+        for name, n in ranked
+    )
+    return (f'<aside class="panel {width_class}" aria-labelledby="top-sources-title">'
+            '<h2 class="panel-title" id="top-sources-title">Nguồn đăng nhiều nhất</h2>'
+            '<p class="panel-note">Số bài trong ngày, 8 nguồn đứng đầu.</p>'
+            f'<div class="bar-list">{rows}</div></aside>')
+
+
 def render_day_page(
     day: date,
     sources: Dict[str, List[dict]],
@@ -1070,6 +866,7 @@ def render_day_page(
     latest_href: Optional[str] = None,
     has_analytics: bool = False,
     brand_tags: Optional[Dict[str, Tagged]] = None,
+    prev_total: Optional[int] = None,
 ) -> str:
     now = datetime.now(ZoneInfo(config.timezone))
     is_latest = trending is not None
@@ -1078,58 +875,90 @@ def render_day_page(
     ordered_sources = _ordered_sources(sources.keys())
     issue_lookup = _issue_lookup(issues)
     all_articles = [a for items in sources.values() for a in items]
-
-    nav_issues = '<a href="#issues">ISSUES</a>' if issues else ""
-    nav_analytics = (
-        '<a href="brands.html">BRANDS</a>\n<a href="analytics.html">ANALYTICS</a>\n' if has_analytics else ""
-    )
     brand_names = sorted({b for t in (brand_tags or {}).values() for b in t.brands})
-    header_html = f"""<header class="site-header">
-<div class="masthead">Vietnam News<span class="dot">.</span>Monitor</div>
-<input type="search" id="search-news" class="search-input" placeholder="Tìm kiếm tiêu đề..." oninput="applyFilters()">
-<nav class="main-nav">
-<a href="#overview">TODAY</a>
-{nav_issues}
-<a href="#news">NEWS</a>
-<a href="#sources">SOURCES</a>
-{nav_analytics}<a href="#archive">ARCHIVE</a>
-</nav>
-<div class="header-meta"><span class="live-dot"></span>LIVE&nbsp;·&nbsp;{now.strftime("%H:%M")}</div>
-{_scan_button_html()}
-</header>"""
 
-    news_html = (
-        '<section id="news" class="news-stream"><h2 class="section-title">All news</h2>'
+    if is_latest:
+        title, description = "Tổng quan", (
+            f"Tin tài chính - kinh doanh từ {len(_SOURCE_ORDER)} nguồn báo Việt Nam, "
+            f"tự cập nhật mỗi {config.crawl_interval_minutes} phút.")
+    else:
+        title, description = f"Tin ngày {day.strftime('%d/%m/%Y')}", "Bản lưu trữ của ngày đã chọn."
+
+    empty_state = ('<div class="state" id="news-empty" hidden><b>Không tìm thấy tin phù hợp</b>'
+                   '<span>Thử đổi từ khoá hoặc bộ lọc.</span>'
+                   '<button type="button" class="btn" onclick="resetFilters()">Xoá bộ lọc</button></div>')
+    news = (
+        '<section id="news" class="section" aria-labelledby="news-title">'
+        '<div class="section-head"><h2 class="section-title" id="news-title">Tin tức</h2>'
+        '<span class="count-chip" id="news-count" aria-live="polite"></span></div>'
         f'{_filters_html(ordered_sources, issues, brand_names)}'
+        '<div class="news-table"><div class="news-head" aria-hidden="true">'
+        '<span>Nguồn</span><span>Tiêu đề</span><span>Issue</span><span>Giờ</span></div>'
         f'<div id="news-stream-list" class="news-stream-list">{_news_stream_html(all_articles, issue_lookup, brand_tags)}</div>'
-        '<div id="news-pagination" class="pagination"></div>'
-        '</section>'
+        f'{empty_state}</div>'
+        '<div id="news-pagination" class="pagination"></div></section>'
     )
 
-    return f"""<!DOCTYPE html>
-<html lang="vi">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Vietnam News Monitor — {day.strftime('%d/%m/%Y')}</title>
-<link rel="alternate" type="application/rss+xml" title="Vietnam News Monitor" href="feed.xml">
-<style>{STYLE}</style>
-</head>
-<body>
-{header_html}
-{_latest_banner_html(latest_href)}
-<main>
-{_today_overview_html(total, len(sources), issues, now, is_latest)}
-{_top_issues_html(issues)}
-{news_html}
-{_by_source_html(sources)}
-{_archive_html(day, all_dates)}
-</main>
-<footer><p>Tự động cập nhật mỗi {config.crawl_interval_minutes} phút qua GitHub Actions.</p></footer>
-<script>{_INTERACTION_SCRIPT}</script>
-</body>
-</html>
-"""
+    issues_panel = _top_issues_html(issues, "col-8") if issues else ""
+    side_panel = _sources_panel(sources, "col-4" if issues else "col-12")
+    grid = f'<div class="content-grid">{issues_panel}{side_panel}</div>' if (issues_panel or side_panel) else ""
+
+    body = (
+        f'{_latest_banner_html(latest_href)}'
+        f'<section id="overview" aria-label="Tổng quan">'
+        f'{_page_head(title, description, _scan_button_html())}'
+        f'{_today_overview_html(total, len(sources), issues, now, is_latest, prev_total)}</section>'
+        f'{grid}{news}{_by_source_html(sources)}{_archive_html(day, all_dates)}'
+    )
+    return render_shell(
+        active="home",
+        title=f"Vietnam News Monitor — {day.strftime('%d/%m/%Y')}",
+        crumb=title,
+        body=body,
+        now_label=now.strftime("%H:%M"),
+        has_data=has_analytics,
+        has_issues=bool(issues),
+        scripts=f"<script>{_INTERACTION_SCRIPT}</script>",
+        footer=f"Tự động cập nhật mỗi {config.crawl_interval_minutes} phút qua GitHub Actions.",
+    )
+
+
+def render_brands_page(stats7, stats30, alerts, watch, index, now: datetime, window_minutes: int) -> str:
+    tracked = [s for s in stats7 if s.mentions]
+    mentions = sum(s.mentions for s in stats7)
+    negative = sum(s.negative for s in stats7)
+    cards = _kpi_grid([
+        _kpi_card("Thương hiệu có tin", str(len(tracked)), "trong 7 ngày gần nhất"),
+        _kpi_card("Lượt nhắc tới", f"{mentions:,}".replace(",", "."), "tổng 7 ngày"),
+        _kpi_card("Tin tiêu cực", f"{negative}", f"{negative / mentions * 100:.0f}% (ước lượng)" if mentions else "—"),
+        _kpi_card("Cảnh báo hiện hành", str(len(alerts)), f"trong {window_minutes} phút qua"),
+    ])
+    body = (_page_head("Brands", "Share of voice, sắc thái và cảnh báo khủng hoảng theo thương hiệu.") + cards
+            + _brands_body(stats7, stats30, alerts, watch, index, window_minutes))
+    return render_shell(
+        active="brands", title="Brands — Vietnam News Monitor", crumb="Brands", body=body,
+        now_label=now.strftime("%H:%M"), has_data=True, has_issues=False,
+        footer="Sắc thái tin là ước lượng bằng từ khoá từ tiêu đề — cần người xác nhận trước khi hành động.",
+    )
+
+
+def render_analytics_page(an: Analytics, streaks: List[IssueStreak], trend, now: datetime) -> str:
+    """The separate ANALYTICS tab (analytics.html) — kept off the home
+    page on purpose so the home page stays a fast news reader."""
+    reposts_total = sum(r["reposts"] for r in an.repost_stats)
+    cards = _kpi_grid([
+        _kpi_card("Issue nhiều nguồn hôm nay", str(len(an.first_mover_today)), "có ≥2 báo cùng đưa"),
+        _kpi_card("Độ trễ thu thập", _median_lag(an), "trung vị các nguồn, 7 ngày"),
+        _kpi_card("Tin đăng lặp", str(reposts_total), "cùng 1 báo, 7 ngày"),
+        _kpi_card("Issue có lịch sử", str(len(streaks)), "từng lọt Top Issues"),
+    ])
+    body = (_page_head("Analytics", "Ai đưa tin trước, khoảng trống đưa tin, nhịp đăng bài và xu hướng chủ đề.")
+            + cards + _analytics_body(an, streaks, trend))
+    return render_shell(
+        active="analytics", title="Analytics — Vietnam News Monitor", crumb="Analytics", body=body,
+        now_label=now.strftime("%H:%M"), has_data=True, has_issues=False,
+        footer=f"Tự động cập nhật mỗi {config.crawl_interval_minutes} phút qua GitHub Actions.",
+    )
 
 
 def build_site(db: Database, out_dir: Path = SITE_DIR) -> None:
@@ -1144,6 +973,12 @@ def build_site(db: Database, out_dir: Path = SITE_DIR) -> None:
     now = datetime.now(ZoneInfo(config.timezone))
     trending = top_issues(articles, now)
     has_data = bool(articles)
+    prev_day = (now - timedelta(days=1)).date()
+    prev_total = sum(
+        1 for a in articles
+        if (a["published_at"] or a["first_seen_at"]).date() == prev_day
+        and (a["published_at"] or a["first_seen_at"]).time() <= now.time()
+    )
     index, watch = load_watchlist(config.watchlist_path)
     tagged = tag_articles(articles, index, watch)
     brand_tags = tags_by_url(tagged)
@@ -1161,6 +996,7 @@ def build_site(db: Database, out_dir: Path = SITE_DIR) -> None:
                 trending=(trending if is_latest else None),
                 latest_href=(None if is_latest else f"{latest.isoformat()}.html"),
                 has_analytics=has_data, brand_tags=brand_tags,
+                prev_total=(prev_total if is_latest else None),
             ),
             encoding="utf-8",
         )
@@ -1168,7 +1004,7 @@ def build_site(db: Database, out_dir: Path = SITE_DIR) -> None:
     latest_sources = by_date.get(latest, {})
     (out_dir / "index.html").write_text(
         render_day_page(latest, latest_sources, all_dates, trending=trending, has_analytics=has_data,
-                        brand_tags=brand_tags), encoding="utf-8"
+                        brand_tags=brand_tags, prev_total=prev_total), encoding="utf-8"
     )
 
     # Tells GitHub Pages not to run this through Jekyll (irrelevant here

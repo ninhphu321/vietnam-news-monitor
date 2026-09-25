@@ -358,7 +358,7 @@ def test_build_site_writes_brands_tab_with_share_of_voice_and_export(tmp_path, d
 
     brands = (out_dir / "brands.html").read_text(encoding="utf-8")
     assert "Share of voice" in brands and "Techcombank" in brands and "Cảnh báo khủng hoảng" in brands
-    assert 'href="analytics.html"' in brands and 'class="active"' in brands
+    assert 'href="analytics.html"' in brands and 'aria-current="page"' in brands
     data = json.loads((out_dir / "brands.json").read_text(encoding="utf-8"))
     assert {"share_of_voice_7d", "share_of_voice_30d", "crisis_alerts", "watchlist"} <= set(data)
 
