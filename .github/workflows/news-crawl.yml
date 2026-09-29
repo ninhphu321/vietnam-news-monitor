@@ -70,6 +70,14 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
+      # Roadmap DevOps V1 (mandatory): a failing test must stop the run
+      # here — a non-zero exit from this step fails the job outright, so
+      # none of the steps below (crawl, push to db-state, deploy) ever
+      # run. Before this, a broken PR could reach production at the next
+      # scheduled crawl (worst case 20 minutes) with no gate at all.
+      - name: Run tests
+        run: pytest -q
+
       - name: Restore database from db-state branch
         run: |
           if git ls-remote --exit-code --heads origin "$DB_BRANCH" > /dev/null 2>&1; then

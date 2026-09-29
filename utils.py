@@ -4,9 +4,9 @@ Kept separate from crawlers/base.py so tests can exercise normalization
 logic without importing feedparser/requests.
 """
 
-import html
-import re
 from urllib.parse import urljoin, urlsplit, urlunsplit, parse_qsl, urlencode
+
+from core.normalization import normalize_display_title
 
 # Query-string parameters that identify tracking/campaign noise, not the
 # article itself. Kept short and easy to extend; anything not listed here
@@ -31,14 +31,18 @@ def normalize_title(raw_title: str) -> str:
     the CDATA-wrapped <title>, which RSS parsers correctly leave as
     literal text since CDATA content is plain text, not HTML. This is
     a no-op for titles that contain no entities.
+
+    Delegates to core.normalization.normalize_display_title(), which
+    also composes Vietnamese diacritics to a single canonical Unicode
+    form (NFC) — confirmed necessary on real data (see that module's
+    docstring): a VietnamPlus title stored "xung đột" with its dấu nặng
+    as a separate combining character, which silently fails to match
+    the precomposed literal every keyword list in this project is
+    written in. Kept as a thin wrapper here since every crawler already
+    imports `normalize_title` from this module — no call site needs to
+    change.
     """
-    if raw_title is None:
-        return ""
-    unescaped = html.unescape(raw_title)
-    # Collapse any run of whitespace (spaces, tabs, newlines) to a single
-    # space, then strip the ends. Vietnamese diacritics are untouched
-    # because we only match on \s.
-    return re.sub(r"\s+", " ", unescaped).strip()
+    return normalize_display_title(raw_title)
 
 
 def normalize_url(raw_url: str, base_url: str = "") -> str:

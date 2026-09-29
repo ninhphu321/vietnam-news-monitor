@@ -257,7 +257,7 @@ Dành cho phòng truyền thông/PR ngành ngân hàng - tài chính. Toàn bộ
 
 ## 13. Testing
 
-**201 test** (`pytest`), chạy hoàn toàn offline bằng fixture lấy từ dữ liệu thực tế lúc audit — không cần mạng, mock qua thư viện `responses`.
+**208 test** (`pytest`), chạy hoàn toàn offline bằng fixture lấy từ dữ liệu thực tế lúc audit — không cần mạng, mock qua thư viện `responses`.
 
 | File | Phạm vi |
 |------|---------|
@@ -267,6 +267,7 @@ Dành cho phòng truyền thông/PR ngành ngân hàng - tài chính. Toàn bộ
 | `test_scheduler.py` | Toàn bộ luồng `run_cycle` (dry-run/thành công/lỗi 1 phần/tất cả lỗi), cô lập lỗi từng nguồn, phát hiện + cooldown cảnh báo nguồn chết, lịch quét cố định đúng chu kỳ |
 | `test_backup.py` | Backup có timestamp, tự xoá bản cũ |
 | `test_utils.py` | Chuẩn hoá URL (bỏ `fbclid`/`utm_*`/fragment) |
+| `test_normalization.py` | Chuẩn hoá tiêu đề cho việc so khớp (`core/normalization.py`) — NFC Unicode, không đổi nội dung hiển thị, regression test cho lỗi "xung đột" bị lưu sai dạng Unicode phát hiện trên dữ liệu thật |
 | `test_generate_site.py` | Sinh trang web: gom đúng ngày, escape XSS, cửa sổ 7-tab ngày, nút Quét ngay, phân trang, banner "xem tin mới nhất", tích hợp Top Issues, khung SaaS (sidebar/nav/KPI), trang Brands/Analytics riêng, các file xuất dữ liệu |
 | `test_issues.py` | Cả 8 kịch bản test bắt buộc theo đặc tả Issue Intelligence V3 (gộp đúng issue giống nhau, không gộp nhầm cùng entity khác topic, không gộp nhầm cùng topic khác entity, đa dạng nguồn, chống thiên vị khối lượng, "vì sao hot" đúng số liệu, ổn định xếp hạng, đúng múi giờ) + regression test cho lỗi "HĐQT" |
 | `test_analytics.py` | 8 khối phân tích dòng tin ở mục 10 (ai đưa trước, khoảng trống đưa tin, độ trễ, nhịp giờ, khối lượng theo chủ đề, đăng lặp — kể cả case bản tin mẫu theo ngày không bị tính nhầm, đồng xuất hiện, hồ sơ chủ đề) |
@@ -324,7 +325,7 @@ news-monitor/
 - **Riêng tư:** trang web và `watchlist.json` nằm trong repo/GitHub Pages **công khai**. Dùng cho mục đích nội bộ của 1 tổ chức (danh sách thương hiệu mình theo dõi, đối thủ) thì cần host riêng tư hoặc thêm đăng nhập trước khi đưa thông tin nhạy cảm vào.
 - **Bản quyền:** hệ thống chỉ lưu tiêu đề + đường dẫn gốc (an toàn). Lưu/phát lại toàn văn bài báo để làm báo cáo thương mại cần được các báo cho phép.
 - **Chưa có tuyên bố miễn trừ/điều khoản sử dụng** — cần ghi rõ đây không phải tư vấn đầu tư trước khi đưa ra ngoài phạm vi cá nhân.
-- **Vận hành:** CI hiện không chạy `pytest` trước khi deploy (code lỗi có thể lên production ở lần chạy kế tiếp); backup (`--backup-now`) không được gọi trong workflow CI (chỉ gắn với chế độ scheduler chạy dài hạn); không có giám sát độc lập cho chuỗi cron-job.org → Cloudflare Worker → GitHub Actions — nếu 1 mắt xích ngừng chạy, hệ thống im lặng không ai biết.
+- **Vận hành:** ~~CI không chạy `pytest` trước khi deploy~~ đã sửa trên nhánh `A_VMNs` (bước "Run tests" chặn hẳn crawl/deploy nếu có test lỗi). Còn lại: backup (`--backup-now`) không được gọi trong workflow CI (chỉ gắn với chế độ scheduler chạy dài hạn); không có giám sát độc lập cho chuỗi cron-job.org → Cloudflare Worker → GitHub Actions — nếu 1 mắt xích ngừng chạy, hệ thống im lặng không ai biết.
 - **Báo Đầu tư không có `published_at` cho bất kỳ bài nào** (giới hạn của chính trang nguồn, không phải lỗi crawler) — mọi bài của nguồn này hiển thị giờ `--:--` khi không fetch được trang chi tiết.
 
 ---

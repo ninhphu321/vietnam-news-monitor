@@ -1,3 +1,5 @@
+import unicodedata
+
 from utils import normalize_title, normalize_url
 
 
@@ -17,6 +19,20 @@ def test_normalize_title_never_rewrites_content():
 
 def test_normalize_title_handles_none():
     assert normalize_title(None) == ""
+
+
+def test_normalize_title_composes_vietnamese_diacritics_to_nfc():
+    # Regression guard: audit of the production DB on 2026-09-30 found a
+    # real VietnamPlus title storing "xung đột" with a decomposed "ộ"
+    # (precomposed "ô" + a separate combining dấu nặng, U+0323) instead
+    # of the single precomposed codepoint every keyword list in this
+    # project is written in — same *rendered* glyphs, different string,
+    # so a regex/entity/topic match against it silently fails. See
+    # core/normalization.py's docstring for the exact codepoints.
+    decomposed = "Xung đột leo thang tại Trung Đông"
+    normalized = normalize_title(decomposed)
+    assert normalized == unicodedata.normalize("NFC", normalized)
+    assert "đột" in normalized
 
 
 def test_normalize_title_unescapes_html_entities():
