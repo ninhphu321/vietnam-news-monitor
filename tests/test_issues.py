@@ -10,11 +10,15 @@ from zoneinfo import ZoneInfo
 import pytest
 
 from web.issues import (
+    BROAD_COVERAGE,
+    MULTI_SOURCE,
+    SINGLE_SOURCE,
     Issue,
     _entity_display,
     _extract_entities,
     _extract_topics,
     _issue_keys,
+    media_consensus,
     top_issues,
 )
 
@@ -366,3 +370,30 @@ def test_missing_source_weights_defaults_every_source_to_equal_weight():
     # No source_weights kwarg at all -> every source implicitly weight 1.0.
     issues = top_issues(articles, now, min_articles=2, min_sources=2)
     assert issues[0].source_weight_score == 100.0
+
+
+# --- Media Consensus (roadmap V3 §24) -----------------------------------
+
+
+def test_media_consensus_classifies_by_source_count():
+    assert media_consensus(0) == SINGLE_SOURCE
+    assert media_consensus(1) == SINGLE_SOURCE
+    assert media_consensus(2) == MULTI_SOURCE
+    assert media_consensus(5) == MULTI_SOURCE
+    assert media_consensus(6) == BROAD_COVERAGE
+    assert media_consensus(20) == BROAD_COVERAGE
+
+
+# --- Velocity Engine integration (roadmap V3 §22-23) --------------------
+
+
+def test_top_issues_exposes_a_populated_velocity_1h_per_issue():
+    now = TODAY_9AM + timedelta(hours=2)
+    articles = [
+        _article("VnExpress", "Eximbank tăng lãi suất huy động", "u1", TODAY_9AM),
+        _article("CafeF", "Eximbank điều chỉnh biểu lãi suất tiết kiệm", "u2", TODAY_9AM + timedelta(minutes=10)),
+        _article("Vietstock", "Eximbank huy động lãi suất mới nhất", "u3", now - timedelta(minutes=20)),
+    ]
+    issues = top_issues(articles, now, min_articles=2, min_sources=2)
+    assert issues[0].velocity_1h is not None
+    assert issues[0].velocity_1h.current_rate == 1.0  # 1 article in the last hour

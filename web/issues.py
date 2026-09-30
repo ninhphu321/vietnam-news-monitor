@@ -48,6 +48,8 @@ from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Set, Tuple
 from zoneinfo import ZoneInfo
 
+from web.velocity import DEFAULT_WINDOW, VelocityResult, calculate_velocity
+
 TIMEZONE = "Asia/Ho_Chi_Minh"
 TOP_N = 5
 # Spec section 10's minimum threshold, verbatim: "article_count >= 3
@@ -55,6 +57,27 @@ TOP_N = 5
 # ("Threshold phải configurable") — pass overrides into top_issues().
 MIN_ARTICLES_THRESHOLD = 3
 MIN_SOURCES_THRESHOLD = 2
+
+# Roadmap V3 §24 "Media Consensus": a coverage-breadth label, not a
+# truth/confidence score (the roadmap explicitly forbids reading "more
+# sources = more true" into this) — purely "how many outlets are
+# independently covering this right now".
+SINGLE_SOURCE = "single-source"
+MULTI_SOURCE = "multi-source"
+BROAD_COVERAGE = "broad-coverage"
+
+# Chosen intuitively (~1/4 of the 23-source pool) — same "tune from
+# real data" spirit as HOT_KEYWORDS/ACCELERATION_UP/DOWN elsewhere in
+# the project, not a validated cutoff.
+BROAD_COVERAGE_THRESHOLD = 6
+
+
+def media_consensus(source_count: int) -> str:
+    if source_count <= 1:
+        return SINGLE_SOURCE
+    if source_count >= BROAD_COVERAGE_THRESHOLD:
+        return BROAD_COVERAGE
+    return MULTI_SOURCE
 
 _WORD_RE = re.compile(r"[^\W\d_]+", re.UNICODE)
 
@@ -272,12 +295,19 @@ def _score_issue(g: dict, now: datetime, source_weights: Optional[Dict[str, floa
     earlier_sources = {s["source"] for s in g["samples"] if s["ts"] < recent_cutoff}
     new_sources = recent_sources - earlier_sources
 
+    # Roadmap V3 §22-23: a fixed-window read ("is this issue moving
+    # right now") separate from the quarter-of-lifespan `velocity`/
+    # `acceleration` above (which exists for SignalScore's ranking, not
+    # for absolute-rate display) — see web/velocity.py's docstring.
+    velocity_1h = calculate_velocity(timestamps, now, DEFAULT_WINDOW)
+
     return {
         "group": g, "article_count": article_count, "source_count": source_count,
         "first_seen": first_seen, "last_seen": last_seen,
         "velocity": velocity, "acceleration": acceleration,
         "recent_count": len(recent), "new_sources": new_sources,
         "source_weight_avg": source_weight_avg,
+        "velocity_1h": velocity_1h,
     }
 
 
@@ -402,6 +432,11 @@ class Issue:
     why_hot: List[str] = field(default_factory=list)
     representative_articles: List[dict] = field(default_factory=list)  # top 3, newest first
     all_articles: List[dict] = field(default_factory=list)  # full list, newest first
+    # Roadmap V3 §22-23 (web/velocity.py) — a fixed 1h-window read,
+    # separate from `velocity`/`acceleration` above (SignalScore's
+    # ranking inputs). Defaulted so existing test factories/callers
+    # that predate this field keep constructing Issue() unchanged.
+    velocity_1h: Optional[VelocityResult] = None
 
 
 def top_issues(
@@ -472,6 +507,7 @@ def top_issues(
                 why_hot=_why_hot(m),
                 representative_articles=articles_out[:3],
                 all_articles=articles_out,
+                velocity_1h=m["velocity_1h"],
             )
         )
     return issues

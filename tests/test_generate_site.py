@@ -390,3 +390,23 @@ def test_issue_card_omits_lifecycle_badge_when_not_provided():
     # "lifecycle-badge" alone would also match the CSS class definition
     # in <style>, which is always present — check for the actual element.
     assert '<span class="lifecycle-badge' not in html
+
+
+def test_issue_card_shows_media_consensus_label():
+    html = render_day_page(date(2026, 9, 14), {}, [date(2026, 9, 14)],
+                           trending=[_issue(unique_source_count=8)])
+    assert "Bao phủ rộng" in html
+
+
+def test_issue_card_shows_velocity_1h_when_present():
+    from web.velocity import VelocityResult
+    html = render_day_page(
+        date(2026, 9, 14), {}, [date(2026, 9, 14)],
+        trending=[_issue(velocity_1h=VelocityResult(current_rate=3.5, previous_rate=1.0, acceleration=3.5, status="accelerating"))],
+    )
+    assert "3.5 bài/giờ" in html
+
+
+def test_issue_card_omits_velocity_1h_line_when_not_provided():
+    html = render_day_page(date(2026, 9, 14), {}, [date(2026, 9, 14)], trending=[_issue()])
+    assert "bài/giờ" not in html

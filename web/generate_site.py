@@ -33,7 +33,7 @@ from web.brands import BrandIndex, Watchlist, load_watchlist
 from web.brandwatch import (BrandStat, CrisisAlert, Tagged, crisis_alerts, share_of_voice,
                             tag_articles, tags_by_url)
 from web.exports import brands_json, feed_xml, issues_json, stats_json
-from web.issues import Issue, top_issues
+from web.issues import BROAD_COVERAGE, MULTI_SOURCE, SINGLE_SOURCE, Issue, media_consensus, top_issues
 from web.signals import LIFECYCLE_LABELS
 from web.source_registry import load_source_registry, weight_for
 from web.theme import STYLE, icon, render_shell
@@ -283,6 +283,22 @@ def _lifecycle_badge_html(status: Optional[str]) -> str:
     return f'<span class="lifecycle-badge {css_class}">{escape(label)}</span>'
 
 
+# Roadmap V3 §24 — plain text, not a badge: the card already shows one
+# colored lifecycle badge (signal_status, a cross-cycle comparison since
+# this issue's first appearance today); a second badge for
+# velocity_1h's status (a same-window-size-independent, fixed 1h-vs-1h
+# comparison recomputed fresh on every build) could easily disagree
+# with the first one with no visual explanation why, e.g. an issue
+# correctly badged "Ổn định" for the day while its last hour alone
+# happens to be quiet — showing that as plain numbers instead avoids
+# implying two contradictory verdicts.
+_MEDIA_CONSENSUS_LABELS = {
+    SINGLE_SOURCE: "1 nguồn",
+    MULTI_SOURCE: "Nhiều nguồn",
+    BROAD_COVERAGE: "Bao phủ rộng",
+}
+
+
 def _issue_card_html(rank: int, issue: Issue, lifecycle_status: Optional[str] = None) -> str:
     # The compact (collapsed) card caps Why Hot at 2 bullets to hit the
     # spec's ~180-220px target height — the full list (already <=4
@@ -304,6 +320,17 @@ def _issue_card_html(rank: int, issue: Issue, lifecycle_status: Optional[str] = 
         f'<span class="metric-value">{issue.first_seen_at.strftime("%H:%M")}</span></div>'
         f'<div class="metric"><span class="metric-label">Cập nhật gần nhất</span>'
         f'<span class="metric-value">{issue.last_seen_at.strftime("%H:%M")}</span></div>'
+    )
+    if issue.velocity_1h is not None:
+        metrics += (
+            f'<div class="metric"><span class="metric-label">Tốc độ 1h qua</span>'
+            f'<span class="metric-value">{issue.velocity_1h.current_rate:.1f} bài/giờ</span></div>'
+        )
+    metrics += (
+        f'<div class="metric"><span class="metric-label">Đồng thuận</span>'
+        f'<span class="metric-value">'
+        f'{escape(_MEDIA_CONSENSUS_LABELS[media_consensus(issue.unique_source_count)])}'
+        f'</span></div>'
     )
     issue_id = escape(issue.issue_id)
     return (

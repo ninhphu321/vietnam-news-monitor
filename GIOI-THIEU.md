@@ -35,12 +35,13 @@ Trang tĩnh tự sinh lại sau mỗi lần quét, lưu toàn bộ lịch sử t
 - **Bảng Kanban nằm ngang** — mỗi nguồn 1 cột, cuộn ngang toàn hàng, mỗi cột tự cuộn dọc riêng khi quá dài. Bấm vào tiêu đề cột để đóng/mở.
 - **Thanh điều hướng 7 ngày** trải đều hết chiều ngang, tự căn giữa quanh ngày đang xem; xem ngày cũ hơn qua dropdown "Ngày khác".
 - **🔥 Top 5 Issues hôm nay** (tab gấp/mở, nằm dưới bảng Kanban) — xếp hạng 5 "issue" (1 cặp cụ thể tên riêng + chủ đề, ví dụ "Eximbank · Tăng vốn" — không gộp bừa theo 1 từ trùng lặp bất kỳ nên tránh gộp nhầm 2 tin không liên quan) đang được nhiều báo cùng đưa tin nhất **trong ngày hôm nay**, tính theo **SignalScore** (roadmap V2, xem TONG-QUAN-DU-AN.md):
-  - 40% số bài đề cập
-  - 25% số nguồn đề cập
-  - 20% tốc độ xuất hiện
-  - 15% mức độ mới/tăng tốc
+  - 30% đa dạng nguồn
+  - 25% tốc độ xuất hiện
+  - 20% mức độ mới/tăng tốc
+  - 15% số bài đề cập
+  - 10% trọng số nguồn (`source_registry.json`)
 
-  Mỗi issue kèm vài dòng "Vì sao hot" giải thích ngắn gọn, và bấm vào để xem toàn bộ bài viết liên quan. Cập nhật lại **mỗi lần quét**.
+  Mỗi issue kèm vài dòng "Vì sao hot" giải thích ngắn gọn, nhãn vòng đời (Mới xuất hiện/Đang tăng tốc/Ổn định/Đang hạ nhiệt), tốc độ 1 giờ qua + mức độ đồng thuận nguồn (roadmap V3), và bấm vào để xem toàn bộ bài viết liên quan. Cập nhật lại **mỗi lần quét**.
 - Giao diện phong cách biên tập báo chí (viền đen, đổ bóng cứng, không dùng gradient màu mè), hỗ trợ sẵn dark mode theo hệ thống.
 
 ### 🤖 Hạ tầng miễn phí, tự vận hành
@@ -74,7 +75,7 @@ GitHub Pages (trang web) + nhánh db-state (lưu database)
 
 ## Chất lượng & kiểm thử
 
-243 test tự động (`pytest`), chạy offline bằng dữ liệu fixture lấy từ audit thực tế — bao phủ toàn bộ crawler, logic chống trùng, format Telegram, sinh trang web, và thuật toán phát hiện issue.
+255 test tự động (`pytest`), chạy offline bằng dữ liệu fixture lấy từ audit thực tế — bao phủ toàn bộ crawler, logic chống trùng, format Telegram, sinh trang web, và thuật toán phát hiện issue.
 
 ---
 

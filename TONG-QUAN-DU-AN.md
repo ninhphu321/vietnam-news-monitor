@@ -221,6 +221,20 @@ Module [web/signals.py](web/signals.py) + bảng `issue_history`/`signal_events`
 
 **Trên web:** mỗi thẻ Top Issues có 1 nhãn nhỏ cạnh số bài/nguồn thể hiện đúng trạng thái hiện tại (đọc lại `issue_history` của hôm nay ngay sau khi `snapshot_data()` vừa ghi trong cùng 1 lần chạy job).
 
+### Velocity Engine + Media Consensus (roadmap V3 §22-24, Sprint 4)
+
+**Vì sao thêm module riêng thay vì sửa `velocity`/`acceleration` sẵn có:** 2 con số đó (mục 9) đã dùng để chấm điểm SignalScore — chia lịch sử issue thành "1/4 gần đây nhất" so với "phần trước đó", tốt cho **xếp hạng tương đối** nhưng không trả lời được "issue này đang nhanh hay chậm **ngay lúc này**" theo cách so sánh được giữa các issue có tuổi đời khác nhau. [web/velocity.py](web/velocity.py) tính thêm 1 chỉ số **độc lập, chỉ để hiển thị**, không đụng vào công thức SignalScore đã tune/test kỹ:
+
+- `calculate_velocity(timestamps, now, window=1h)` — chia 2 tiếng gần nhất thành 2 khung liền kề (giờ vừa qua = "current", giờ trước đó = "previous"), so tỷ lệ bài/giờ giữa 2 khung.
+- Dùng lại đúng ngưỡng ±15% và 4 trạng thái EMERGING/ACCELERATING/PEAK/COOLING của [web/signals.py](web/signals.py) — cố tình không bịa ra bộ trạng thái thứ 2 cho cùng 1 khái niệm "đang nhanh lên".
+- Roadmap §22 liệt kê 7 cỡ cửa sổ (5 phút → 24 giờ) để minh hoạ *vì sao* velocity cố định quan trọng, không phải yêu cầu hiển thị cả 7 con số cùng lúc — không có wireframe nào trong roadmap render quá 1 con số tốc độ, nên chỉ implement 1 cửa sổ cấu hình được (mặc định 1 giờ) thay vì dựng cả chuỗi thời gian 7 mốc.
+- **Không thêm bảng DB mới** (roadmap gợi ý `velocity_snapshots`) — tính thẳng từ timestamp bài viết đã có sẵn trong từng issue mỗi lần build, đúng tinh thần "Top Issues vốn đã tính lại từ đầu mỗi chu kỳ" hiện có, tránh lưu trùng dữ liệu suy ra được.
+- Trên thẻ issue: dòng "Tốc độ 1h qua" hiện số thô (bài/giờ), **không** hiện thành badge màu thứ 2 cạnh badge vòng đời Signal đã có — 2 chỉ số đo 2 thứ khác nhau (so với chu kỳ trước vs. so với 1 giờ cố định trước đó) nên có thể lệch trạng thái nhau; hiện badge thứ 2 dễ trông như 2 kết luận mâu thuẫn không giải thích được.
+
+**Media Consensus** (roadmap V3 §24, `web/issues.py`, hàm `media_consensus(source_count)`): chỉ là nhãn "độ rộng bao phủ", **không phải điểm tin cậy** — roadmap cấm hiểu "nhiều nguồn đưa = chắc chắn đúng". 3 mức: `single-source` (≤1 nguồn), `multi-source` (2-5), `broad-coverage` (≥6 — chọn trực giác theo ~1/4 số nguồn đang theo dõi, cùng tinh thần "cần tinh chỉnh theo dữ liệu thật" như `HOT_KEYWORDS`/ngưỡng ±15%, không phải số đã kiểm định).
+
+**Đã xác minh trên dữ liệu production thật:** cả 2 chỉ số tính đúng và hiện đúng vị trí trên thẻ issue (ảnh chụp DOM thực tế trong quá trình phát triển).
+
 ### Các cơ chế đảm bảo chất lượng khác
 
 - **Cửa sổ tính:** đúng 1 ngày dương lịch theo giờ Việt Nam (`Asia/Ho_Chi_Minh`), không phải cửa sổ trượt 48 giờ như bản đầu tiên.
@@ -281,7 +295,7 @@ Dành cho phòng truyền thông/PR ngành ngân hàng - tài chính. Toàn bộ
 
 ## 13. Testing
 
-**243 test** (`pytest`), chạy hoàn toàn offline bằng fixture lấy từ dữ liệu thực tế lúc audit — không cần mạng, mock qua thư viện `responses`.
+**255 test** (`pytest`), chạy hoàn toàn offline bằng fixture lấy từ dữ liệu thực tế lúc audit — không cần mạng, mock qua thư viện `responses`.
 
 | File | Phạm vi |
 |------|---------|
@@ -292,8 +306,9 @@ Dành cho phòng truyền thông/PR ngành ngân hàng - tài chính. Toàn bộ
 | `test_backup.py` | Backup có timestamp, tự xoá bản cũ |
 | `test_utils.py` | Chuẩn hoá URL (bỏ `fbclid`/`utm_*`/fragment) |
 | `test_normalization.py` | Chuẩn hoá tiêu đề cho việc so khớp (`core/normalization.py`) — NFC Unicode, không đổi nội dung hiển thị, regression test cho lỗi "xung đột" bị lưu sai dạng Unicode phát hiện trên dữ liệu thật |
-| `test_generate_site.py` | Sinh trang web: gom đúng ngày, escape XSS, cửa sổ 7-tab ngày, nút Quét ngay, phân trang, banner "xem tin mới nhất", tích hợp Top Issues, khung SaaS (sidebar/nav/KPI), trang Brands/Analytics riêng, các file xuất dữ liệu |
-| `test_issues.py` | Cả 8 kịch bản test bắt buộc theo đặc tả Issue Intelligence V3 (gộp đúng issue giống nhau, không gộp nhầm cùng entity khác topic, không gộp nhầm cùng topic khác entity, đa dạng nguồn, chống thiên vị khối lượng, "vì sao hot" đúng số liệu, ổn định xếp hạng, đúng múi giờ) + regression test cho lỗi "HĐQT" + đúng công thức trọng số SignalScore, trọng số nguồn tuỳ chỉnh ảnh hưởng xếp hạng đúng hướng |
+| `test_generate_site.py` | Sinh trang web: gom đúng ngày, escape XSS, cửa sổ 7-tab ngày, nút Quét ngay, phân trang, banner "xem tin mới nhất", tích hợp Top Issues, khung SaaS (sidebar/nav/KPI), trang Brands/Analytics riêng, các file xuất dữ liệu, thẻ issue hiện đúng nhãn Đồng thuận và dòng Tốc độ 1h qua khi có, ẩn dòng tốc độ khi không có (roadmap V3 §22-24) |
+| `test_issues.py` | Cả 8 kịch bản test bắt buộc theo đặc tả Issue Intelligence V3 (gộp đúng issue giống nhau, không gộp nhầm cùng entity khác topic, không gộp nhầm cùng topic khác entity, đa dạng nguồn, chống thiên vị khối lượng, "vì sao hot" đúng số liệu, ổn định xếp hạng, đúng múi giờ) + regression test cho lỗi "HĐQT" + đúng công thức trọng số SignalScore, trọng số nguồn tuỳ chỉnh ảnh hưởng xếp hạng đúng hướng + `media_consensus()` phân loại đúng theo số nguồn (roadmap V3 §24), `top_issues()` gắn đúng `velocity_1h` cho từng issue |
+| `test_velocity.py` | Velocity Engine (roadmap V3 §22-23): cả 2 khung trống → cooling, chỉ khung hiện tại có bài → emerging, nhanh/chậm hơn khung trước → accelerating/cooling, tốc độ không đổi → peak, cửa sổ tuỳ chỉnh (không cố định 1 giờ), bắt buộc `now` có timezone |
 | `test_analytics.py` | 8 khối phân tích dòng tin ở mục 10 (ai đưa trước, khoảng trống đưa tin, độ trễ, nhịp giờ, khối lượng theo chủ đề, đăng lặp — kể cả case bản tin mẫu theo ngày không bị tính nhầm, đồng xuất hiện, hồ sơ chủ đề) |
 | `test_brandwatch.py` | Từ điển thương hiệu (mã viết hoa phân biệt hoa/thường, ranh giới từ), watchlist tuỳ chỉnh, sắc thái (kể cả case bác bỏ tin đồn và nỗ lực bảo vệ không bị tính tiêu cực), share of voice, ngưỡng cảnh báo khủng hoảng, cooldown + "khẩn" vượt cooldown của "leo thang" trong `scheduler.check_crisis` |
 | `test_datainfra.py` | Bảng `daily_stats`/`issue_history`, `snapshot_data` (kể cả không được raise lỗi — trả `None` khi thất bại thay vì raise, và trả đúng danh sách issue đã xếp hạng kèm trạng thái vòng đời khi thành công, để `run_cycle` chuyển thẳng cho Telegram; vòng đời Signal: lần đầu → emerging, đổi trạng thái → ghi `signal_event`, lặp lại không đổi → không ghi thêm), các hàm xuất `issues.json`/`stats.json`/`feed.xml`, lưu trữ theo tháng (xuất không xoá theo mặc định, xoá + giữ nguyên file khi chạy lại) |
@@ -324,8 +339,9 @@ news-monitor/
 ├── web/
 │   ├── theme.py                          # khung ứng dụng SaaS: CSS, icon SVG, render_shell (mục 8)
 │   ├── generate_site.py                  # lắp ráp nội dung từng trang, gọi render_shell
-│   ├── issues.py                          # Issue Intelligence + SignalScore (Entity/Topic/Issue)
+│   ├── issues.py                          # Issue Intelligence + SignalScore (Entity/Topic/Issue) + Media Consensus (mục 9)
 │   ├── signals.py                          # phân loại vòng đời Signal (mục 9)
+│   ├── velocity.py                          # Velocity Engine 1h (mục 9, roadmap V3 §22-23)
 │   ├── source_registry.py                   # tải source_registry.json
 │   ├── analytics.py                          # phân tích dòng tin (mục 10)
 │   ├── brands.py                              # từ điển thương hiệu + watchlist (mục 11)
@@ -333,7 +349,7 @@ news-monitor/
 │   ├── brandwatch.py                            # share of voice + cảnh báo khủng hoảng (mục 11)
 │   ├── exports.py                                # issues.json/stats.json/feed.xml/brands.json (mục 12)
 │   └── cloudflare-worker/worker.js                # proxy bảo mật cho nút "Quét ngay"
-├── tests/                                           # 243 test, xem mục 13
+├── tests/                                           # 255 test, xem mục 13
 ├── data/news.db                                      # SQLite (local dev; trên CI lấy từ nhánh db-state)
 ├── data/archive/                                  # file lưu trữ theo tháng (--archive-old)
 ├── backup/                                         # snapshot DB có timestamp
@@ -349,6 +365,8 @@ news-monitor/
 - **SignalScore không phải "phủ quyết" tuyệt đối cho đa dạng nguồn** (mục 9) — 1 nguồn đăng nhiều tin gần giống nhau vẫn có thể thắng điểm 1 issue thật sự đa nguồn nếu chênh lệch số bài đủ lớn (đỡ hơn công thức HotScore cũ vì trọng số Source Diversity đã tăng từ 25%→30% và Volume giảm từ 40%→15%, nhưng vẫn không phải phủ quyết tuyệt đối).
 - **Vòng đời Signal dùng ngưỡng ±15% chưa qua kiểm chứng bằng dữ liệu dán nhãn** (mục 9) — chọn theo trực giác kỹ thuật, cùng kiểu "cần tinh chỉnh dần" như mọi ngưỡng luật khác trong dự án, không phải con số tối ưu đã kiểm định.
 - **`source_registry.json` mặc định trung lập (tất cả tier A)** — thành phần Source Weight của SignalScore chưa có tác dụng thực tế cho tới khi ai đó chủ động phân hạng lại nguồn.
+- **Velocity Engine (mục 9, roadmap V3 §22-23) dùng cửa sổ cố định 1 giờ và ngưỡng ±15% mượn từ vòng đời Signal** — chưa kiểm chứng bằng dữ liệu dán nhãn, cùng tình trạng "cần tinh chỉnh dần" như mọi ngưỡng luật khác. Ngưỡng "Bao phủ rộng" của Media Consensus (≥6 nguồn) cũng chọn theo trực giác (~1/4 số nguồn đang theo dõi), không phải số đã kiểm định.
+- **`velocity_1h` và badge vòng đời Signal có thể "lệch nhau" mà không giải thích tại sao** — 1 issue có thể hiện badge "● Ổn định" (so với chu kỳ trước) trong khi dòng "Tốc độ 1h qua" cho thấy 0 bài/giờ (không có bài nào trong 2 giờ gần nhất), vì 2 chỉ số đo 2 khung thời gian khác nhau (mục 9). Cố ý hiện dưới dạng số thô thay vì badge màu thứ 2 để giảm cảm giác mâu thuẫn, nhưng người đọc kỹ vẫn có thể thấy khó hiểu nếu không đọc phần giải thích này.
 - **"Ngày mới nhất" trễ tối đa ~20 phút sau nửa đêm** cho tới khi có bài đầu tiên của ngày mới (mục 8) — đã thêm banner "xem tin mới nhất" để giảm nhầm lẫn, nhưng chưa sửa tận gốc để trang tự bám theo đồng hồ thật (người dùng đã được hỏi, chọn giữ nguyên).
 - **Chưa có dark mode** ở giao diện hiện tại.
 - **Danh sách từ khoá (`HOT_KEYWORDS`, `_TOPIC_KEYWORDS`, `_GENERIC_ACRONYMS`, sắc thái ở mục 11) là tự chọn tay**, không phải NLP thật — cần tinh chỉnh dần khi phát hiện case sai qua vận hành thực tế, không phải giải pháp hoàn hảo 1 lần là xong. Chưa đo precision/recall trên tập dữ liệu dán nhãn tay, nên không có con số "độ chính xác X%" đáng tin để công bố.
