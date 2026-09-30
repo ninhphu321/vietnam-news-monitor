@@ -88,6 +88,49 @@ def test_run_cycle_sends_digest_and_marks_sent(db, monkeypatch):
     assert not any(kind == "single" for kind, _ in sent_calls)  # no error, no "no-new" needed
 
 
+def test_run_cycle_passes_snapshot_data_top_signals_to_telegram(db, monkeypatch):
+    # Roadmap V2 §19: run_cycle must reuse snapshot_data()'s return value
+    # (the ranked issues it just computed/persisted) as format_grouped_
+    # articles()'s top_signals, rather than recomputing top_issues() a
+    # second time or silently dropping it.
+    items = [NewsItem("A", "Tiêu đề 1", "https://x/1", datetime(2026, 9, 14, 10, 0, tzinfo=TZ))]
+    monkeypatch.setattr(scheduler, "CRAWLER_CLASSES", [fake_crawler_factory("A", items=items)])
+
+    sentinel = [("fake-issue", "accelerating")]
+    monkeypatch.setattr(scheduler, "snapshot_data", lambda *a, **k: sentinel)
+
+    captured = {}
+    def fake_format_grouped_articles(*args, **kwargs):
+        captured["top_signals"] = kwargs.get("top_signals")
+        return ["msg"]
+    monkeypatch.setattr(telegram, "format_grouped_articles", fake_format_grouped_articles)
+    monkeypatch.setattr(telegram, "send_messages", lambda *a, **k: None)
+
+    scheduler.run_cycle(db, make_cfg(), dry_run=False)
+
+    assert captured["top_signals"] is sentinel
+
+
+def test_run_cycle_passes_none_top_signals_when_snapshot_data_fails(db, monkeypatch):
+    # snapshot_data() is best-effort and returns None on failure (see its
+    # docstring) — run_cycle must still send the digest, just without a
+    # TOP SIGNALS section, rather than crashing the whole cycle.
+    items = [NewsItem("A", "Tiêu đề 1", "https://x/1", datetime(2026, 9, 14, 10, 0, tzinfo=TZ))]
+    monkeypatch.setattr(scheduler, "CRAWLER_CLASSES", [fake_crawler_factory("A", items=items)])
+    monkeypatch.setattr(scheduler, "snapshot_data", lambda *a, **k: None)
+
+    captured = {}
+    def fake_format_grouped_articles(*args, **kwargs):
+        captured["top_signals"] = kwargs.get("top_signals")
+        return ["msg"]
+    monkeypatch.setattr(telegram, "format_grouped_articles", fake_format_grouped_articles)
+    monkeypatch.setattr(telegram, "send_messages", lambda *a, **k: None)
+
+    scheduler.run_cycle(db, make_cfg(), dry_run=False)
+
+    assert captured["top_signals"] is None
+
+
 def test_run_cycle_sends_all_failed_report_when_every_source_fails(db, monkeypatch):
     monkeypatch.setattr(
         scheduler, "CRAWLER_CLASSES", [fake_crawler_factory("A", error=CrawlerError("timeout"))]

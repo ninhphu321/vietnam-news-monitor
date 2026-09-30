@@ -127,7 +127,8 @@ Nhịp quét: **cố định 20 phút/lần, cả ngày lẫn đêm** (`CRAWL_IN
 - Dùng thẳng HTTP Bot API qua `requests` (không dùng thư viện `python-telegram-bot` — thư viện đó async-first, nặng hơn mức cần cho đúng 1 POST đồng bộ/chu kỳ).
 - **Định dạng tin nhắn:** nhóm theo nguồn, mỗi nguồn có icon riêng (`SOURCE_ICONS`, nguồn lạ chưa có icon thì lấy fallback theo hash tên nguồn — ổn định qua các lần restart nhờ dùng tổng mã ký tự thay vì `hash()` của Python, vốn bị randomize ngẫu nhiên mỗi lần chạy process), tiêu đề là link HTML bấm được, mở đầu bằng 1 dòng tóm tắt (mấy bài, từ mấy nguồn).
 - **Tin "nóng":** tiêu đề khớp 1 trong các cụm từ `HOT_KEYWORDS` (`khẩn cấp`, `khủng hoảng`, `sập sàn`, `tăng vọt`, `lao dốc`, `kỷ lục`...) được tách riêng lên đầu tin nhắn — để không bị chìm lẫn giữa hàng chục tin bình thường khi lướt trên điện thoại. Danh sách này cố ý chọn theo cụm từ, không theo từ đơn lẻ như "tăng" (sẽ khớp gần như mọi tin).
-- **Giới hạn 4096 ký tự/tin nhắn của Telegram:** tự động chia nhỏ thành nhiều tin nếu vượt giới hạn.
+- **TOP TÍN HIỆU** (roadmap V2 §19, làm trên nhánh `A_VMNs`, `telegram.format_top_signals`): Top 5 issue theo SignalScore của hôm nay (cùng dữ liệu `scheduler.snapshot_data()` đã tính và ghi vào `issue_history` — không tính lại lần 2) được đặt lên **đầu tin nhắn**, trước cả mục "TIN NÓNG" và danh sách theo nguồn, kèm trạng thái vòng đời (★ Mới xuất hiện / ↑ Đang tăng tốc / ● Ổn định / ↓ Đang hạ nhiệt — cùng nhãn với trang web, xem `web/signals.LIFECYCLE_LABELS`). Đúng tinh thần roadmap: "Telegram phải giúp người dùng biết chuyện gì đáng chú ý trước khi đọc từng title". Chỉ hiện khi chu kỳ đó có bài mới để gửi (chu kỳ không có gì mới vẫn dùng tin nhắn "không có bài mới" riêng như cũ) và khi `snapshot_data()` thành công tính ra ít nhất 1 issue đạt ngưỡng Top Issues (mục 9) — `snapshot_data()` lỗi (hiếm, best-effort) thì trả `None`, digest vẫn gửi bình thường chỉ là không có mục này.
+- **Giới hạn 4096 ký tự/tin nhắn của Telegram:** tự động chia nhỏ thành nhiều tin nếu vượt giới hạn; mục TOP TÍN HIỆU luôn nằm trọn trong tin đầu tiên (phần 1/N) kể cả khi phải chia nhỏ.
 - **Retry:** gửi lỗi thì thử lại tối đa `MAX_RETRIES` lần (mặc định 3) trước khi coi là thất bại hẳn.
 - **Định dạng giờ:** `dd/mm HH:MM` (không chỉ giờ) — vì VTV có thể trả về bài trải dài nhiều ngày trong 1 response, chỉ hiện giờ sẽ khiến các bài từ ngày khác nhau nhìn như bị xáo trộn thứ tự.
 - **Cảnh báo khủng hoảng thương hiệu:** loại tin nhắn riêng (`format_crisis_alert`), tách biệt hoàn toàn khỏi digest bài mới thường ngày — xem mục 11.
@@ -280,14 +281,14 @@ Dành cho phòng truyền thông/PR ngành ngân hàng - tài chính. Toàn bộ
 
 ## 13. Testing
 
-**231 test** (`pytest`), chạy hoàn toàn offline bằng fixture lấy từ dữ liệu thực tế lúc audit — không cần mạng, mock qua thư viện `responses`.
+**243 test** (`pytest`), chạy hoàn toàn offline bằng fixture lấy từ dữ liệu thực tế lúc audit — không cần mạng, mock qua thư viện `responses`.
 
 | File | Phạm vi |
 |------|---------|
 | `test_crawlers.py`, `test_html_crawlers.py`, `test_fili_crawler.py` | Parse RSS cho 18 nguồn, HTML scrape cho 4 nguồn, JSON API cho FiLi — bao gồm mọi lỗi thật đã phát hiện qua audit (ngày phi chuẩn, encoding sai, thiếu giờ, cấu trúc trang đổi) |
 | `test_database.py` | Dedup theo URL, baseline seeding lần đầu + baseline riêng cho nguồn mới thêm vào DB đã có dữ liệu |
-| `test_telegram.py` | Định dạng tin nhắn, tách tin nóng, chia nhỏ khi vượt 4096 ký tự, retry khi lỗi |
-| `test_scheduler.py` | Toàn bộ luồng `run_cycle` (dry-run/thành công/lỗi 1 phần/tất cả lỗi), cô lập lỗi từng nguồn, phát hiện + cooldown cảnh báo nguồn chết, lịch quét cố định đúng chu kỳ |
+| `test_telegram.py` | Định dạng tin nhắn, tách tin nóng, chia nhỏ khi vượt 4096 ký tự, retry khi lỗi, mục TOP TÍN HIỆU đứng trước TIN NÓNG/theo nguồn (roadmap V2 §19) kể cả khi phải chia nhỏ tin nhắn |
+| `test_scheduler.py` | Toàn bộ luồng `run_cycle` (dry-run/thành công/lỗi 1 phần/tất cả lỗi), cô lập lỗi từng nguồn, phát hiện + cooldown cảnh báo nguồn chết, lịch quét cố định đúng chu kỳ, `snapshot_data()` trả về đúng được chuyển thẳng vào tham số `top_signals` của Telegram (và vẫn gửi digest bình thường khi `snapshot_data()` thất bại, trả `None`) |
 | `test_backup.py` | Backup có timestamp, tự xoá bản cũ |
 | `test_utils.py` | Chuẩn hoá URL (bỏ `fbclid`/`utm_*`/fragment) |
 | `test_normalization.py` | Chuẩn hoá tiêu đề cho việc so khớp (`core/normalization.py`) — NFC Unicode, không đổi nội dung hiển thị, regression test cho lỗi "xung đột" bị lưu sai dạng Unicode phát hiện trên dữ liệu thật |
@@ -295,7 +296,7 @@ Dành cho phòng truyền thông/PR ngành ngân hàng - tài chính. Toàn bộ
 | `test_issues.py` | Cả 8 kịch bản test bắt buộc theo đặc tả Issue Intelligence V3 (gộp đúng issue giống nhau, không gộp nhầm cùng entity khác topic, không gộp nhầm cùng topic khác entity, đa dạng nguồn, chống thiên vị khối lượng, "vì sao hot" đúng số liệu, ổn định xếp hạng, đúng múi giờ) + regression test cho lỗi "HĐQT" + đúng công thức trọng số SignalScore, trọng số nguồn tuỳ chỉnh ảnh hưởng xếp hạng đúng hướng |
 | `test_analytics.py` | 8 khối phân tích dòng tin ở mục 10 (ai đưa trước, khoảng trống đưa tin, độ trễ, nhịp giờ, khối lượng theo chủ đề, đăng lặp — kể cả case bản tin mẫu theo ngày không bị tính nhầm, đồng xuất hiện, hồ sơ chủ đề) |
 | `test_brandwatch.py` | Từ điển thương hiệu (mã viết hoa phân biệt hoa/thường, ranh giới từ), watchlist tuỳ chỉnh, sắc thái (kể cả case bác bỏ tin đồn và nỗ lực bảo vệ không bị tính tiêu cực), share of voice, ngưỡng cảnh báo khủng hoảng, cooldown + "khẩn" vượt cooldown của "leo thang" trong `scheduler.check_crisis` |
-| `test_datainfra.py` | Bảng `daily_stats`/`issue_history`, `snapshot_data` (kể cả không được raise lỗi, và vòng đời Signal: lần đầu → emerging, đổi trạng thái → ghi `signal_event`, lặp lại không đổi → không ghi thêm), các hàm xuất `issues.json`/`stats.json`/`feed.xml`, lưu trữ theo tháng (xuất không xoá theo mặc định, xoá + giữ nguyên file khi chạy lại) |
+| `test_datainfra.py` | Bảng `daily_stats`/`issue_history`, `snapshot_data` (kể cả không được raise lỗi — trả `None` khi thất bại thay vì raise, và trả đúng danh sách issue đã xếp hạng kèm trạng thái vòng đời khi thành công, để `run_cycle` chuyển thẳng cho Telegram; vòng đời Signal: lần đầu → emerging, đổi trạng thái → ghi `signal_event`, lặp lại không đổi → không ghi thêm), các hàm xuất `issues.json`/`stats.json`/`feed.xml`, lưu trữ theo tháng (xuất không xoá theo mặc định, xoá + giữ nguyên file khi chạy lại) |
 | `test_source_registry.py` | `source_registry.json`: file thiếu/hỏng/thiếu nguồn đều rơi về mặc định tier A/weight 1.0, không crash |
 | `test_signals.py` | Phân loại vòng đời Signal theo roadmap V2 §15 — lần đầu luôn là emerging, ngưỡng ±15% cho accelerating/cooling, trường hợp biên velocity=0 |
 
@@ -332,7 +333,7 @@ news-monitor/
 │   ├── brandwatch.py                            # share of voice + cảnh báo khủng hoảng (mục 11)
 │   ├── exports.py                                # issues.json/stats.json/feed.xml/brands.json (mục 12)
 │   └── cloudflare-worker/worker.js                # proxy bảo mật cho nút "Quét ngay"
-├── tests/                                           # 231 test, xem mục 13
+├── tests/                                           # 243 test, xem mục 13
 ├── data/news.db                                      # SQLite (local dev; trên CI lấy từ nhánh db-state)
 ├── data/archive/                                  # file lưu trữ theo tháng (--archive-old)
 ├── backup/                                         # snapshot DB có timestamp

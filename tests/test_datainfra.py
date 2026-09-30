@@ -95,6 +95,24 @@ def test_snapshot_data_never_raises(db, monkeypatch):
     snapshot_data(db, NOW)  # secondary, best-effort step: must swallow
 
 
+def test_snapshot_data_returns_none_on_failure(db, monkeypatch):
+    # scheduler.run_cycle() feeds this straight into Telegram's
+    # top_signals param (roadmap V2 §19) — a failed snapshot must come
+    # back as None, not raise, so the digest still sends without a
+    # TOP SIGNALS section.
+    monkeypatch.setattr(db, "get_all_articles", lambda: (_ for _ in ()).throw(RuntimeError("boom")))
+    assert snapshot_data(db, NOW) is None
+
+
+def test_snapshot_data_returns_ranked_issues_with_lifecycle_status(db):
+    for a in _issue_articles():
+        db.insert_if_new(NewsItem(a["source"], a["title"], a["url"], a["published_at"]))
+    ranked = snapshot_data(db, NOW)
+    assert ranked is not None and ranked != []
+    issue, status = ranked[0]
+    assert issue.issue_id and status == "emerging"
+
+
 # --- snapshot_data: signal lifecycle (roadmap V2 §15-16) ----------------------
 def test_first_snapshot_marks_a_new_issue_emerging_with_one_event(db):
     for a in _issue_articles():

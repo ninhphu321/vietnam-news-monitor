@@ -21,6 +21,8 @@ from typing import Dict, List, Optional, Tuple
 import requests
 
 from models import NewsItem
+from web.issues import Issue
+from web.signals import LIFECYCLE_LABELS
 
 logger = logging.getLogger(__name__)
 
@@ -172,10 +174,49 @@ def _pack_bullets(header: str, bullets: List[str], limit: int) -> List[str]:
     return messages
 
 
+# Roadmap V2 §19: same Top-N the website's Top Issues section shows,
+# so a reader who only ever looks at Telegram sees a consistent number.
+TOP_SIGNALS_LIMIT = 5
+
+
+def _signal_line(rank: int, issue: Issue, status: Optional[str]) -> str:
+    label = LIFECYCLE_LABELS.get(status, "")
+    stats = f"{issue.article_count} bài / {issue.unique_source_count} nguồn"
+    tail = f"\n{label}" if label else ""
+    return f"{rank}. <b>{_esc(issue.issue_title)}</b>\n{stats}{tail}"
+
+
+def format_top_signals(
+    ranked_issues: List[Tuple[Issue, Optional[str]]],
+    limit: int = TOP_SIGNALS_LIMIT,
+) -> str:
+    """Build the "TOP SIGNALS" block (roadmap V2 §19): today's top
+    SignalScore issues plus their lifecycle status, meant to sit above
+    the usual per-source digest so a reader sees what the signal
+    engine flagged as noteworthy before the raw per-source title list
+    ("Telegram phải giúp người dùng biết chuyện gì đáng chú ý trước
+    khi đọc từng title").
+
+    Returns "" for an empty `ranked_issues` so callers can pass
+    whatever they have without a special case. `ranked_issues` is
+    expected already ranked best-first (the same order
+    web.issues.top_issues() returns) — this only truncates to `limit`,
+    it does not re-sort.
+    """
+    if not ranked_issues:
+        return ""
+    lines = ["📡 <b>TOP TÍN HIỆU</b>", ""]
+    for rank, (issue, status) in enumerate(ranked_issues[:limit], start=1):
+        lines.append(_signal_line(rank, issue, status))
+        lines.append("")
+    return "\n".join(lines).rstrip()
+
+
 def format_grouped_articles(
     items_by_source: Dict[str, List[NewsItem]],
     limit: int = 4096,
     errored_sources: Optional[List[str]] = None,
+    top_signals: Optional[List[Tuple[Issue, Optional[str]]]] = None,
 ) -> List[str]:
     """Build one (or more, only if over the char limit) Telegram message(s)
     grouping new articles by source.
@@ -191,10 +232,22 @@ def format_grouped_articles(
     if given, is appended as a trailing warning so a cycle with both
     new articles and a failing source never looks fully healthy
     (spec section 14).
+
+    `top_signals`, if given (roadmap V2 §19), is today's ranked
+    SignalScore issues placed above everything else — including the
+    keyword-based "TIN NÓNG" section — so a reader sees what the
+    signal engine considers noteworthy before the raw per-source
+    title list. Only rendered when there are new articles to report
+    this cycle (an empty `items_by_source` still returns [] below,
+    same as before this parameter existed); a cycle with nothing new
+    keeps using the separate format_no_new_articles() message.
     """
     sources = [s for s, items in items_by_source.items() if items]
     if not sources:
         return []
+
+    top_signals_block = format_top_signals(top_signals) if top_signals else ""
+    top_signals_lines = top_signals_block.split("\n") if top_signals_block else []
 
     total = sum(len(items_by_source[s]) for s in sources)
     summary = f"📬 <b>{total} bài mới</b> · {len(sources)} nguồn"
@@ -230,7 +283,8 @@ def format_grouped_articles(
     body_parts = ([hot_block] if hot_block else []) + [
         "\n".join(blocks[s]) for s in normal_sources
     ]
-    full_text = f"{summary}\n\n" + "\n\n".join(body_parts) + footer
+    prefix = f"{top_signals_block}\n\n" if top_signals_block else ""
+    full_text = f"{prefix}{summary}\n\n" + "\n\n".join(body_parts) + footer
     if len(full_text) <= limit:
         return [full_text]
 
@@ -241,21 +295,30 @@ def format_grouped_articles(
     # instead, repeating its header.
     split_limit = limit - _PART_HEADER_RESERVE
     messages: List[str] = []
+    # Top signals (if any) lead the very first message no matter what
+    # follows, so they seed `current` before the hot/oversized-hot
+    # branch below even runs.
+    current: List[str] = list(top_signals_lines)
+    if current:
+        current.append("")
+
     def flush() -> None:
         if current:
             messages.append("\n".join(current))
             current.clear()
 
     if hot_pairs and len(hot_block) > split_limit:
-        # The hot section itself is too big for one message — pack it
-        # on its own (never silently dropped), `current` starts empty.
-        current: List[str] = []
+        # The hot section itself is too big for one message — flush
+        # whatever's pending (top signals, if any) as its own message
+        # first, then pack the hot section on its own (never silently
+        # dropped).
+        flush()
         messages.extend(_pack_bullets(hot_header, [_hot_line(s, i) for s, i in hot_pairs], split_limit))
     else:
         # The hot section always leads the first message — it's the
-        # whole point of pulling it out — so it seeds `current` before
-        # anything else is packed.
-        current = list(hot_lines)
+        # whole point of pulling it out — so it's appended right after
+        # any top signals already seeded into `current`.
+        current.extend(hot_lines)
 
     for source in normal_sources:
         items = normal_by_source[source]

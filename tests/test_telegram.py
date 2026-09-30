@@ -6,8 +6,36 @@ import responses
 
 import telegram
 from models import NewsItem
+from web.issues import Issue
 
 TZ = ZoneInfo("Asia/Ho_Chi_Minh")
+
+
+def _issue(**overrides):
+    defaults = dict(
+        issue_id="eximbank-nhan-su",
+        issue_title="Eximbank · Nhân sự lãnh đạo",
+        entities=["eximbank"],
+        topics=["nhân sự lãnh đạo"],
+        article_count=17,
+        unique_source_count=6,
+        first_seen_at=datetime(2026, 9, 14, 9, 0, tzinfo=TZ),
+        last_seen_at=datetime(2026, 9, 14, 16, 0, tzinfo=TZ),
+        velocity=1.2,
+        acceleration=1.5,
+        volume_score=100.0,
+        source_score=100.0,
+        velocity_score=80.0,
+        novelty_score=60.0,
+        source_weight_score=100.0,
+        hot_score=88.5,
+        sources=["VnExpress", "CafeF", "Tuổi Trẻ"],
+        why_hot=["3 nguồn báo cùng đề cập"],
+        representative_articles=[],
+        all_articles=[],
+    )
+    defaults.update(overrides)
+    return Issue(**defaults)
 
 
 def make_items(source, n, title_len=90, start_hour=10):
@@ -148,6 +176,59 @@ def test_is_hot_matches_curated_keywords_case_insensitively():
     assert telegram._is_hot("Doanh nghiệp ký hợp tác chiến lược") is False
 
 
+# ---------------------------------------------------------------------------
+# format_top_signals / format_grouped_articles(top_signals=...) — roadmap
+# V2 §19: SignalScore issues surfaced before the per-source digest.
+# ---------------------------------------------------------------------------
+
+
+def test_format_top_signals_empty_list_returns_empty_string():
+    assert telegram.format_top_signals([]) == ""
+
+
+def test_format_top_signals_lists_rank_title_stats_and_lifecycle_label():
+    text = telegram.format_top_signals([(_issue(), "accelerating")])
+    assert "TOP TÍN HIỆU" in text
+    assert "1. <b>Eximbank · Nhân sự lãnh đạo</b>" in text
+    assert "17 bài / 6 nguồn" in text
+    assert "Đang tăng tốc" in text
+
+
+def test_format_top_signals_omits_label_for_unknown_status():
+    text = telegram.format_top_signals([(_issue(), None)])
+    assert "Eximbank" in text
+    for label in telegram.LIFECYCLE_LABELS.values():
+        assert label not in text
+
+
+def test_format_top_signals_truncates_to_limit():
+    ranked = [(_issue(issue_id=f"i{n}", issue_title=f"Issue {n}"), "peak") for n in range(8)]
+    text = telegram.format_top_signals(ranked, limit=3)
+    assert "Issue 0" in text and "Issue 2" in text
+    assert "Issue 3" not in text
+
+
+def test_format_grouped_puts_top_signals_before_hot_section_and_sources():
+    items = {"VnExpress": [
+        NewsItem("VnExpress", "khủng hoảng tài chính", "https://x/1", datetime(2026, 9, 14, 10, 0, tzinfo=TZ)),
+        NewsItem("VnExpress", "Tin bình thường", "https://x/2", datetime(2026, 9, 14, 10, 1, tzinfo=TZ)),
+    ]}
+    text = telegram.format_grouped_articles(items, top_signals=[(_issue(), "accelerating")])[0]
+    assert text.index("TOP TÍN HIỆU") < text.index("TIN NÓNG") < text.index("VNEXPRESS")
+
+
+def test_format_grouped_without_top_signals_omits_the_section():
+    items = {"VnExpress": [NewsItem("VnExpress", "Tin bình thường", "https://x/1", datetime(2026, 9, 14, 10, 0, tzinfo=TZ))]}
+    text = telegram.format_grouped_articles(items)[0]
+    assert "TOP TÍN HIỆU" not in text
+
+
+def test_format_grouped_empty_items_omits_top_signals_too():
+    # No new articles this cycle -> still [] even if top_signals is given;
+    # a cycle with nothing new keeps using format_no_new_articles() instead.
+    assert telegram.format_grouped_articles({}, top_signals=[(_issue(), "peak")]) == []
+
+
 def test_format_grouped_appends_error_footer_when_given():
     items = [NewsItem("Vietstock", "T", "https://x/1", datetime(2026, 9, 14, 10, 0, tzinfo=TZ))]
     text = telegram.format_grouped_articles({"Vietstock": items}, errored_sources=["VnExpress"])[0]
@@ -180,6 +261,21 @@ def test_format_grouped_splits_across_many_sources_without_losing_articles():
     assert len(messages) > 1
     for msg in messages:
         assert len(msg) <= 4096
+    for items in items_by_source.values():
+        for item in items:
+            occurrences = sum(1 for msg in messages if item.url in msg)
+            assert occurrences == 1
+
+
+def test_format_grouped_top_signals_lead_the_first_part_when_split():
+    items_by_source = {f"Source{i}": make_items(f"Source{i}", 15, title_len=100) for i in range(6)}
+    messages = telegram.format_grouped_articles(
+        items_by_source, limit=4096, top_signals=[(_issue(), "accelerating")],
+    )
+
+    assert len(messages) > 1
+    assert "TOP TÍN HIỆU" in messages[0]
+    assert all("TOP TÍN HIỆU" not in msg for msg in messages[1:])
     for items in items_by_source.values():
         for item in items:
             occurrences = sum(1 for msg in messages if item.url in msg)

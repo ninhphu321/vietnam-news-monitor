@@ -31,6 +31,18 @@ COOLING = "cooling"
 ACCELERATION_UP = 1.15
 ACCELERATION_DOWN = 0.85
 
+# Single source of truth for how each status is shown to a human,
+# reused by both the website (web/generate_site.py, which adds its own
+# CSS class alongside this text) and Telegram (telegram.py's "TOP
+# SIGNALS" section, roadmap V2 §19) so the two surfaces can never
+# drift into describing the same status with different words.
+LIFECYCLE_LABELS = {
+    EMERGING: "★ Mới xuất hiện",
+    ACCELERATING: "↑ Đang tăng tốc",
+    PEAK: "● Ổn định",
+    COOLING: "↓ Đang hạ nhiệt",
+}
+
 
 def classify_lifecycle(velocity_now: float, velocity_previous: Optional[float]) -> str:
     """`velocity_previous` is None when the issue has no row yet today

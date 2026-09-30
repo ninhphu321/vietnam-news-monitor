@@ -24,6 +24,7 @@ Mỗi nguồn được audit thực tế trên dữ liệu sống (không đoán
 
 ### 📬 Gửi tin qua Telegram
 - Gom bài theo từng nguồn, mỗi nguồn 1 icon riêng để phân biệt nhanh.
+- **"📡 TOP TÍN HIỆU" dẫn đầu tin nhắn** (roadmap V2) — Top 5 issue đang hot nhất hôm nay theo SignalScore, kèm trạng thái (★ Mới xuất hiện / ↑ Đang tăng tốc / ● Ổn định / ↓ Đang hạ nhiệt), để biết ngay chuyện gì đáng chú ý trước khi đọc từng title.
 - **Tự động tách "🚨 TIN NÓNG"** lên đầu tin nhắn — nhận diện bằng bộ từ khoá (khủng hoảng, sụp đổ, tăng vọt, giảm sốc, phá sản...) để bài quan trọng không bị chìm giữa hàng chục tin thường.
 - Cảnh báo khi 1 nguồn "chết âm thầm" (vẫn phản hồi HTTP 200 nhưng ngừng cập nhật nội dung thật).
 - Có nút "🔄 Quét ngay" trên web để tự kích hoạt quét thủ công bất cứ lúc nào.
@@ -73,7 +74,7 @@ GitHub Pages (trang web) + nhánh db-state (lưu database)
 
 ## Chất lượng & kiểm thử
 
-231 test tự động (`pytest`), chạy offline bằng dữ liệu fixture lấy từ audit thực tế — bao phủ toàn bộ crawler, logic chống trùng, format Telegram, sinh trang web, và thuật toán phát hiện issue.
+243 test tự động (`pytest`), chạy offline bằng dữ liệu fixture lấy từ audit thực tế — bao phủ toàn bộ crawler, logic chống trùng, format Telegram, sinh trang web, và thuật toán phát hiện issue.
 
 ---
 

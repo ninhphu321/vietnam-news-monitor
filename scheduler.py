@@ -28,7 +28,7 @@ import telegram
 from web.analytics import daily_stats_rows
 from web.brands import load_watchlist
 from web.brandwatch import LEVEL_URGENT, crisis_alerts, tag_articles
-from web.issues import top_issues
+from web.issues import Issue, top_issues
 from web.signals import classify_lifecycle
 from web.source_registry import load_source_registry, weight_for
 
@@ -230,7 +230,9 @@ def run_backup(cfg: Config) -> None:
 STATS_REFRESH_DAYS = 3
 
 
-def snapshot_data(db: Database, now: datetime, cfg: Optional[Config] = None) -> None:
+def snapshot_data(
+    db: Database, now: datetime, cfg: Optional[Config] = None
+) -> Optional[List[Tuple[Issue, str]]]:
     """Persist derived data that would otherwise be lost or recomputed
     from scratch: today's Top Issues (-> issue_history, plus signal
     lifecycle transitions -> signal_events) and per-day source/topic
@@ -242,7 +244,14 @@ def snapshot_data(db: Database, now: datetime, cfg: Optional[Config] = None) -> 
 
     `cfg` is optional (defaults to every source at equal weight) only so
     existing callers/tests that predate SignalScore's Source Weight
-    component keep working without passing one."""
+    component keep working without passing one.
+
+    Returns the same ranked (Issue, lifecycle_status) pairs it just
+    persisted — already computed here, so run_cycle() reuses them for
+    Telegram's "TOP SIGNALS" section (roadmap V2 §19) instead of
+    recomputing top_issues() a second time — or None if the snapshot
+    itself failed, so a broken signal computation degrades Telegram to
+    "no top signals section" rather than taking the whole cycle down."""
     try:
         articles = db.get_all_articles()
         today = now.date().isoformat()
@@ -259,6 +268,7 @@ def snapshot_data(db: Database, now: datetime, cfg: Optional[Config] = None) -> 
         # answerable later, not just the latest snapshot.
         previous_by_id = {row["issue_id"]: row for row in db.get_issue_history(since_day=today)}
         issue_rows = []
+        ranked: List[Tuple[Issue, str]] = []
         for rank, i in enumerate(issues, start=1):
             previous = previous_by_id.get(i.issue_id)
             previous_velocity = previous["velocity"] if previous else None
@@ -276,6 +286,7 @@ def snapshot_data(db: Database, now: datetime, cfg: Optional[Config] = None) -> 
                 "first_seen_at": i.first_seen_at.isoformat(), "last_seen_at": i.last_seen_at.isoformat(),
                 "velocity": i.velocity, "signal_status": status,
             })
+            ranked.append((i, status))
         db.record_issues(today, issue_rows, now)
 
         # First run on an existing DB backfills every historical day; after
@@ -287,8 +298,10 @@ def snapshot_data(db: Database, now: datetime, cfg: Optional[Config] = None) -> 
         rows = daily_stats_rows(articles, only_days)
         days = only_days if only_days is not None else {date.fromisoformat(r[0]) for r in rows}
         db.replace_daily_stats([d.isoformat() for d in days], rows)
+        return ranked
     except Exception:  # noqa: BLE001 - secondary feature, see docstring
         logger.exception("Data snapshot (issue_history/daily_stats) failed; continuing.")
+        return None
 
 
 def check_crisis(db: Database, cfg: Config, now: datetime) -> None:
@@ -348,7 +361,7 @@ def run_cycle(db: Database, cfg: Config, dry_run: bool = False) -> None:
         if db.insert_if_new(item):
             newly_inserted.append(item)
 
-    snapshot_data(db, now, cfg)
+    top_signals = snapshot_data(db, now, cfg)
 
     # get_pending() already includes rows from this cycle's inserts (they
     # were just written with sent_at NULL), so it's the single source of
@@ -371,6 +384,7 @@ def run_cycle(db: Database, cfg: Config, dry_run: bool = False) -> None:
                 grouped,
                 limit=cfg.telegram_message_limit,
                 errored_sources=errored_sources or None,
+                top_signals=top_signals,
             )
             telegram.send_messages(
                 cfg.telegram_bot_token, cfg.telegram_chat_id, messages,

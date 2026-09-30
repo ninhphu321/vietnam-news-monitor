@@ -34,6 +34,7 @@ from web.brandwatch import (BrandStat, CrisisAlert, Tagged, crisis_alerts, share
                             tag_articles, tags_by_url)
 from web.exports import brands_json, feed_xml, issues_json, stats_json
 from web.issues import Issue, top_issues
+from web.signals import LIFECYCLE_LABELS
 from web.source_registry import load_source_registry, weight_for
 from web.theme import STYLE, icon, render_shell
 
@@ -263,20 +264,22 @@ def _related_articles_html(articles: List[dict]) -> str:
     )
 
 
-# Roadmap V2 §15 lifecycle labels — Vietnamese, no emoji (arrow glyphs
-# only, consistent with the rest of the site's icon-free badges).
-_LIFECYCLE_LABELS = {
-    "emerging": ("★ Mới xuất hiện", "lc-emerging"),
-    "accelerating": ("↑ Đang tăng tốc", "lc-accelerating"),
-    "peak": ("● Ổn định", "lc-peak"),
-    "cooling": ("↓ Đang hạ nhiệt", "lc-cooling"),
+# CSS class per status; the label text itself lives in web/signals.py
+# (LIFECYCLE_LABELS) so the site and the Telegram "TOP SIGNALS" section
+# (roadmap V2 §19) always describe a status with the same words.
+_LIFECYCLE_CSS_CLASSES = {
+    "emerging": "lc-emerging",
+    "accelerating": "lc-accelerating",
+    "peak": "lc-peak",
+    "cooling": "lc-cooling",
 }
 
 
 def _lifecycle_badge_html(status: Optional[str]) -> str:
-    if not status or status not in _LIFECYCLE_LABELS:
+    if not status or status not in LIFECYCLE_LABELS:
         return ""
-    label, css_class = _LIFECYCLE_LABELS[status]
+    label = LIFECYCLE_LABELS[status]
+    css_class = _LIFECYCLE_CSS_CLASSES[status]
     return f'<span class="lifecycle-badge {css_class}">{escape(label)}</span>'
 
 
