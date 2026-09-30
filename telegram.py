@@ -21,6 +21,7 @@ from typing import Dict, List, Optional, Tuple
 import requests
 
 from models import NewsItem
+from personal_watchlist import PersonalWatchlistMatch
 from web.issues import Issue
 from web.signals import LIFECYCLE_LABELS
 
@@ -442,6 +443,23 @@ def format_signal_alert(issue: Issue, now: datetime) -> str:
     if v is not None:
         lines.append(f"Tốc độ 1h qua: {v.current_rate:.1f} bài/giờ (trước đó: {v.previous_rate:.1f})")
     lines += ["", f"⏰ {now.strftime('%d/%m/%Y %H:%M')}"]
+    return "\n".join(lines)
+
+
+def format_personal_watchlist_alert(matches: List[PersonalWatchlistMatch], now: datetime) -> str:
+    """Roadmap V4 §34 "Personal Telegram": one combined digest of every
+    personal-watchlist entity that got at least 1 new article this
+    cycle — never the raw titles themselves (roadmap: "Không gửi toàn
+    bộ title"), just the counts, since the titles are already in the
+    regular per-source digest. Caller (scheduler.send_personal_
+    watchlist_alert) only calls this with a non-empty `matches`."""
+    lines = ["📡 <b>MY RADAR</b>", ""]
+    for m in matches:
+        lines.append(f"<b>{_esc(m.entity)}</b>")
+        tail = f", {m.new_source_count} nguồn mới" if m.new_source_count > 1 else ""
+        lines.append(f"+{m.new_article_count} bài mới{tail}")
+        lines.append("")
+    lines.append(f"⏰ {now.strftime('%d/%m/%Y %H:%M')}")
     return "\n".join(lines)
 
 

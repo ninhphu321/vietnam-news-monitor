@@ -1,0 +1,15 @@
+{
+  "_comment": "Copy this file to personal_watchlist.json (gitignored, never committed) and edit freely. Roadmap V4 §30's own example entities are used here as placeholders.",
+  "entities": [
+    "Vietcombank",
+    "ACB",
+    "MWG",
+    "FPT",
+    "Lãi suất",
+    "Bất động sản",
+    "Ngân hàng Nhà nước"
+  ],
+  "extra_aliases": {
+    "Ngân hàng Nhà nước": ["NHNN", "SBV"]
+  }
+}

@@ -343,6 +343,26 @@ def test_format_signal_alert_omits_velocity_line_when_absent():
 
 
 # ---------------------------------------------------------------------------
+# format_personal_watchlist_alert — roadmap V4 §34 "My Watchlist"
+# ---------------------------------------------------------------------------
+
+
+def test_format_personal_watchlist_alert_lists_each_entity_with_counts():
+    from personal_watchlist import PersonalWatchlistMatch
+    matches = [
+        PersonalWatchlistMatch(entity="Vietcombank", new_article_count=5, new_source_count=2),
+        PersonalWatchlistMatch(entity="FPT", new_article_count=1, new_source_count=1),
+    ]
+    text = telegram.format_personal_watchlist_alert(matches, datetime(2026, 9, 14, 12, 0, tzinfo=TZ))
+    assert "MY RADAR" in text
+    assert "<b>Vietcombank</b>" in text
+    assert "+5 bài mới, 2 nguồn mới" in text
+    assert "<b>FPT</b>" in text
+    assert "+1 bài mới" in text
+    assert "1 nguồn mới" not in text  # single source isn't worth calling out
+
+
+# ---------------------------------------------------------------------------
 # Sending
 # ---------------------------------------------------------------------------
 

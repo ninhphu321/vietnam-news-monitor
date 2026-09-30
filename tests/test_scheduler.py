@@ -148,6 +148,37 @@ def test_run_cycle_sends_no_alerts_when_snapshot_data_fails(db, monkeypatch):
     assert captured == [[]]
 
 
+def test_run_cycle_sends_personal_watchlist_alert_when_configured_and_matched(db, monkeypatch, tmp_path):
+    watchlist_path = tmp_path / "personal_watchlist.json"
+    watchlist_path.write_text('{"entities": ["Vietcombank"]}', encoding="utf-8")
+
+    items = [NewsItem("A", "Vietcombank tăng lãi suất", "https://x/1", datetime(2026, 9, 14, 10, 0, tzinfo=TZ))]
+    monkeypatch.setattr(scheduler, "CRAWLER_CLASSES", [fake_crawler_factory("A", items=items)])
+
+    sent_calls = []
+    monkeypatch.setattr(telegram, "send_message", lambda *a, **k: sent_calls.append(a))
+    monkeypatch.setattr(telegram, "send_messages", lambda *a, **k: None)
+
+    cfg = make_cfg(personal_watchlist_path=watchlist_path)
+    scheduler.run_cycle(db, cfg, dry_run=False)
+
+    assert any("MY RADAR" in text for _, _, text, *_ in sent_calls)
+
+
+def test_run_cycle_skips_personal_watchlist_alert_when_not_configured(db, monkeypatch, tmp_path):
+    items = [NewsItem("A", "Vietcombank tăng lãi suất", "https://x/1", datetime(2026, 9, 14, 10, 0, tzinfo=TZ))]
+    monkeypatch.setattr(scheduler, "CRAWLER_CLASSES", [fake_crawler_factory("A", items=items)])
+
+    sent_calls = []
+    monkeypatch.setattr(telegram, "send_message", lambda *a, **k: sent_calls.append(a))
+    monkeypatch.setattr(telegram, "send_messages", lambda *a, **k: None)
+
+    cfg = make_cfg(personal_watchlist_path=tmp_path / "does-not-exist.json")
+    scheduler.run_cycle(db, cfg, dry_run=False)
+
+    assert not any("MY RADAR" in text for _, _, text, *_ in sent_calls)
+
+
 def test_run_cycle_passes_none_top_signals_when_snapshot_data_fails(db, monkeypatch):
     # snapshot_data() is best-effort and returns None on failure (see its
     # docstring) — run_cycle must still send the digest, just without a

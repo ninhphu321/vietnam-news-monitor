@@ -1,4 +1,5 @@
 .env
+personal_watchlist.json
 data/*.db
 logs/*.log
 backup/*.db

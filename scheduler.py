@@ -25,6 +25,7 @@ from crawlers import CRAWLER_CLASSES
 from crawlers.base import CrawlerError
 from database import Database
 from models import NewsItem
+from personal_watchlist import load_personal_watchlist, match_new_articles
 import telegram
 from web.analytics import daily_stats_rows
 from web.brands import load_watchlist
@@ -396,6 +397,33 @@ def send_signal_alerts(cfg: Config, now: datetime, alerts: List[Issue]) -> None:
         logger.exception("Signal alert dispatch failed; continuing.")
 
 
+def send_personal_watchlist_alert(cfg: Config, now: datetime, newly_inserted: List[NewsItem]) -> None:
+    """Roadmap V4 §29-34 "My Watchlist" — private, local-only, Telegram-
+    only (see personal_watchlist.py's module docstring for why there is
+    no public website page for this). A no-op when
+    cfg.personal_watchlist_path doesn't exist, so leaving the feature
+    unconfigured costs nothing every cycle beyond a file-existence
+    check. Best-effort like check_crisis()/send_signal_alerts(): a
+    failure here must never affect the primary digest."""
+    try:
+        index = load_personal_watchlist(cfg.personal_watchlist_path)
+        if index is None:
+            return
+        matches = match_new_articles(index, newly_inserted)
+        if not matches:
+            return
+        telegram.send_message(
+            cfg.telegram_bot_token, cfg.telegram_chat_id,
+            telegram.format_personal_watchlist_alert(matches, now),
+            cfg.request_timeout, cfg.max_retries,
+        )
+        logger.info("Personal watchlist alert sent: %s", [m.entity for m in matches])
+    except telegram.TelegramError as exc:
+        logger.error("Failed to send personal watchlist alert: %s", exc)
+    except Exception:  # noqa: BLE001 - secondary feature, see docstring
+        logger.exception("Personal watchlist check failed; continuing.")
+
+
 def run_cycle(db: Database, cfg: Config, dry_run: bool = False) -> None:
     tz = ZoneInfo(cfg.timezone)
     now = datetime.now(tz)
@@ -488,6 +516,7 @@ def run_cycle(db: Database, cfg: Config, dry_run: bool = False) -> None:
 
     check_crisis(db, cfg, now)
     send_signal_alerts(cfg, now, snapshot_result.new_alerts if snapshot_result else [])
+    send_personal_watchlist_alert(cfg, now, newly_inserted)
 
     # Best-effort, secondary check — must never affect the primary
     # crawl/send outcome above, success or failure.

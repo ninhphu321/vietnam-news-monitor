@@ -108,6 +108,17 @@ class Config:
         default_factory=lambda: Path(os.getenv("SOURCE_REGISTRY_PATH", str(BASE_DIR / "source_registry.json")))
     )
 
+    # Personal Watchlist (roadmap V4 §29-34) — see personal_watchlist.py's
+    # module docstring for why this is a separate, gitignored, local-only
+    # file (never the same as watchlist_path above, which is committed
+    # and public). Missing file = feature disabled, not "watch nothing
+    # matters" vs. crisis watchlist's opposite default.
+    personal_watchlist_path: Path = field(
+        default_factory=lambda: Path(
+            os.getenv("PERSONAL_WATCHLIST_PATH", str(BASE_DIR / "personal_watchlist.json"))
+        )
+    )
+
     archive_dir: Path = field(default_factory=lambda: BASE_DIR / "data" / "archive")
     archive_keep_days: int = field(default_factory=lambda: _env_int("ARCHIVE_KEEP_DAYS", 90))
 

@@ -297,7 +297,7 @@ Dành cho phòng truyền thông/PR ngành ngân hàng - tài chính. Toàn bộ
 **Từ điển & watchlist:**
 - Từ điển sẵn có ~28 ngân hàng (tên + mã + tên cũ, vd "Vietcombank / VCB / Ngân hàng Ngoại thương") và Ngân hàng Nhà nước.
 - Mã ngắn viết hoa (≤4 ký tự: `MB`, `ACB`, `VIB`...) khớp **phân biệt hoa/thường** và theo ranh giới từ, để "20 mb" hay "5MB" không bị nhận nhầm.
-- [watchlist.json](watchlist.json) (nằm ở thư mục gốc, hiện để trống = theo dõi cả từ điển): `own` (thương hiệu của mình), `competitors`, `extra_aliases`, `extra_brands`, `extra_negative_keywords`. Tên lạ trong `own`/`competitors` tự thành thương hiệu tuỳ chỉnh. ⚠ File này nằm trong repo **public**, không đưa thông tin nội bộ nhạy cảm vào.
+- [watchlist.json](watchlist.json) (nằm ở thư mục gốc, hiện để trống = theo dõi cả từ điển): `own` (thương hiệu của mình), `competitors`, `extra_aliases`, `extra_brands`, `extra_negative_keywords`. Tên lạ trong `own`/`competitors` tự thành thương hiệu tuỳ chỉnh. ⚠ File này nằm trong repo **public**, không đưa thông tin nội bộ nhạy cảm vào — nếu cần theo dõi RIÊNG TƯ (danh mục cá nhân, mã quan tâm), dùng Watchlist cá nhân ở mục 17 (file riêng, không commit).
 
 **Sắc thái** — 3 mức từ khoá xấu (nghiêm trọng: khởi tố, vỡ nợ, rút tiền ồ ạt...; mạnh: tin đồn, bị phạt, rò rỉ...; nhẹ: nợ xấu, cảnh báo, rủi ro...) và từ khoá tích cực. Chỉ mức mạnh/nghiêm trọng mới tính vào cảnh báo khủng hoảng. Hai quy tắc giảm sai lầm, tìm ra từ chạy thử trên dữ liệu thật: (1) tiêu đề **bác bỏ/đính chính** ("bác bỏ tin đồn") là phản hồi của ngân hàng → trung tính; (2) tiêu đề mô tả **nỗ lực bảo vệ** ("mở rộng tính năng cảnh báo lừa đảo") không bị coi là tin xấu. Đây là **ước lượng từ tiêu đề**, không phải kết luận.
 
@@ -323,7 +323,7 @@ Dành cho phòng truyền thông/PR ngành ngân hàng - tài chính. Toàn bộ
 
 ## 13. Testing
 
-**274 test** (`pytest`), chạy hoàn toàn offline bằng fixture lấy từ dữ liệu thực tế lúc audit — không cần mạng, mock qua thư viện `responses`.
+**286 test** (`pytest`), chạy hoàn toàn offline bằng fixture lấy từ dữ liệu thực tế lúc audit — không cần mạng, mock qua thư viện `responses`.
 
 | File | Phạm vi |
 |------|---------|
@@ -342,6 +342,7 @@ Dành cho phòng truyền thông/PR ngành ngân hàng - tài chính. Toàn bộ
 | `test_datainfra.py` | Bảng `daily_stats`/`issue_history`, `snapshot_data` (kể cả không được raise lỗi — trả `None` khi thất bại thay vì raise, và trả đúng danh sách issue đã xếp hạng kèm trạng thái vòng đời khi thành công, để `run_cycle` chuyển thẳng cho Telegram; vòng đời Signal: lần đầu → emerging, đổi trạng thái → ghi `signal_event`, lặp lại không đổi → không ghi thêm), các hàm xuất `issues.json`/`stats.json`/`feed.xml`, lưu trữ theo tháng (xuất không xoá theo mặc định, xoá + giữ nguyên file khi chạy lại) |
 | `test_source_registry.py` | `source_registry.json`: file thiếu/hỏng/thiếu nguồn đều rơi về mặc định tier A/weight 1.0, không crash |
 | `test_signals.py` | Phân loại vòng đời Signal theo roadmap V2 §15 — lần đầu luôn là emerging, ngưỡng ±15% cho accelerating/cooling, trường hợp biên velocity=0; `should_alert()` (roadmap V3 §26) — cần cả 2 ngưỡng cùng lúc, ngưỡng bao gồm cả biên, cấu hình được |
+| `test_personal_watchlist.py` | Watchlist cá nhân (roadmap V4 §29-34, mục 17) — file thiếu/hỏng/rỗng đều tắt tính năng, khớp đúng tiêu đề + alias tuỳ chỉnh, mã ngắn khớp phân biệt hoa/thường, đếm đúng số bài/nguồn mới, rỗng khi không khớp gì |
 
 ---
 
@@ -359,7 +360,9 @@ news-monitor/
 ├── utils.py                     # normalize_url
 ├── logger.py                     # setup logging
 ├── archive.py                      # lưu trữ bài cũ theo tháng (--archive-old)
+├── personal_watchlist.py            # Watchlist cá nhân, riêng tư — mục 17 (roadmap V4)
 ├── watchlist.json                   # thương hiệu của mình/đối thủ theo dõi (mục 11)
+├── personal_watchlist.example.json   # mẫu cho personal_watchlist.json (gitignored — mục 17)
 ├── source_registry.json              # phân hạng + trọng số nguồn cho SignalScore (mục 9)
 ├── core/
 │   └── normalization.py               # chuẩn hoá NFC tiêu đề cho việc so khớp (roadmap V1 §6)
@@ -377,7 +380,7 @@ news-monitor/
 │   ├── brandwatch.py                            # share of voice + cảnh báo khủng hoảng (mục 11)
 │   ├── exports.py                                # issues.json/stats.json/feed.xml/brands.json (mục 12)
 │   └── cloudflare-worker/worker.js                # proxy bảo mật cho nút "Quét ngay"
-├── tests/                                           # 274 test, xem mục 13
+├── tests/                                           # 286 test, xem mục 13
 ├── data/news.db                                      # SQLite (local dev; trên CI lấy từ nhánh db-state)
 ├── data/archive/                                  # file lưu trữ theo tháng (--archive-old)
 ├── backup/                                         # snapshot DB có timestamp
@@ -432,3 +435,27 @@ pytest
 ```
 
 Cấu hình qua `.env` (copy từ `.env.example`) — bắt buộc `TELEGRAM_BOT_TOKEN`/`TELEGRAM_CHAT_ID` khi chạy thật (không cần cho `--dry-run`). Muốn tab Brands phân biệt "của mình"/"đối thủ" thay vì theo dõi cả từ điển, sửa [watchlist.json](watchlist.json) ở thư mục gốc (mục 11). Chi tiết đầy đủ từng biến ở [README.md](README.md).
+
+---
+
+## 17. Watchlist cá nhân (roadmap V4 §29-34) — riêng tư, chỉ qua Telegram
+
+**Quyết định kiến trúc quan trọng:** roadmap V4 tự nêu rõ đây là version đầu tiên phải nghĩ nghiêm túc về private data — repo GitHub của dự án này là **public**, nên 1 danh sách "công ty/mã tôi đang quan tâm" nếu commit thẳng vào đó sẽ công khai luôn sở thích/chiến lược cá nhân cho cả internet xem (roadmap §35 cấm rõ: "V4 không được tiếp tục lưu `private_watchlist.json` trên public repository"). Đã hỏi và chốt với người dùng: **chỉ lưu local, không có trang web công khai, chỉ nhận qua Telegram** — bỏ hẳn phần "MY RADAR dashboard công khai"/multi-user/authentication mà roadmap gốc có nhắc tới (§32/§35/§36), vì dự án là cá nhân dùng 1 mình, không phải SaaS nhiều người dùng.
+
+**Khác gì với watchlist thương hiệu ở mục 11:**
+
+| | `watchlist.json` (mục 11) | `personal_watchlist.json` (mục này) |
+|---|---|---|
+| Vị trí | Repo **public**, được commit | **Gitignored**, không bao giờ commit |
+| Mục đích | Brand monitoring/cảnh báo khủng hoảng cho phòng PR | Sở thích/mối quan tâm cá nhân riêng tư |
+| Hiện ở đâu | Trang `brands.html` công khai | Chỉ Telegram, không có trang web |
+| Mặc định khi trống/thiếu file | Theo dõi **cả từ điển** có sẵn (~28 ngân hàng) | Tính năng **tắt hẳn** — không có gì để "mặc định theo dõi" vì đây là sở thích riêng, không có từ điển sẵn |
+
+**Module [personal_watchlist.py](personal_watchlist.py)** (ở thư mục gốc, không nằm trong `web/` vì cố tình không dính gì tới việc sinh trang web công khai):
+- `load_personal_watchlist(path)`: đọc file JSON (`{"entities": [...], "extra_aliases": {...}}`, xem [personal_watchlist.example.json](personal_watchlist.example.json) — copy thành `personal_watchlist.json` để dùng thật). File thiếu/hỏng/rỗng → trả `None` (tắt tính năng), không lỗi.
+- Dùng lại đúng `web.brands.Brand`/`BrandIndex` để so khớp (cùng luật: mã ngắn viết hoa khớp phân biệt hoa/thường theo ranh giới từ) — không dựng thêm 1 bộ máy so khớp thứ 2 cho cùng 1 bài toán.
+- `match_new_articles(index, newly_inserted)`: chỉ so khớp bài **mới trong đúng chu kỳ này** (không phải toàn bộ DB), đếm số bài mới + số nguồn mới cho mỗi thực thể khớp được.
+
+**Luồng gửi Telegram** (`scheduler.send_personal_watchlist_alert`, gọi ngay sau `send_signal_alerts` trong `run_cycle`): nếu không cấu hình file (`PERSONAL_WATCHLIST_PATH`) thì bỏ qua hoàn toàn, không tốn gì ngoài 1 lần kiểm tra file tồn tại. Nếu có khớp, gửi đúng 1 tin "📡 MY RADAR" liệt kê từng thực thể + số bài/nguồn mới — **không gửi nguyên title** (đúng yêu cầu roadmap "Không gửi toàn bộ title", vì title đã có trong digest chính rồi). Bước phụ best-effort: lỗi chỉ ghi log, không ảnh hưởng digest chính.
+
+**Đã xác minh trên dữ liệu production thật:** nạp [personal_watchlist.example.json](personal_watchlist.example.json) (đúng ví dụ mẫu của roadmap) và so khớp với tiêu đề thật trong 1 ngày — ra đúng kết quả hợp lý (vd "Lãi suất" khớp 13 bài/6 nguồn), tin Telegram hiện đúng định dạng.
