@@ -288,5 +288,81 @@ def test_hot_score_components_are_each_0_to_100():
 
     assert len(issues) == 1
     i = issues[0]
-    for score in (i.volume_score, i.source_score, i.velocity_score, i.novelty_score, i.hot_score):
+    for score in (i.volume_score, i.source_score, i.velocity_score, i.novelty_score,
+                  i.source_weight_score, i.hot_score):
         assert 0 <= score <= 100
+
+
+# --- Roadmap V2 §13: SignalScore weights (supersedes HotScore) ----------
+
+def test_signal_score_blends_the_five_components_with_the_documented_weights():
+    """Pins down the exact weights so a future refactor can't silently
+    drift from the roadmap's formula: Source Diversity 30% · Velocity
+    25% · Novelty 20% · Volume 15% · Source Weight 10%."""
+    now = TODAY_9AM + timedelta(hours=1)
+    articles = [
+        _article("VnExpress", "Eximbank tăng lãi suất huy động", "u1", TODAY_9AM),
+        _article("CafeF", "Eximbank điều chỉnh biểu lãi suất tiết kiệm", "u2", TODAY_9AM),
+    ]
+    issues = top_issues(articles, now, min_articles=2, min_sources=2)
+    i = issues[0]
+
+    expected = (
+        i.source_score * 0.30 + i.velocity_score * 0.25 + i.novelty_score * 0.20
+        + i.volume_score * 0.15 + i.source_weight_score * 0.10
+    )
+    assert i.hot_score == round(expected, 1)
+
+
+def test_source_diversity_now_outweighs_raw_volume_in_the_blend():
+    """The roadmap's whole reason for reweighting: with a single source's
+    volume edge no longer worth 40%, a diverse issue should need a much
+    smaller source-diversity advantage to come out on top than the old
+    HotScore formula required."""
+    now = TODAY_9AM + timedelta(hours=2)
+    # Same shape as the volume-bias test, but same article count on both
+    # sides — isolates source diversity's own weight from any volume edge.
+    single_source = [
+        _article("A", f"Vietcombank cập nhật tăng vốn điều lệ lần {i}", f"va{i}", TODAY_9AM)
+        for i in range(3)
+    ]
+    diverse = [
+        _article("B", "Eximbank tăng lãi suất huy động", "e1", TODAY_9AM),
+        _article("C", "Eximbank điều chỉnh lãi suất tiết kiệm", "e2", TODAY_9AM),
+        _article("D", "Eximbank công bố biểu lãi suất mới", "e3", TODAY_9AM),
+    ]
+    issues = top_issues(single_source + diverse, now, min_articles=2, min_sources=1)
+    by_entity = {i.entities[0]: i for i in issues}
+    assert by_entity["eximbank"].hot_score > by_entity["vietcombank"].hot_score
+
+
+def test_custom_source_weights_shift_the_ranking():
+    now = TODAY_9AM + timedelta(hours=1)
+    articles = [
+        _article("A", "Eximbank tăng lãi suất huy động", "u1", TODAY_9AM),
+        _article("B", "Eximbank điều chỉnh lãi suất tiết kiệm", "u2", TODAY_9AM),
+        _article("C", "Vietcombank tăng vốn điều lệ lên 50.000 tỷ", "u3", TODAY_9AM),
+        _article("D", "Vietcombank công bố kế hoạch tăng vốn mới", "u4", TODAY_9AM),
+    ]
+    equal = {s: 1.0 for s in "ABCD"}
+    tiered = {"A": 1.0, "B": 1.0, "C": 0.2, "D": 0.2}  # downweight Vietcombank's sources
+
+    baseline = {i.entities[0]: i for i in top_issues(articles, now, min_articles=2, min_sources=2,
+                                                     source_weights=equal)}
+    adjusted = {i.entities[0]: i for i in top_issues(articles, now, min_articles=2, min_sources=2,
+                                                      source_weights=tiered)}
+
+    assert baseline["vietcombank"].source_weight_score == baseline["eximbank"].source_weight_score
+    assert adjusted["vietcombank"].source_weight_score < adjusted["eximbank"].source_weight_score
+    assert adjusted["vietcombank"].hot_score < baseline["vietcombank"].hot_score
+
+
+def test_missing_source_weights_defaults_every_source_to_equal_weight():
+    now = TODAY_9AM + timedelta(hours=1)
+    articles = [
+        _article("VnExpress", "Eximbank tăng lãi suất huy động", "u1", TODAY_9AM),
+        _article("CafeF", "Eximbank điều chỉnh biểu lãi suất tiết kiệm", "u2", TODAY_9AM),
+    ]
+    # No source_weights kwarg at all -> every source implicitly weight 1.0.
+    issues = top_issues(articles, now, min_articles=2, min_sources=2)
+    assert issues[0].source_weight_score == 100.0

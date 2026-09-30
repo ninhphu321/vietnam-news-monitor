@@ -16,7 +16,7 @@ Một hệ thống **tự động, chạy 24/7, miễn phí hoàn toàn**, quét
 1. Gửi thông báo qua **Telegram** (nhóm theo nguồn, đánh dấu tin "nóng", cảnh báo khủng hoảng theo thương hiệu).
 2. Cập nhật một **trang web dạng ứng dụng** (GitHub Pages, giao diện SaaS 3 trang: Tổng quan / Brands / Analytics) hiển thị lại toàn bộ tin theo ngày, "Top Issues" tự phát hiện sự kiện đang được nhiều báo cùng đưa tin, theo dõi share of voice theo thương hiệu, và các phân tích dòng tin (ai đưa trước, khoảng trống đưa tin, nhịp đăng bài...).
 
-Không dùng AI/LLM ở bất kỳ đâu trong hệ thống — toàn bộ là rule-based (RSS parsing, regex, từ khoá tự chọn tay, HotScore/sắc thái tính bằng công thức và từ điển cố định). Không có server riêng, không trả phí cho bất kỳ dịch vụ nào (GitHub Actions free tier, GitHub Pages free, Cloudflare Workers free tier, cron-job.org free).
+Không dùng AI/LLM ở bất kỳ đâu trong hệ thống — toàn bộ là rule-based (RSS parsing, regex, từ khoá tự chọn tay, SignalScore/sắc thái tính bằng công thức và từ điển cố định). Không có server riêng, không trả phí cho bất kỳ dịch vụ nào (GitHub Actions free tier, GitHub Pages free, Cloudflare Workers free tier, cron-job.org free).
 
 ---
 
@@ -185,19 +185,40 @@ Nguyên tắc cốt lõi, khác hẳn bản "trending" đời đầu (gộp theo
 
 **Lỗi thật đã phát hiện và sửa (2026-09-16):** tin "Eximbank gia hạn đề cử nhân sự HĐQT" (Vietstock, FiLi) từng bị gộp nhầm với tin hoàn toàn không liên quan "Cựu HLV trưởng bóng đá Việt Nam tham gia HĐQT một công ty khai thác cảng" (Dân Trí) — chỉ vì cả 2 cùng nhắc tới từ "HĐQT" (Hội đồng quản trị, một chức danh chung mà công ty nào cũng có, không phải tên riêng). Phát hiện qua kiểm tra trên dữ liệu sản xuất thật, sửa bằng cách thêm `_GENERIC_ACRONYMS` — có test hồi quy riêng (`test_generic_role_acronym_does_not_falsely_merge_unrelated_companies`) đảm bảo không tái phát.
 
-### HotScore
+### SignalScore (trước đây gọi là HotScore)
 
-Mỗi issue được chấm 4 thành phần, mỗi thành phần chuẩn hoá **riêng** về thang 0-100 (so với giá trị cao nhất trong đợt tính hiện tại, và **được lộ ra để dò lỗi** chứ không chỉ có điểm tổng), rồi nhân trọng số theo đúng công thức người dùng yêu cầu:
+Mỗi issue được chấm 5 thành phần, mỗi thành phần chuẩn hoá **riêng** về thang 0-100 (so với giá trị cao nhất trong đợt tính hiện tại, và **được lộ ra để dò lỗi** chứ không chỉ có điểm tổng), rồi nhân trọng số. Công thức gốc (Volume 40%/Source 25%/Velocity 20%/Novelty 15%) đã được thay bằng **SignalScore** theo Roadmap V1→V6 (mục V2 §13, làm trên nhánh `A_VMNs`), đảo trọng số Volume và Source Diversity cho nhau và thêm hẳn thành phần Source Weight:
 
 ```
-├── Số bài đề cập (volume_score)         40%
-├── Số nguồn đề cập (source_score)       25%
-├── Tốc độ xuất hiện (velocity_score)    20%   — số bài / số giờ kể từ lần đầu thấy issue
-└── Mức độ mới/tăng tốc (novelty_score)  15%   — so nhịp ra bài 1/4 thời gian gần nhất
-                                                  với trước đó, cộng số nguồn mới xuất hiện gần đây
+├── Số nguồn đề cập (source_score)         30%
+├── Tốc độ xuất hiện (velocity_score)      25%   — số bài / số giờ kể từ lần đầu thấy issue
+├── Mức độ mới/tăng tốc (novelty_score)    20%   — so nhịp ra bài 1/4 thời gian gần nhất
+│                                                   với trước đó, cộng số nguồn mới xuất hiện gần đây
+├── Số bài đề cập (volume_score)           15%
+└── Trọng số nguồn (source_weight_score)   10%   — trung bình trọng số các nguồn đưa tin,
+                                                    lấy từ source_registry.json (mục 12b)
 ```
+
+Tên trường trong code vẫn giữ `hot_score`/`volume_score`... (không đổi tên hàng loạt qua toàn bộ `generate_site.py`/`exports.py`/`analytics.py`/hàng trăm chỗ assert trong test chỉ vì đổi công thức — xem docstring `_score_all()` trong `web/issues.py`), nhưng ý nghĩa và trọng số đã là SignalScore. Giao diện web vẫn hiện nhãn "HOT {điểm}" trên thẻ issue.
+
+**Trọng số nguồn (`source_registry.json`):** file ở thư mục gốc, phân hạng A/B/C cho từng nguồn — **không** dùng để chê/khen báo nào uy tín hơn, chỉ để đo "độ tin cậy tín hiệu" khi cần. Mặc định cả 23 nguồn đều tier A/weight 1.0 (khởi điểm trung lập, người dùng tự điều chỉnh dần theo dữ liệu thật thay vì để AI tự ý đánh giá báo nào đáng tin hơn). Khi mọi trọng số bằng nhau, thành phần này không đổi thứ hạng gì cả — chỉ có tác dụng khi ai đó thực sự tinh chỉnh file.
 
 **Giới hạn thật đã biết:** trọng số 25% cho đa dạng nguồn là 1 "lực đối trọng" chứ không phải "phủ quyết" tuyệt đối — 1 nguồn đăng đủ nhiều tin gần giống nhau vẫn có thể vượt điểm 1 issue thật sự đa nguồn nếu chênh lệch số bài đủ lớn (có test minh chứng riêng cho giới hạn này).
+
+### Vòng đời Signal (roadmap V2 §15-16)
+
+Module [web/signals.py](web/signals.py) + bảng `issue_history`/`signal_events` trong database. Mỗi issue được gắn 1 trong 4 trạng thái, tính bằng cách so `velocity` của chu kỳ hiện tại với chu kỳ trước đó (lấy từ `issue_history` của đúng ngày hôm đó, đọc **trước** khi ghi đè):
+
+- **EMERGING** (★ Mới xuất hiện) — chưa có dòng nào của issue này trong hôm nay (chu kỳ đầu tiên xuất hiện).
+- **ACCELERATING** (↑ Đang tăng tốc) — velocity hiện tại ≥1.15× chu kỳ trước.
+- **PEAK** (● Ổn định) — velocity gần như không đổi (trong khoảng 0.85×-1.15× chu kỳ trước).
+- **COOLING** (↓ Đang hạ nhiệt) — velocity hiện tại ≤0.85× chu kỳ trước.
+
+**Cố ý không có trạng thái "ARCHIVED" riêng** — issue rớt khỏi Top 5 hôm nay đơn giản là không còn dòng nào trong `issue_history` của ngày đó, và "Lịch sử Top Issues" ở mục 10 đã tự suy ra được điều này (`current_streak == 0`). Thêm 1 trạng thái lưu trữ riêng cho đúng 1 sự thật mà dữ liệu đã thể hiện sẵn sẽ là phức tạp hoá không cần thiết.
+
+**`signal_events`** — mỗi lần trạng thái thực sự đổi (không phải mỗi chu kỳ) thì ghi 1 dòng bất biến (`from_status`, `to_status`, velocity, số bài, số nguồn tại thời điểm đó) — đây là câu trả lời cho "vì sao issue này đang ACCELERATING" mà không chỉ có mỗi con số cuối cùng.
+
+**Trên web:** mỗi thẻ Top Issues có 1 nhãn nhỏ cạnh số bài/nguồn thể hiện đúng trạng thái hiện tại (đọc lại `issue_history` của hôm nay ngay sau khi `snapshot_data()` vừa ghi trong cùng 1 lần chạy job).
 
 ### Các cơ chế đảm bảo chất lượng khác
 
@@ -248,16 +269,18 @@ Dành cho phòng truyền thông/PR ngành ngân hàng - tài chính. Toàn bộ
 ## 12. Hạ tầng dữ liệu
 
 - **`daily_stats`** (`day, kind, name, articles`; kind = `source`/`topic`): số bài theo ngày/nguồn/chủ đề, tổng hợp sẵn để tab Analytics không phải quét lại toàn bộ bài mỗi lần build. Lần đầu (bảng trống) backfill toàn bộ lịch sử, sau đó mỗi chu kỳ chỉ tính lại 3 ngày gần nhất.
-- **`issue_history`** (`day, issue_id, title, rank, hot_score, article_count, source_count, first_seen_at, last_seen_at, updated_at`): mỗi ngày mỗi issue từng lọt Top 5 có 1 dòng (giá trị của chu kỳ mới nhất, upsert). Issue vốn tính lại từ đầu mỗi lần và biến mất khi qua ngày — bảng này là nền cho "Lịch sử Top Issues" ở mục 10.
+- **`issue_history`** (`day, issue_id, title, rank, hot_score, article_count, source_count, first_seen_at, last_seen_at, velocity, signal_status, updated_at`): mỗi ngày mỗi issue từng lọt Top 5 có 1 dòng (giá trị của chu kỳ mới nhất, upsert). Issue vốn tính lại từ đầu mỗi lần và biến mất khi qua ngày — bảng này là nền cho "Lịch sử Top Issues" ở mục 10 và vòng đời Signal ở mục 9. `velocity`/`signal_status` thêm sau (roadmap V2), tự nâng cấp vào DB cũ qua `ALTER TABLE` có kiểm tra tồn tại cột (`Database._ensure_issue_history_columns`) chứ không chỉ `CREATE TABLE IF NOT EXISTS` (lệnh đó không retrofit cột vào bảng đã có sẵn).
+- **`signal_events`** (`day, issue_id, from_status, to_status, velocity, article_count, source_count, occurred_at`): nhật ký bất biến mỗi lần vòng đời 1 issue đổi trạng thái — xem mục 9.
+- **`source_registry.json`** (thư mục gốc): phân hạng A/B/C + trọng số cho từng nguồn, phục vụ thành phần Source Weight của SignalScore — xem mục 9.
 - **Vì sao ghi trong `run_cycle` (`scheduler.snapshot_data`) chứ không phải lúc build site:** workflow đẩy `news.db` lên nhánh `db-state` *trước* bước build site; dữ liệu ghi lúc build sẽ không bao giờ được lưu. Bảng mới tạo bằng `CREATE TABLE IF NOT EXISTS` nên DB cũ trên `db-state` tự nâng cấp.
-- **Xuất dữ liệu** ([web/exports.py](web/exports.py)), ghi cạnh các trang HTML mỗi lần build: `issues.json` (Top Issues + 4 thành phần HotScore), `stats.json` (`daily_stats` + `issue_history`), `feed.xml` (RSS 100 bài mới nhất, URL kênh lấy từ `NEWS_SITE_URL`), `brands.json` (share of voice + cảnh báo khủng hoảng — mục 11).
+- **Xuất dữ liệu** ([web/exports.py](web/exports.py)), ghi cạnh các trang HTML mỗi lần build: `issues.json` (Top Issues + 5 thành phần SignalScore), `stats.json` (`daily_stats` + `issue_history`), `feed.xml` (RSS 100 bài mới nhất, URL kênh lấy từ `NEWS_SITE_URL`), `brands.json` (share of voice + cảnh báo khủng hoảng — mục 11).
 - **Lưu trữ theo tháng** ([archive.py](archive.py)): `python main.py --archive-old` xuất bài cũ hơn `ARCHIVE_KEEP_DAYS` (mặc định 90) ra `data/archive/news-YYYY-MM.jsonl.gz`. **Mặc định chỉ xuất, không xoá**; thêm `--delete-archived` mới xoá khỏi DB (khi đó các ngày đó biến mất khỏi trang lưu trữ, và nguồn có feed dài như VietnamNet — ~2 tháng — có thể nạp lại URL đã xoá nếu `ARCHIVE_KEEP_DAYS` quá nhỏ). **Cố ý không gắn vào CI** vì file archive không nằm trên nhánh `db-state`, chạy ở đó sẽ mất.
 
 ---
 
 ## 13. Testing
 
-**208 test** (`pytest`), chạy hoàn toàn offline bằng fixture lấy từ dữ liệu thực tế lúc audit — không cần mạng, mock qua thư viện `responses`.
+**231 test** (`pytest`), chạy hoàn toàn offline bằng fixture lấy từ dữ liệu thực tế lúc audit — không cần mạng, mock qua thư viện `responses`.
 
 | File | Phạm vi |
 |------|---------|
@@ -269,10 +292,12 @@ Dành cho phòng truyền thông/PR ngành ngân hàng - tài chính. Toàn bộ
 | `test_utils.py` | Chuẩn hoá URL (bỏ `fbclid`/`utm_*`/fragment) |
 | `test_normalization.py` | Chuẩn hoá tiêu đề cho việc so khớp (`core/normalization.py`) — NFC Unicode, không đổi nội dung hiển thị, regression test cho lỗi "xung đột" bị lưu sai dạng Unicode phát hiện trên dữ liệu thật |
 | `test_generate_site.py` | Sinh trang web: gom đúng ngày, escape XSS, cửa sổ 7-tab ngày, nút Quét ngay, phân trang, banner "xem tin mới nhất", tích hợp Top Issues, khung SaaS (sidebar/nav/KPI), trang Brands/Analytics riêng, các file xuất dữ liệu |
-| `test_issues.py` | Cả 8 kịch bản test bắt buộc theo đặc tả Issue Intelligence V3 (gộp đúng issue giống nhau, không gộp nhầm cùng entity khác topic, không gộp nhầm cùng topic khác entity, đa dạng nguồn, chống thiên vị khối lượng, "vì sao hot" đúng số liệu, ổn định xếp hạng, đúng múi giờ) + regression test cho lỗi "HĐQT" |
+| `test_issues.py` | Cả 8 kịch bản test bắt buộc theo đặc tả Issue Intelligence V3 (gộp đúng issue giống nhau, không gộp nhầm cùng entity khác topic, không gộp nhầm cùng topic khác entity, đa dạng nguồn, chống thiên vị khối lượng, "vì sao hot" đúng số liệu, ổn định xếp hạng, đúng múi giờ) + regression test cho lỗi "HĐQT" + đúng công thức trọng số SignalScore, trọng số nguồn tuỳ chỉnh ảnh hưởng xếp hạng đúng hướng |
 | `test_analytics.py` | 8 khối phân tích dòng tin ở mục 10 (ai đưa trước, khoảng trống đưa tin, độ trễ, nhịp giờ, khối lượng theo chủ đề, đăng lặp — kể cả case bản tin mẫu theo ngày không bị tính nhầm, đồng xuất hiện, hồ sơ chủ đề) |
 | `test_brandwatch.py` | Từ điển thương hiệu (mã viết hoa phân biệt hoa/thường, ranh giới từ), watchlist tuỳ chỉnh, sắc thái (kể cả case bác bỏ tin đồn và nỗ lực bảo vệ không bị tính tiêu cực), share of voice, ngưỡng cảnh báo khủng hoảng, cooldown + "khẩn" vượt cooldown của "leo thang" trong `scheduler.check_crisis` |
-| `test_datainfra.py` | Bảng `daily_stats`/`issue_history`, `snapshot_data` (kể cả không được raise lỗi), các hàm xuất `issues.json`/`stats.json`/`feed.xml`, lưu trữ theo tháng (xuất không xoá theo mặc định, xoá + giữ nguyên file khi chạy lại) |
+| `test_datainfra.py` | Bảng `daily_stats`/`issue_history`, `snapshot_data` (kể cả không được raise lỗi, và vòng đời Signal: lần đầu → emerging, đổi trạng thái → ghi `signal_event`, lặp lại không đổi → không ghi thêm), các hàm xuất `issues.json`/`stats.json`/`feed.xml`, lưu trữ theo tháng (xuất không xoá theo mặc định, xoá + giữ nguyên file khi chạy lại) |
+| `test_source_registry.py` | `source_registry.json`: file thiếu/hỏng/thiếu nguồn đều rơi về mặc định tier A/weight 1.0, không crash |
+| `test_signals.py` | Phân loại vòng đời Signal theo roadmap V2 §15 — lần đầu luôn là emerging, ngưỡng ±15% cho accelerating/cooling, trường hợp biên velocity=0 |
 
 ---
 
@@ -291,19 +316,24 @@ news-monitor/
 ├── logger.py                     # setup logging
 ├── archive.py                      # lưu trữ bài cũ theo tháng (--archive-old)
 ├── watchlist.json                   # thương hiệu của mình/đối thủ theo dõi (mục 11)
-├── crawlers/                          # 23 crawler, 1 file/nguồn + base.py
+├── source_registry.json              # phân hạng + trọng số nguồn cho SignalScore (mục 9)
+├── core/
+│   └── normalization.py               # chuẩn hoá NFC tiêu đề cho việc so khớp (roadmap V1 §6)
+├── crawlers/                            # 23 crawler, 1 file/nguồn + base.py
 ├── web/
-│   ├── theme.py                        # khung ứng dụng SaaS: CSS, icon SVG, render_shell (mục 8)
-│   ├── generate_site.py                # lắp ráp nội dung từng trang, gọi render_shell
-│   ├── issues.py                        # Issue Intelligence V3 (Entity/Topic/Issue, HotScore)
-│   ├── analytics.py                      # phân tích dòng tin (mục 10)
-│   ├── brands.py                          # từ điển thương hiệu + watchlist (mục 11)
-│   ├── sentiment.py                        # sắc thái theo luật + từ khoá (mục 11)
-│   ├── brandwatch.py                        # share of voice + cảnh báo khủng hoảng (mục 11)
-│   ├── exports.py                            # issues.json/stats.json/feed.xml/brands.json (mục 12)
-│   └── cloudflare-worker/worker.js            # proxy bảo mật cho nút "Quét ngay"
-├── tests/                                       # 201 test, xem mục 13
-├── data/news.db                                  # SQLite (local dev; trên CI lấy từ nhánh db-state)
+│   ├── theme.py                          # khung ứng dụng SaaS: CSS, icon SVG, render_shell (mục 8)
+│   ├── generate_site.py                  # lắp ráp nội dung từng trang, gọi render_shell
+│   ├── issues.py                          # Issue Intelligence + SignalScore (Entity/Topic/Issue)
+│   ├── signals.py                          # phân loại vòng đời Signal (mục 9)
+│   ├── source_registry.py                   # tải source_registry.json
+│   ├── analytics.py                          # phân tích dòng tin (mục 10)
+│   ├── brands.py                              # từ điển thương hiệu + watchlist (mục 11)
+│   ├── sentiment.py                            # sắc thái theo luật + từ khoá (mục 11)
+│   ├── brandwatch.py                            # share of voice + cảnh báo khủng hoảng (mục 11)
+│   ├── exports.py                                # issues.json/stats.json/feed.xml/brands.json (mục 12)
+│   └── cloudflare-worker/worker.js                # proxy bảo mật cho nút "Quét ngay"
+├── tests/                                           # 231 test, xem mục 13
+├── data/news.db                                      # SQLite (local dev; trên CI lấy từ nhánh db-state)
 ├── data/archive/                                  # file lưu trữ theo tháng (--archive-old)
 ├── backup/                                         # snapshot DB có timestamp
 ├── site/                                            # HTML/JSON/RSS sinh ra (gitignored)
@@ -315,7 +345,9 @@ news-monitor/
 
 ## 15. Giới hạn đã biết
 
-- **HotScore không phải "phủ quyết" tuyệt đối cho đa dạng nguồn** (mục 9) — 1 nguồn đăng nhiều tin gần giống nhau vẫn có thể thắng điểm 1 issue thật sự đa nguồn nếu chênh lệch số bài đủ lớn.
+- **SignalScore không phải "phủ quyết" tuyệt đối cho đa dạng nguồn** (mục 9) — 1 nguồn đăng nhiều tin gần giống nhau vẫn có thể thắng điểm 1 issue thật sự đa nguồn nếu chênh lệch số bài đủ lớn (đỡ hơn công thức HotScore cũ vì trọng số Source Diversity đã tăng từ 25%→30% và Volume giảm từ 40%→15%, nhưng vẫn không phải phủ quyết tuyệt đối).
+- **Vòng đời Signal dùng ngưỡng ±15% chưa qua kiểm chứng bằng dữ liệu dán nhãn** (mục 9) — chọn theo trực giác kỹ thuật, cùng kiểu "cần tinh chỉnh dần" như mọi ngưỡng luật khác trong dự án, không phải con số tối ưu đã kiểm định.
+- **`source_registry.json` mặc định trung lập (tất cả tier A)** — thành phần Source Weight của SignalScore chưa có tác dụng thực tế cho tới khi ai đó chủ động phân hạng lại nguồn.
 - **"Ngày mới nhất" trễ tối đa ~20 phút sau nửa đêm** cho tới khi có bài đầu tiên của ngày mới (mục 8) — đã thêm banner "xem tin mới nhất" để giảm nhầm lẫn, nhưng chưa sửa tận gốc để trang tự bám theo đồng hồ thật (người dùng đã được hỏi, chọn giữ nguyên).
 - **Chưa có dark mode** ở giao diện hiện tại.
 - **Danh sách từ khoá (`HOT_KEYWORDS`, `_TOPIC_KEYWORDS`, `_GENERIC_ACRONYMS`, sắc thái ở mục 11) là tự chọn tay**, không phải NLP thật — cần tinh chỉnh dần khi phát hiện case sai qua vận hành thực tế, không phải giải pháp hoàn hảo 1 lần là xong. Chưa đo precision/recall trên tập dữ liệu dán nhãn tay, nên không có con số "độ chính xác X%" đáng tin để công bố.

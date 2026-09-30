@@ -221,6 +221,12 @@ details.issue-card:target>*:not(summary){display:block!important;}
 .issue-score{flex:0 0 auto;font-family:var(--mono);font-weight:700;font-size:12px;color:var(--accent);background:var(--accent-soft);
   border-radius:999px;padding:3px 10px;white-space:nowrap;}
 .issue-stats{font-family:var(--mono);font-size:12px;color:var(--text-2);margin:var(--sp-1) 0 var(--sp-2);}
+.lifecycle-badge{margin-left:var(--sp-2);font-family:var(--mono);font-size:11px;font-weight:500;
+  border-radius:999px;padding:1px 8px;white-space:nowrap;}
+.lifecycle-badge.lc-emerging{background:var(--accent-soft);color:var(--accent);}
+.lifecycle-badge.lc-accelerating{background:#FEF3C7;color:#B45309;}
+.lifecycle-badge.lc-peak{background:var(--surface-2);color:var(--text-2);border:1px solid var(--border);}
+.lifecycle-badge.lc-cooling{background:#FEE2E2;color:var(--live);}
 .why-hot-compact{list-style:none;margin:0;padding:0;}
 .why-hot-compact li{font-size:13px;color:var(--text-2);padding:1px 0;}
 .why-hot-compact li::before{content:"— ";color:var(--muted);}

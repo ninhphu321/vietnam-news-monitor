@@ -69,6 +69,8 @@ CREATE TABLE IF NOT EXISTS daily_stats (
 -- point. Issues are recomputed from scratch each cycle and would
 -- otherwise vanish at midnight — this is what lets the site say "this
 -- issue has been hot N days in a row". Values are the latest cycle's.
+-- `velocity`/`signal_status` (roadmap V2 §15-16) added after the table
+-- already existed on some deployments — see _ensure_issue_history_columns.
 CREATE TABLE IF NOT EXISTS issue_history (
     day TEXT NOT NULL,
     issue_id TEXT NOT NULL,
@@ -79,8 +81,28 @@ CREATE TABLE IF NOT EXISTS issue_history (
     source_count INTEGER NOT NULL,
     first_seen_at TEXT,
     last_seen_at TEXT,
+    velocity REAL,
+    signal_status TEXT,
     updated_at TEXT NOT NULL,
     PRIMARY KEY (day, issue_id)
+);
+
+-- Audit trail for signal lifecycle transitions (roadmap V2 §16): every
+-- time an issue's status changes (including its first appearance,
+-- from_status NULL), one row here explains *why* the current status is
+-- what it is — "Score 83 vì: velocity_now/previous, article/source
+-- count at that moment" — rather than only ever showing the latest
+-- snapshot. Never deleted/rewritten; issue_history rows are.
+CREATE TABLE IF NOT EXISTS signal_events (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    day TEXT NOT NULL,
+    issue_id TEXT NOT NULL,
+    from_status TEXT,
+    to_status TEXT NOT NULL,
+    velocity REAL NOT NULL,
+    article_count INTEGER NOT NULL,
+    source_count INTEGER NOT NULL,
+    occurred_at TEXT NOT NULL
 );
 """
 
@@ -100,6 +122,19 @@ class Database:
     def _init_schema(self) -> None:
         with self._connect() as conn:
             conn.executescript(SCHEMA)
+            self._ensure_issue_history_columns(conn)
+
+    def _ensure_issue_history_columns(self, conn: sqlite3.Connection) -> None:
+        """`CREATE TABLE IF NOT EXISTS` never retrofits columns onto a
+        table that already existed on a deployment from before this
+        column was added (e.g. the news.db already persisted on the
+        db-state branch) — SQLite has no `ADD COLUMN IF NOT EXISTS`, so
+        check PRAGMA table_info first. Safe to run on every startup."""
+        existing = {row["name"] for row in conn.execute("PRAGMA table_info(issue_history)")}
+        if "velocity" not in existing:
+            conn.execute("ALTER TABLE issue_history ADD COLUMN velocity REAL")
+        if "signal_status" not in existing:
+            conn.execute("ALTER TABLE issue_history ADD COLUMN signal_status TEXT")
 
     def is_empty(self) -> bool:
         with self._connect() as conn:
@@ -304,26 +339,58 @@ class Database:
     def record_issues(self, day: str, issues: Iterable[dict], when: datetime) -> None:
         """Upsert today's Top Issues. `issues` are plain dicts (issue_id,
         title, rank, hot_score, article_count, source_count,
-        first_seen_at, last_seen_at) so this layer doesn't import web/."""
+        first_seen_at, last_seen_at, velocity, signal_status) so this
+        layer doesn't import web/. velocity/signal_status are optional
+        (roadmap V2 §15) — omitted callers just get NULL, same as before
+        those columns existed."""
         with self._connect() as conn:
             conn.executemany(
                 """
                 INSERT INTO issue_history
                     (day, issue_id, title, rank, hot_score, article_count, source_count,
-                     first_seen_at, last_seen_at, updated_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                     first_seen_at, last_seen_at, velocity, signal_status, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(day, issue_id) DO UPDATE SET
                     title = excluded.title, rank = excluded.rank, hot_score = excluded.hot_score,
                     article_count = excluded.article_count, source_count = excluded.source_count,
                     first_seen_at = excluded.first_seen_at, last_seen_at = excluded.last_seen_at,
+                    velocity = excluded.velocity, signal_status = excluded.signal_status,
                     updated_at = excluded.updated_at
                 """,
                 [
                     (day, i["issue_id"], i["title"], i["rank"], i["hot_score"], i["article_count"],
-                     i["source_count"], i.get("first_seen_at"), i.get("last_seen_at"), when.isoformat())
+                     i["source_count"], i.get("first_seen_at"), i.get("last_seen_at"),
+                     i.get("velocity"), i.get("signal_status"), when.isoformat())
                     for i in issues
                 ],
             )
+
+    def record_signal_event(
+        self, day: str, issue_id: str, from_status: Optional[str], to_status: str,
+        velocity: float, article_count: int, source_count: int, when: datetime,
+    ) -> None:
+        """One immutable row per lifecycle transition (roadmap V2 §16) —
+        `from_status` is None for an issue's first appearance today."""
+        with self._connect() as conn:
+            conn.execute(
+                """
+                INSERT INTO signal_events
+                    (day, issue_id, from_status, to_status, velocity, article_count, source_count, occurred_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (day, issue_id, from_status, to_status, velocity, article_count, source_count, when.isoformat()),
+            )
+
+    def get_signal_events(self, issue_id: Optional[str] = None, since_day: Optional[str] = None) -> List[dict]:
+        query = "SELECT * FROM signal_events WHERE day >= ?"
+        params: List = [since_day or "0000-00-00"]
+        if issue_id:
+            query += " AND issue_id = ?"
+            params.append(issue_id)
+        query += " ORDER BY occurred_at ASC"
+        with self._connect() as conn:
+            rows = conn.execute(query, params).fetchall()
+        return [dict(r) for r in rows]
 
     def get_issue_history(self, since_day: Optional[str] = None) -> List[dict]:
         with self._connect() as conn:

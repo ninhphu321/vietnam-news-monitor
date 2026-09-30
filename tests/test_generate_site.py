@@ -201,6 +201,7 @@ def _issue(**overrides):
         source_score=100.0,
         velocity_score=80.0,
         novelty_score=60.0,
+        source_weight_score=100.0,
         hot_score=88.5,
         sources=["VnExpress", "CafeF", "Tuổi Trẻ"],
         why_hot=["3 nguồn báo cùng đề cập", "xuất hiện 5 bài trong ngày"],
@@ -250,7 +251,7 @@ def test_top_issues_omitted_on_non_latest_day_pages(tmp_path, db, monkeypatch):
     day (see _top_issues_html's docstring)."""
     import web.generate_site as generate_site_module
 
-    monkeypatch.setattr(generate_site_module, "top_issues", lambda articles, now: [_issue()])
+    monkeypatch.setattr(generate_site_module, "top_issues", lambda articles, now, **kw: [_issue()])
 
     db.insert_if_new(NewsItem("VnExpress", "Old day article", "https://x/1", datetime(2026, 9, 14, 10, 0, tzinfo=TZ)))
     db.insert_if_new(NewsItem("VnExpress", "Latest day article", "https://x/2", datetime(2026, 9, 15, 10, 0, tzinfo=TZ)))
@@ -375,3 +376,17 @@ def test_news_rows_show_a_negative_dot_with_the_triggering_keywords(tmp_path, db
     build_site(db, out_dir=out_dir)
     home = (out_dir / "index.html").read_text(encoding="utf-8")
     assert 'class="sent neg"' in home and "bị phạt" in home
+
+
+def test_issue_card_shows_lifecycle_badge_when_provided():
+    html = render_day_page(date(2026, 9, 14), {}, [date(2026, 9, 14)], trending=[_issue()],
+                           lifecycle_by_id={"eximbank-nhan-su": "accelerating"})
+    assert 'lifecycle-badge lc-accelerating' in html
+    assert "Đang tăng tốc" in html
+
+
+def test_issue_card_omits_lifecycle_badge_when_not_provided():
+    html = render_day_page(date(2026, 9, 14), {}, [date(2026, 9, 14)], trending=[_issue()])
+    # "lifecycle-badge" alone would also match the CSS class definition
+    # in <style>, which is always present — check for the actual element.
+    assert '<span class="lifecycle-badge' not in html

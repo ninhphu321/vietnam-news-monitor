@@ -29,6 +29,8 @@ from web.analytics import daily_stats_rows
 from web.brands import load_watchlist
 from web.brandwatch import LEVEL_URGENT, crisis_alerts, tag_articles
 from web.issues import top_issues
+from web.signals import classify_lifecycle
+from web.source_registry import load_source_registry, weight_for
 
 logger = logging.getLogger(__name__)
 
@@ -228,31 +230,53 @@ def run_backup(cfg: Config) -> None:
 STATS_REFRESH_DAYS = 3
 
 
-def snapshot_data(db: Database, now: datetime) -> None:
+def snapshot_data(db: Database, now: datetime, cfg: Optional[Config] = None) -> None:
     """Persist derived data that would otherwise be lost or recomputed
-    from scratch: today's Top Issues (-> issue_history) and per-day
-    source/topic counts (-> daily_stats). Runs in the crawl job — NOT in
-    the site build — because the CI workflow pushes news.db to the
-    db-state branch *before* it builds the site; anything written during
-    the build would never be saved. Best-effort: a failure here is logged
-    and must never affect crawling or Telegram delivery."""
+    from scratch: today's Top Issues (-> issue_history, plus signal
+    lifecycle transitions -> signal_events) and per-day source/topic
+    counts (-> daily_stats). Runs in the crawl job — NOT in the site
+    build — because the CI workflow pushes news.db to the db-state
+    branch *before* it builds the site; anything written during the
+    build would never be saved. Best-effort: a failure here is logged
+    and must never affect crawling or Telegram delivery.
+
+    `cfg` is optional (defaults to every source at equal weight) only so
+    existing callers/tests that predate SignalScore's Source Weight
+    component keep working without passing one."""
     try:
         articles = db.get_all_articles()
+        today = now.date().isoformat()
 
-        issues = top_issues(articles, now)
-        db.record_issues(
-            now.date().isoformat(),
-            [
-                {
-                    "issue_id": i.issue_id, "title": i.issue_title, "rank": rank,
-                    "hot_score": i.hot_score, "article_count": i.article_count,
-                    "source_count": i.unique_source_count,
-                    "first_seen_at": i.first_seen_at.isoformat(), "last_seen_at": i.last_seen_at.isoformat(),
-                }
-                for rank, i in enumerate(issues, start=1)
-            ],
-            now,
-        )
+        registry = load_source_registry(cfg.source_registry_path) if cfg else {}
+        source_weights = {a["source"]: weight_for(a["source"], registry) for a in articles}
+        issues = top_issues(articles, now, source_weights=source_weights)
+
+        # Roadmap V2 §15-16: classify each issue's lifecycle by comparing
+        # this cycle's velocity to whatever was already on record for it
+        # today (None if this is its first cycle appearing) — fetched
+        # BEFORE the upsert below overwrites it — and log every actual
+        # transition to signal_events so "why is this ACCELERATING" stays
+        # answerable later, not just the latest snapshot.
+        previous_by_id = {row["issue_id"]: row for row in db.get_issue_history(since_day=today)}
+        issue_rows = []
+        for rank, i in enumerate(issues, start=1):
+            previous = previous_by_id.get(i.issue_id)
+            previous_velocity = previous["velocity"] if previous else None
+            status = classify_lifecycle(i.velocity, previous_velocity)
+            previous_status = previous["signal_status"] if previous else None
+            if status != previous_status:
+                db.record_signal_event(
+                    today, i.issue_id, previous_status, status,
+                    i.velocity, i.article_count, i.unique_source_count, now,
+                )
+            issue_rows.append({
+                "issue_id": i.issue_id, "title": i.issue_title, "rank": rank,
+                "hot_score": i.hot_score, "article_count": i.article_count,
+                "source_count": i.unique_source_count,
+                "first_seen_at": i.first_seen_at.isoformat(), "last_seen_at": i.last_seen_at.isoformat(),
+                "velocity": i.velocity, "signal_status": status,
+            })
+        db.record_issues(today, issue_rows, now)
 
         # First run on an existing DB backfills every historical day; after
         # that only the last few days are recomputed (older days are final).
@@ -324,7 +348,7 @@ def run_cycle(db: Database, cfg: Config, dry_run: bool = False) -> None:
         if db.insert_if_new(item):
             newly_inserted.append(item)
 
-    snapshot_data(db, now)
+    snapshot_data(db, now, cfg)
 
     # get_pending() already includes rows from this cycle's inserts (they
     # were just written with sent_at NULL), so it's the single source of

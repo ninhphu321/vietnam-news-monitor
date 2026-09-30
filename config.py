@@ -93,6 +93,13 @@ class Config:
     crisis_window_minutes: int = field(default_factory=lambda: _env_int("CRISIS_WINDOW_MINUTES", 60))
     crisis_cooldown_hours: int = field(default_factory=lambda: _env_int("CRISIS_COOLDOWN_HOURS", 3))
 
+    # SignalScore's Source Weight component (roadmap V2 §14) — see
+    # web/source_registry.py. Missing file/entries default to tier A /
+    # weight 1.0, so this is safe to leave unset.
+    source_registry_path: Path = field(
+        default_factory=lambda: Path(os.getenv("SOURCE_REGISTRY_PATH", str(BASE_DIR / "source_registry.json")))
+    )
+
     archive_dir: Path = field(default_factory=lambda: BASE_DIR / "data" / "archive")
     archive_keep_days: int = field(default_factory=lambda: _env_int("ARCHIVE_KEEP_DAYS", 90))
 

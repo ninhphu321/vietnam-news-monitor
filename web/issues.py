@@ -239,12 +239,17 @@ def _passes_threshold(g: dict, min_articles: int, min_sources: int) -> bool:
     return len(g["urls"]) >= min_articles or len(g["sources"]) >= min_sources
 
 
-def _score_issue(g: dict, now: datetime) -> dict:
+def _score_issue(g: dict, now: datetime, source_weights: Optional[Dict[str, float]] = None) -> dict:
     timestamps = [s["ts"] for s in g["samples"]]
     article_count = len(g["urls"])
     source_count = len(g["sources"])
     first_seen = min(timestamps)
     last_seen = max(timestamps)
+
+    weights = source_weights or {}
+    source_weight_avg = (
+        sum(weights.get(s, 1.0) for s in g["sources"]) / source_count if source_count else 0.0
+    )
 
     age_hours = max((now - first_seen).total_seconds() / 3600, 0.5)
     velocity = article_count / age_hours
@@ -272,34 +277,48 @@ def _score_issue(g: dict, now: datetime) -> dict:
         "first_seen": first_seen, "last_seen": last_seen,
         "velocity": velocity, "acceleration": acceleration,
         "recent_count": len(recent), "new_sources": new_sources,
+        "source_weight_avg": source_weight_avg,
     }
 
 
 def _score_all(metrics: List[dict]) -> None:
     """Normalizes each component to 0-100 relative to the strongest
-    candidate in this batch, then blends per spec section 7 — mutates
-    each metric dict in place, adding volume_score/source_score/
-    velocity_score/novelty_score/hot_score, each independently
-    inspectable (spec: "Code phải tách thành các component... không
-    hard-code thành một công thức khó debug").
+    candidate in this batch, then blends into SignalScore (roadmap V2
+    §13 — supersedes the original HotScore formula) — mutates each
+    metric dict in place, adding volume_score/source_score/
+    velocity_score/novelty_score/source_weight_score/hot_score, each
+    independently inspectable (spec: "Code phải tách thành các
+    component... không hard-code thành một công thức khó debug"). The
+    `hot_score` field name is kept as-is rather than renamed to
+    `signal_score` throughout the codebase (generate_site.py,
+    exports.py, analytics.py, 100+ test assertions) purely to avoid a
+    large mechanical rename with zero behavior change — SignalScore is
+    what this field *means* now, documented here and in README.md.
 
-    Honest limit on spec section 8's anti-bias goal: this weighted
-    blend makes source diversity a real, measurable factor instead of
-    ignoring it, but at 25% weight it is a *counterweight* to volume
-    (40%) and velocity (20%), not a veto. A single source posting many
+    Weights (roadmap V2 §13, chosen to make source diversity the
+    largest single factor instead of raw volume):
+        Source Diversity 30% · Velocity 25% · Novelty 20%
+        · Volume 15% · Source Weight 10%
+
+    Honest limit carried over from the original HotScore design: this
+    is still a weighted *blend*, not a veto — a single source posting
     enough near-duplicate updates can still out-score a genuinely
-    multi-source issue with a modest article-count edge — verified in
-    tests/test_issues.py's volume-bias test, which uses a small (4 vs
-    3) gap precisely because a large enough one does flip the result.
-    Section 8's own wording ("không được mặc định Issue đó hot nhất")
-    reads as "not automatically/by default hottest from raw count
-    alone", which this satisfies; it is not a guarantee that source
-    diversity always wins outright regardless of the volume gap's size.
+    multi-source issue with a modest article-count edge, just less
+    easily than under the old 40% volume weight. Verified in
+    tests/test_issues.py's volume-bias test.
+
+    Source Weight defaults to a no-op (every source at weight 1.0 in
+    source_registry.json) until someone deliberately tiers a source
+    down/up — with all weights equal, every issue's source_weight_avg
+    is identical, so this component contributes the same 10% to every
+    issue and does not reorder the ranking. It only starts to matter
+    once the registry is actually customized.
     """
     max_articles = max((m["article_count"] for m in metrics), default=0) or 1
     max_sources = max((m["source_count"] for m in metrics), default=0) or 1
     max_velocity = max((m["velocity"] for m in metrics), default=0) or 1
     max_accel = max((m["acceleration"] for m in metrics), default=0) or 1
+    max_weight = max((m["source_weight_avg"] for m in metrics), default=0) or 1
 
     for m in metrics:
         # Clamp defensively (spec section 15: "HotScore ngoài 0-100 ->
@@ -310,11 +329,13 @@ def _score_all(metrics: List[dict]) -> None:
         m["source_score"] = min(max(round(100 * m["source_count"] / max_sources, 1), 0.0), 100.0)
         m["velocity_score"] = min(max(round(100 * m["velocity"] / max_velocity, 1), 0.0), 100.0)
         m["novelty_score"] = min(max(round(100 * m["acceleration"] / max_accel, 1), 0.0), 100.0)
+        m["source_weight_score"] = min(max(round(100 * m["source_weight_avg"] / max_weight, 1), 0.0), 100.0)
         m["hot_score"] = min(max(round(
-            m["volume_score"] * 0.40
-            + m["source_score"] * 0.25
-            + m["velocity_score"] * 0.20
-            + m["novelty_score"] * 0.15,
+            m["source_score"] * 0.30
+            + m["velocity_score"] * 0.25
+            + m["novelty_score"] * 0.20
+            + m["volume_score"] * 0.15
+            + m["source_weight_score"] * 0.10,
             1,
         ), 0.0), 100.0)
 
@@ -375,6 +396,7 @@ class Issue:
     source_score: float
     velocity_score: float
     novelty_score: float
+    source_weight_score: float
     hot_score: float
     sources: List[str]
     why_hot: List[str] = field(default_factory=list)
@@ -388,20 +410,25 @@ def top_issues(
     limit: int = TOP_N,
     min_articles: int = MIN_ARTICLES_THRESHOLD,
     min_sources: int = MIN_SOURCES_THRESHOLD,
+    source_weights: Optional[Dict[str, float]] = None,
 ) -> List[Issue]:
-    """Today's (Asia/Ho_Chi_Minh) top issues by HotScore. `now` must
-    already be tz-aware in that timezone — this function trusts the
-    caller rather than importing a hard-coded ZoneInfo, so tests can
-    supply any reference instant, but refuses a naive datetime outright
-    (spec section 15: the "today" boundary must be unambiguous, never
-    silently computed against the wrong clock)."""
+    """Today's (Asia/Ho_Chi_Minh) top issues by SignalScore (roadmap V2
+    §13; see _score_all's docstring for the formula and why the `hot_score`
+    field name didn't change). `now` must already be tz-aware in that
+    timezone — this function trusts the caller rather than importing a
+    hard-coded ZoneInfo, so tests can supply any reference instant, but
+    refuses a naive datetime outright (spec section 15: the "today"
+    boundary must be unambiguous, never silently computed against the
+    wrong clock). `source_weights` is {source_name: weight}, normally
+    built from source_registry.json via web.source_registry — omitted
+    (every source weight 1.0) when the caller doesn't pass one."""
     if now.tzinfo is None:
         raise ValueError("top_issues() requires a timezone-aware `now` (Asia/Ho_Chi_Minh)")
     groups = _group_by_issue(articles, now)
     groups = [g for g in groups if _passes_threshold(g, min_articles, min_sources)]
     groups = _dedupe_overlapping(groups)
 
-    metrics = [_score_issue(g, now) for g in groups]
+    metrics = [_score_issue(g, now, source_weights) for g in groups]
     _score_all(metrics)
     metrics.sort(key=lambda m: m["hot_score"], reverse=True)
 
@@ -439,6 +466,7 @@ def top_issues(
                 source_score=m["source_score"],
                 velocity_score=m["velocity_score"],
                 novelty_score=m["novelty_score"],
+                source_weight_score=m["source_weight_score"],
                 hot_score=m["hot_score"],
                 sources=sorted(g["sources"]),
                 why_hot=_why_hot(m),

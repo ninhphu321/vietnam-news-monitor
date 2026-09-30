@@ -1,0 +1,94 @@
+{
+  "VnExpress": {
+    "tier": "A",
+    "weight": 1.0
+  },
+  "Tuổi Trẻ": {
+    "tier": "A",
+    "weight": 1.0
+  },
+  "CafeF": {
+    "tier": "A",
+    "weight": 1.0
+  },
+  "Vietstock": {
+    "tier": "A",
+    "weight": 1.0
+  },
+  "Thanh Niên": {
+    "tier": "A",
+    "weight": 1.0
+  },
+  "Dân Trí": {
+    "tier": "A",
+    "weight": 1.0
+  },
+  "VnEconomy": {
+    "tier": "A",
+    "weight": 1.0
+  },
+  "Znews": {
+    "tier": "A",
+    "weight": 1.0
+  },
+  "Tiền Phong": {
+    "tier": "A",
+    "weight": 1.0
+  },
+  "VietnamPlus": {
+    "tier": "A",
+    "weight": 1.0
+  },
+  "Nhân Dân": {
+    "tier": "A",
+    "weight": 1.0
+  },
+  "Chính phủ": {
+    "tier": "A",
+    "weight": 1.0
+  },
+  "VTV": {
+    "tier": "A",
+    "weight": 1.0
+  },
+  "VietnamBiz": {
+    "tier": "A",
+    "weight": 1.0
+  },
+  "CafeBiz": {
+    "tier": "A",
+    "weight": 1.0
+  },
+  "Đầu tư Chứng khoán": {
+    "tier": "A",
+    "weight": 1.0
+  },
+  "Diễn đàn Doanh nghiệp": {
+    "tier": "A",
+    "weight": 1.0
+  },
+  "Báo Đầu tư": {
+    "tier": "A",
+    "weight": 1.0
+  },
+  "FiLi": {
+    "tier": "A",
+    "weight": 1.0
+  },
+  "VietnamNet": {
+    "tier": "A",
+    "weight": 1.0
+  },
+  "Người Quan Sát": {
+    "tier": "A",
+    "weight": 1.0
+  },
+  "SGGP": {
+    "tier": "A",
+    "weight": 1.0
+  },
+  "VnExpress Intl": {
+    "tier": "A",
+    "weight": 1.0
+  }
+}

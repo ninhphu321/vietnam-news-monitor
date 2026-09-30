@@ -95,6 +95,57 @@ def test_snapshot_data_never_raises(db, monkeypatch):
     snapshot_data(db, NOW)  # secondary, best-effort step: must swallow
 
 
+# --- snapshot_data: signal lifecycle (roadmap V2 §15-16) ----------------------
+def test_first_snapshot_marks_a_new_issue_emerging_with_one_event(db):
+    for a in _issue_articles():
+        db.insert_if_new(NewsItem(a["source"], a["title"], a["url"], a["published_at"]))
+    snapshot_data(db, NOW)
+
+    rows = db.get_issue_history()
+    assert rows and rows[0]["signal_status"] == "emerging"
+
+    events = db.get_signal_events()
+    assert len(events) == 1
+    assert events[0]["from_status"] is None and events[0]["to_status"] == "emerging"
+
+
+def test_repeated_snapshots_with_stable_velocity_settle_after_one_more_event(db):
+    for a in _issue_articles():
+        db.insert_if_new(NewsItem(a["source"], a["title"], a["url"], a["published_at"]))
+    snapshot_data(db, NOW)  # 1st cycle: no prior row yet -> "emerging" (event #1)
+    snapshot_data(db, NOW)  # 2nd cycle: velocity unchanged vs. cycle 1 -> "peak" (event #2)
+    snapshot_data(db, NOW)  # 3rd cycle: velocity unchanged vs. cycle 2 -> still "peak", no new event
+
+    events = db.get_signal_events()
+    assert [e["to_status"] for e in events] == ["emerging", "peak"]
+    assert db.get_issue_history()[0]["signal_status"] == "peak"
+
+
+def test_accelerating_issue_gets_a_new_lifecycle_event(db):
+    base = T9
+    for i, source in enumerate(["CafeF", "VnExpress"]):
+        db.insert_if_new(NewsItem(source, TITLE, f"https://x/{source}/{i}", base + timedelta(minutes=i)))
+    snapshot_data(db, base + timedelta(hours=1))  # sparse: low velocity -> emerging
+
+    # A burst of new articles for the same issue sharply raises velocity.
+    for i, source in enumerate(["Dân Trí", "CafeF", "VnExpress", "Vietstock"]):
+        db.insert_if_new(NewsItem(source, TITLE + f" cập nhật {i}", f"https://x/burst/{i}",
+                                  base + timedelta(hours=1, minutes=i)))
+    snapshot_data(db, base + timedelta(hours=1, minutes=5))
+
+    events = db.get_signal_events()
+    statuses = [e["to_status"] for e in events]
+    assert statuses[0] == "emerging"
+    assert "accelerating" in statuses[1:]
+
+
+def test_snapshot_data_accepts_missing_cfg_and_defaults_source_weights(db):
+    for a in _issue_articles():
+        db.insert_if_new(NewsItem(a["source"], a["title"], a["url"], a["published_at"]))
+    snapshot_data(db, NOW, cfg=None)  # no Config passed -> every source weight 1.0
+    assert db.get_issue_history()
+
+
 # --- exports -----------------------------------------------------------------
 def test_issues_json_exposes_all_four_components():
     issues = top_issues(_issue_articles(), NOW)

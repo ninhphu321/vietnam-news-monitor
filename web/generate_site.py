@@ -34,6 +34,7 @@ from web.brandwatch import (BrandStat, CrisisAlert, Tagged, crisis_alerts, share
                             tag_articles, tags_by_url)
 from web.exports import brands_json, feed_xml, issues_json, stats_json
 from web.issues import Issue, top_issues
+from web.source_registry import load_source_registry, weight_for
 from web.theme import STYLE, icon, render_shell
 
 SITE_DIR = Path(__file__).resolve().parent.parent / "site"
@@ -262,7 +263,24 @@ def _related_articles_html(articles: List[dict]) -> str:
     )
 
 
-def _issue_card_html(rank: int, issue: Issue) -> str:
+# Roadmap V2 §15 lifecycle labels — Vietnamese, no emoji (arrow glyphs
+# only, consistent with the rest of the site's icon-free badges).
+_LIFECYCLE_LABELS = {
+    "emerging": ("★ Mới xuất hiện", "lc-emerging"),
+    "accelerating": ("↑ Đang tăng tốc", "lc-accelerating"),
+    "peak": ("● Ổn định", "lc-peak"),
+    "cooling": ("↓ Đang hạ nhiệt", "lc-cooling"),
+}
+
+
+def _lifecycle_badge_html(status: Optional[str]) -> str:
+    if not status or status not in _LIFECYCLE_LABELS:
+        return ""
+    label, css_class = _LIFECYCLE_LABELS[status]
+    return f'<span class="lifecycle-badge {css_class}">{escape(label)}</span>'
+
+
+def _issue_card_html(rank: int, issue: Issue, lifecycle_status: Optional[str] = None) -> str:
     # The compact (collapsed) card caps Why Hot at 2 bullets to hit the
     # spec's ~180-220px target height — the full list (already <=4
     # items, see web/issues.py) would push it noticeably taller, and
@@ -292,7 +310,8 @@ def _issue_card_html(rank: int, issue: Issue) -> str:
         f'<div class="issue-summary">'
         f'<div class="issue-title-row"><span class="issue-title">{escape(issue.issue_title)}</span>'
         f'<span class="issue-score">HOT {issue.hot_score:.0f}</span></div>'
-        f'<div class="issue-stats">{issue.article_count} bài · {issue.unique_source_count} nguồn</div>'
+        f'<div class="issue-stats">{issue.article_count} bài · {issue.unique_source_count} nguồn'
+        f'{_lifecycle_badge_html(lifecycle_status)}</div>'
         f'<ul class="why-hot-compact">{why_hot}</ul>'
         f'</div></summary>'
         f'<div class="issue-detail">'
@@ -303,7 +322,9 @@ def _issue_card_html(rank: int, issue: Issue) -> str:
     )
 
 
-def _top_issues_html(issues: List[Issue], width_class: str = "col-8") -> str:
+def _top_issues_html(
+    issues: List[Issue], width_class: str = "col-8", lifecycle_by_id: Optional[Dict[str, str]] = None
+) -> str:
     """The "TOP ISSUES" panel — only rendered on the latest day's page
     (see build_site), since it is scored against *today* (Asia/Ho_Chi_Minh)
     and would be meaningless attached to an older archive day's page.
@@ -311,7 +332,11 @@ def _top_issues_html(issues: List[Issue], width_class: str = "col-8") -> str:
     (see web/issues.py) rather than shown empty."""
     if not issues:
         return ""
-    cards = "".join(_issue_card_html(rank, issue) for rank, issue in enumerate(issues, start=1))
+    lifecycle_by_id = lifecycle_by_id or {}
+    cards = "".join(
+        _issue_card_html(rank, issue, lifecycle_by_id.get(issue.issue_id))
+        for rank, issue in enumerate(issues, start=1)
+    )
     return (
         f'<section id="issues" class="panel {width_class}" aria-labelledby="issues-title">'
         '<h2 class="panel-title" id="issues-title">Top Issues hôm nay</h2>'
@@ -867,6 +892,7 @@ def render_day_page(
     has_analytics: bool = False,
     brand_tags: Optional[Dict[str, Tagged]] = None,
     prev_total: Optional[int] = None,
+    lifecycle_by_id: Optional[Dict[str, str]] = None,
 ) -> str:
     now = datetime.now(ZoneInfo(config.timezone))
     is_latest = trending is not None
@@ -899,7 +925,7 @@ def render_day_page(
         '<div id="news-pagination" class="pagination"></div></section>'
     )
 
-    issues_panel = _top_issues_html(issues, "col-8") if issues else ""
+    issues_panel = _top_issues_html(issues, "col-8", lifecycle_by_id) if issues else ""
     side_panel = _sources_panel(sources, "col-4" if issues else "col-12")
     grid = f'<div class="content-grid">{issues_panel}{side_panel}</div>' if (issues_panel or side_panel) else ""
 
@@ -971,8 +997,16 @@ def build_site(db: Database, out_dir: Path = SITE_DIR) -> None:
     # ever shown on the latest day's page — see _top_issues_html's
     # docstring for why.
     now = datetime.now(ZoneInfo(config.timezone))
-    trending = top_issues(articles, now)
+    registry = load_source_registry(config.source_registry_path)
+    source_weights = {s: weight_for(s, registry) for s in _SOURCE_ORDER}
+    trending = top_issues(articles, now, source_weights=source_weights)
     has_data = bool(articles)
+    # Written moments earlier in this same crawl cycle by
+    # scheduler.snapshot_data() (see that function's docstring for why
+    # it runs there and not here) — read back just to label each Top
+    # Issues card with its lifecycle (roadmap V2 §15).
+    today_history = db.get_issue_history(since_day=now.date().isoformat())
+    lifecycle_by_id = {r["issue_id"]: r["signal_status"] for r in today_history if r.get("signal_status")}
     prev_day = (now - timedelta(days=1)).date()
     prev_total = sum(
         1 for a in articles
@@ -997,6 +1031,7 @@ def build_site(db: Database, out_dir: Path = SITE_DIR) -> None:
                 latest_href=(None if is_latest else f"{latest.isoformat()}.html"),
                 has_analytics=has_data, brand_tags=brand_tags,
                 prev_total=(prev_total if is_latest else None),
+                lifecycle_by_id=(lifecycle_by_id if is_latest else None),
             ),
             encoding="utf-8",
         )
@@ -1004,7 +1039,8 @@ def build_site(db: Database, out_dir: Path = SITE_DIR) -> None:
     latest_sources = by_date.get(latest, {})
     (out_dir / "index.html").write_text(
         render_day_page(latest, latest_sources, all_dates, trending=trending, has_analytics=has_data,
-                        brand_tags=brand_tags, prev_total=prev_total), encoding="utf-8"
+                        brand_tags=brand_tags, prev_total=prev_total,
+                        lifecycle_by_id=lifecycle_by_id), encoding="utf-8"
     )
 
     # Tells GitHub Pages not to run this through Jekyll (irrelevant here
