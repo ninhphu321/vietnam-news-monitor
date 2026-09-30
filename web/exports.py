@@ -39,7 +39,15 @@ def issues_json(issues: List[Issue], now: datetime) -> str:
                 "first_seen_at": i.first_seen_at.isoformat(),
                 "last_seen_at": i.last_seen_at.isoformat(),
                 "why_hot": i.why_hot,
-                "articles": i.all_articles,
+                # Rebuilt rather than passed straight through: all_articles
+                # carries an internal-only "ts" datetime (roadmap V3 §25)
+                # that isn't JSON-serializable and isn't part of this
+                # export's public contract — keep it to exactly the
+                # {title, url, source} shape this API has always had.
+                "articles": [
+                    {"title": a["title"], "url": a["url"], "source": a["source"]}
+                    for a in i.all_articles
+                ],
             }
             for rank, i in enumerate(issues, start=1)
         ],

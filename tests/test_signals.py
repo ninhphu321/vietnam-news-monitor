@@ -2,7 +2,7 @@
 
 import pytest
 
-from web.signals import ACCELERATING, COOLING, EMERGING, PEAK, classify_lifecycle
+from web.signals import ACCELERATING, COOLING, EMERGING, PEAK, classify_lifecycle, should_alert
 
 
 def test_first_appearance_is_always_emerging_regardless_of_velocity():
@@ -39,3 +39,21 @@ def test_zero_previous_and_zero_now_is_peak_not_accelerating():
     # No movement at all is not "accelerating" just because the ratio
     # (0/0) would otherwise be undefined.
     assert classify_lifecycle(velocity_now=0.0, velocity_previous=0.0) == PEAK
+
+
+# --- should_alert (roadmap V3 §26 Signal Alert) --------------------------
+
+
+def test_should_alert_requires_both_bars_at_once():
+    assert should_alert(source_count=5, hot_score=90.0) is True
+    assert should_alert(source_count=1, hot_score=90.0) is False  # not enough sources
+    assert should_alert(source_count=5, hot_score=50.0) is False  # score too low
+
+
+def test_should_alert_thresholds_are_inclusive():
+    assert should_alert(source_count=3, hot_score=70.0) is True
+
+
+def test_should_alert_thresholds_are_configurable():
+    assert should_alert(source_count=2, hot_score=60.0, min_sources=2, min_score=60.0) is True
+    assert should_alert(source_count=2, hot_score=60.0) is False  # defaults are stricter

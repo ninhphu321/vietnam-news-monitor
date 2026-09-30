@@ -424,6 +424,27 @@ def format_crisis_alert(alert, now: datetime) -> str:
     return "\n".join(lines)
 
 
+def format_signal_alert(issue: Issue, now: datetime) -> str:
+    """Roadmap V3 §26: a dedicated message for one issue that just
+    started ACCELERATING and cleared web.signals.should_alert()'s bar —
+    distinct from the "TOP TÍN HIỆU" section (format_top_signals) that
+    already leads every regular digest listing the Top 5 every cycle
+    regardless of threshold. Sent by scheduler.send_signal_alerts(); see
+    its docstring and scheduler.snapshot_data()'s for why this can't
+    repeat every cycle for the same issue."""
+    lines = [
+        "🎯 <b>TÍN HIỆU ĐANG TĂNG TỐC</b>",
+        "",
+        f"<b>{_esc(issue.issue_title)}</b>",
+        f"{issue.article_count} bài / {issue.unique_source_count} nguồn",
+    ]
+    v = issue.velocity_1h
+    if v is not None:
+        lines.append(f"Tốc độ 1h qua: {v.current_rate:.1f} bài/giờ (trước đó: {v.previous_rate:.1f})")
+    lines += ["", f"⏰ {now.strftime('%d/%m/%Y %H:%M')}"]
+    return "\n".join(lines)
+
+
 # ---------------------------------------------------------------------------
 # Sending
 # ---------------------------------------------------------------------------

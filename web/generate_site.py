@@ -33,8 +33,9 @@ from web.brands import BrandIndex, Watchlist, load_watchlist
 from web.brandwatch import (BrandStat, CrisisAlert, Tagged, crisis_alerts, share_of_voice,
                             tag_articles, tags_by_url)
 from web.exports import brands_json, feed_xml, issues_json, stats_json
-from web.issues import BROAD_COVERAGE, MULTI_SOURCE, SINGLE_SOURCE, Issue, media_consensus, top_issues
-from web.signals import LIFECYCLE_LABELS
+from web.issues import (BROAD_COVERAGE, MULTI_SOURCE, SINGLE_SOURCE, Issue, issue_diff,
+                        media_consensus, top_issues)
+from web.signals import ACCELERATING, LIFECYCLE_LABELS
 from web.source_registry import load_source_registry, weight_for
 from web.theme import STYLE, icon, render_shell
 
@@ -253,14 +254,60 @@ def _source_coverage_html(issue: Issue) -> str:
 
 
 def _related_articles_html(articles: List[dict]) -> str:
-    # Issue.all_articles entries are the lightweight {title, url, source}
-    # shape built in web/issues.py — no timestamp per article (the
-    # issue-level first/last-seen times are shown once in the metrics
-    # row instead, see _issue_card_html).
     return "".join(
         f'<div class="related-row"><span class="src">{escape(a["source"])}</span>'
-        f'<a href="{escape(a["url"])}" target="_blank" rel="noopener">{escape(a["title"])}</a></div>'
+        f'<a href="{escape(a["url"])}" target="_blank" rel="noopener">{escape(a["title"])}</a>'
+        + (f'<span class="related-time">{a["ts"].strftime("%H:%M")}</span>' if a.get("ts") else "")
+        + '</div>'
         for a in articles
+    )
+
+
+def _coverage_timeline_html(issue: Issue) -> str:
+    """Roadmap V3 §25 Coverage Map: which source reported this issue
+    first and how far behind each following source was — distinct from
+    _source_coverage_html's per-source article COUNT bars above it,
+    which say nothing about order. Only describes order, never which
+    source is "right" (roadmap: "không kết luận source nào đúng")."""
+    first_by_source: Dict[str, datetime] = {}
+    for a in issue.all_articles:
+        ts = a.get("ts")
+        if ts is None:
+            continue
+        if a["source"] not in first_by_source or ts < first_by_source[a["source"]]:
+            first_by_source[a["source"]] = ts
+    if not first_by_source:
+        return ""
+    ordered = sorted(first_by_source.items(), key=lambda kv: kv[1])
+    first_ts = ordered[0][1]
+    rows = []
+    for src, ts in ordered:
+        delta_min = int((ts - first_ts).total_seconds() // 60)
+        tail = "đầu tiên" if delta_min == 0 else f"+{delta_min} phút"
+        rows.append(
+            f'<div class="coverage-row"><span class="coverage-src">{escape(src)}</span>'
+            f'<span class="coverage-time">{ts.strftime("%H:%M")} · {tail}</span></div>'
+        )
+    return f'<div class="coverage-timeline">{"".join(rows)}</div>'
+
+
+def _issue_diff_html(diff: Optional[Dict[str, int]]) -> str:
+    """Roadmap V3 §27 "What changed?" — `diff` is web.issues.issue_diff()'s
+    result: None means the issue didn't exist as a qualifying issue at
+    the start of the comparison window (shown as "mới xuất hiện"), not
+    a 0/0 diff."""
+    if diff is None:
+        return '<div class="issue-diff">Mới xuất hiện trong giờ qua</div>'
+    sources_delta, articles_delta = diff["sources_delta"], diff["articles_delta"]
+    if sources_delta == 0 and articles_delta == 0:
+        return ""
+
+    def _signed(n: int) -> str:
+        return f"+{n}" if n > 0 else str(n)
+
+    return (
+        f'<div class="issue-diff">So với 1 giờ trước: {_signed(sources_delta)} nguồn · '
+        f'{_signed(articles_delta)} bài</div>'
     )
 
 
@@ -299,7 +346,18 @@ _MEDIA_CONSENSUS_LABELS = {
 }
 
 
-def _issue_card_html(rank: int, issue: Issue, lifecycle_status: Optional[str] = None) -> str:
+# Distinguishes "caller has no diff data at all" (omit the section) from
+# "caller computed a diff and it's None" (issue_diff()'s own meaning:
+# didn't exist as a qualifying issue 1h ago -> render "mới xuất hiện").
+_DIFF_NOT_PROVIDED = object()
+
+
+def _issue_card_html(
+    rank: int,
+    issue: Issue,
+    lifecycle_status: Optional[str] = None,
+    diff: Optional[Dict[str, int]] = _DIFF_NOT_PROVIDED,
+) -> str:
     # The compact (collapsed) card caps Why Hot at 2 bullets to hit the
     # spec's ~180-220px target height — the full list (already <=4
     # items, see web/issues.py) would push it noticeably taller, and
@@ -333,6 +391,7 @@ def _issue_card_html(rank: int, issue: Issue, lifecycle_status: Optional[str] = 
         f'</span></div>'
     )
     issue_id = escape(issue.issue_id)
+    diff_html = "" if diff is _DIFF_NOT_PROVIDED else _issue_diff_html(diff)
     return (
         f'<details class="issue-card" id="issue-{issue_id}">'
         f'<summary>'
@@ -346,14 +405,19 @@ def _issue_card_html(rank: int, issue: Issue, lifecycle_status: Optional[str] = 
         f'</div></summary>'
         f'<div class="issue-detail">'
         f'<div class="issue-metrics">{metrics}</div>'
+        f'{diff_html}'
         f'{_source_coverage_html(issue)}'
+        f'{_coverage_timeline_html(issue)}'
         f'<div class="related-articles">{_related_articles_html(issue.all_articles)}</div>'
         f'</div></details>'
     )
 
 
 def _top_issues_html(
-    issues: List[Issue], width_class: str = "col-8", lifecycle_by_id: Optional[Dict[str, str]] = None
+    issues: List[Issue],
+    width_class: str = "col-8",
+    lifecycle_by_id: Optional[Dict[str, str]] = None,
+    diff_by_id: Optional[Dict[str, Optional[Dict[str, int]]]] = None,
 ) -> str:
     """The "TOP ISSUES" panel — only rendered on the latest day's page
     (see build_site), since it is scored against *today* (Asia/Ho_Chi_Minh)
@@ -364,7 +428,10 @@ def _top_issues_html(
         return ""
     lifecycle_by_id = lifecycle_by_id or {}
     cards = "".join(
-        _issue_card_html(rank, issue, lifecycle_by_id.get(issue.issue_id))
+        _issue_card_html(
+            rank, issue, lifecycle_by_id.get(issue.issue_id),
+            diff=(diff_by_id[issue.issue_id] if diff_by_id and issue.issue_id in diff_by_id else _DIFF_NOT_PROVIDED),
+        )
         for rank, issue in enumerate(issues, start=1)
     )
     return (
@@ -923,6 +990,7 @@ def render_day_page(
     brand_tags: Optional[Dict[str, Tagged]] = None,
     prev_total: Optional[int] = None,
     lifecycle_by_id: Optional[Dict[str, str]] = None,
+    diff_by_id: Optional[Dict[str, Optional[Dict[str, int]]]] = None,
 ) -> str:
     now = datetime.now(ZoneInfo(config.timezone))
     is_latest = trending is not None
@@ -955,7 +1023,7 @@ def render_day_page(
         '<div id="news-pagination" class="pagination"></div></section>'
     )
 
-    issues_panel = _top_issues_html(issues, "col-8", lifecycle_by_id) if issues else ""
+    issues_panel = _top_issues_html(issues, "col-8", lifecycle_by_id, diff_by_id) if issues else ""
     side_panel = _sources_panel(sources, "col-4" if issues else "col-12")
     grid = f'<div class="content-grid">{issues_panel}{side_panel}</div>' if (issues_panel or side_panel) else ""
 
@@ -1017,6 +1085,54 @@ def render_analytics_page(an: Analytics, streaks: List[IssueStreak], trend, now:
     )
 
 
+def render_radar_page(
+    accelerating: List[Issue],
+    diff_by_id: Dict[str, Optional[Dict[str, int]]],
+    has_issues: bool,
+    now: datetime,
+) -> str:
+    """The Radar tab (radar.html, roadmap V3 §21 "News Radar"): today's
+    Top Issues that are currently ACCELERATING (roadmap V2 §15
+    lifecycle) — a strict, usually-empty subset of the Top 5 already
+    shown on Tổng quan, not a re-listing of all of them. Answers "what
+    needs attention right now" (roadmap: "vấn đề nào đang tăng tốc và
+    cần chú ý ngay?"), separate from Tổng quan's "what's hot today
+    overall" panel.
+
+    Reuses _issue_card_html for each card — same Coverage Map, "what
+    changed" diff, velocity and consensus fields as the Tổng quan
+    cards — so the two surfaces never disagree about the same issue.
+    `has_issues` controls only whether the Issues/Radar nav items show
+    at all (mirrors render_day_page's own `bool(issues)`), independent
+    of whether anything is accelerating right now.
+    """
+    if accelerating:
+        cards = "".join(
+            _issue_card_html(rank, issue, ACCELERATING, diff=diff_by_id.get(issue.issue_id, _DIFF_NOT_PROVIDED))
+            for rank, issue in enumerate(accelerating, start=1)
+        )
+        panel = (
+            '<section class="panel col-12" aria-labelledby="radar-title">'
+            '<h2 class="panel-title" id="radar-title">Đang tăng tốc</h2>'
+            '<p class="panel-note">Trong Top Issues hôm nay, những vấn đề đang tăng tốc thật sự — '
+            'so với chu kỳ quét trước, không phải so với hôm qua.</p>'
+            f'<div class="issues-grid">{cards}</div></section>'
+        )
+    else:
+        panel = (
+            '<section class="panel col-12" aria-labelledby="radar-title">'
+            '<h2 class="panel-title" id="radar-title">Đang tăng tốc</h2>'
+            '<p class="panel-note">Hiện không có vấn đề nào trong Top Issues hôm nay đang tăng tốc.</p>'
+            '</section>'
+        )
+    body = _page_head("Radar", "Vấn đề nào đang tăng tốc và cần chú ý ngay.") + panel
+    return render_shell(
+        active="radar", title="Radar — Vietnam News Monitor", crumb="Radar", body=body,
+        now_label=now.strftime("%H:%M"), has_data=True, has_issues=has_issues,
+        footer=f"Tự động cập nhật mỗi {config.crawl_interval_minutes} phút qua GitHub Actions.",
+    )
+
+
 def build_site(db: Database, out_dir: Path = SITE_DIR) -> None:
     articles = db.get_all_articles()
     by_date = group_by_date_and_source(articles)
@@ -1037,6 +1153,10 @@ def build_site(db: Database, out_dir: Path = SITE_DIR) -> None:
     # Issues card with its lifecycle (roadmap V2 §15).
     today_history = db.get_issue_history(since_day=now.date().isoformat())
     lifecycle_by_id = {r["issue_id"]: r["signal_status"] for r in today_history if r.get("signal_status")}
+    # Roadmap V3 §27 "What changed?" — diff each Top Issues card against
+    # its own state 1h ago (see web.issues.issue_diff's docstring for
+    # why this needs no new snapshot table).
+    diff_by_id = {i.issue_id: issue_diff(i, articles, now, source_weights=source_weights) for i in trending}
     prev_day = (now - timedelta(days=1)).date()
     prev_total = sum(
         1 for a in articles
@@ -1062,6 +1182,7 @@ def build_site(db: Database, out_dir: Path = SITE_DIR) -> None:
                 has_analytics=has_data, brand_tags=brand_tags,
                 prev_total=(prev_total if is_latest else None),
                 lifecycle_by_id=(lifecycle_by_id if is_latest else None),
+                diff_by_id=(diff_by_id if is_latest else None),
             ),
             encoding="utf-8",
         )
@@ -1070,7 +1191,7 @@ def build_site(db: Database, out_dir: Path = SITE_DIR) -> None:
     (out_dir / "index.html").write_text(
         render_day_page(latest, latest_sources, all_dates, trending=trending, has_analytics=has_data,
                         brand_tags=brand_tags, prev_total=prev_total,
-                        lifecycle_by_id=lifecycle_by_id), encoding="utf-8"
+                        lifecycle_by_id=lifecycle_by_id, diff_by_id=diff_by_id), encoding="utf-8"
     )
 
     # Tells GitHub Pages not to run this through Jekyll (irrelevant here
@@ -1095,6 +1216,10 @@ def build_site(db: Database, out_dir: Path = SITE_DIR) -> None:
         )
         (out_dir / "brands.json").write_text(brands_json(stats7, stats30, alerts, watch, now), encoding="utf-8")
         (out_dir / "issues.json").write_text(issues_json(trending, now), encoding="utf-8")
+        accelerating = [i for i in trending if lifecycle_by_id.get(i.issue_id) == ACCELERATING]
+        (out_dir / "radar.html").write_text(
+            render_radar_page(accelerating, diff_by_id, bool(trending), now), encoding="utf-8"
+        )
         (out_dir / "stats.json").write_text(
             stats_json(daily_stats, db.get_issue_history(), now), encoding="utf-8"
         )

@@ -107,10 +107,20 @@ def test_snapshot_data_returns_none_on_failure(db, monkeypatch):
 def test_snapshot_data_returns_ranked_issues_with_lifecycle_status(db):
     for a in _issue_articles():
         db.insert_if_new(NewsItem(a["source"], a["title"], a["url"], a["published_at"]))
-    ranked = snapshot_data(db, NOW)
-    assert ranked is not None and ranked != []
-    issue, status = ranked[0]
+    result = snapshot_data(db, NOW)
+    assert result is not None and result.ranked_issues != []
+    issue, status = result.ranked_issues[0]
     assert issue.issue_id and status == "emerging"
+
+
+def test_snapshot_data_has_no_alerts_on_first_appearance(db):
+    # A brand-new issue's first cycle is always "emerging", never
+    # "accelerating" (see classify_lifecycle) -> never alert-worthy yet,
+    # no matter how many sources/how high the score.
+    for a in _issue_articles():
+        db.insert_if_new(NewsItem(a["source"], a["title"], a["url"], a["published_at"]))
+    result = snapshot_data(db, NOW)
+    assert result.new_alerts == []
 
 
 # --- snapshot_data: signal lifecycle (roadmap V2 §15-16) ----------------------
@@ -155,6 +165,28 @@ def test_accelerating_issue_gets_a_new_lifecycle_event(db):
     statuses = [e["to_status"] for e in events]
     assert statuses[0] == "emerging"
     assert "accelerating" in statuses[1:]
+
+
+def test_snapshot_data_alerts_on_a_real_acceleration_with_enough_sources(db):
+    # Same 2-cycle burst shape as test_accelerating_issue_gets_a_new_
+    # lifecycle_event above, but asserting the roadmap V3 §26 side of
+    # it: a real transition into ACCELERATING, with enough source
+    # diversity (4 distinct sources here) and a high enough score
+    # (the only issue in the cycle -> hot_score normalizes to 100),
+    # must surface as a new_alerts entry.
+    base = T9
+    for i, source in enumerate(["CafeF", "VnExpress"]):
+        db.insert_if_new(NewsItem(source, TITLE, f"https://x/{source}/{i}", base + timedelta(minutes=i)))
+    snapshot_data(db, base + timedelta(hours=1))  # sparse: low velocity -> emerging, no alert yet
+
+    for i, source in enumerate(["Dân Trí", "CafeF", "VnExpress", "Vietstock"]):
+        db.insert_if_new(NewsItem(source, TITLE + f" cập nhật {i}", f"https://x/burst/{i}",
+                                  base + timedelta(hours=1, minutes=i)))
+    result = snapshot_data(db, base + timedelta(hours=1, minutes=5))
+
+    assert len(result.new_alerts) == 1
+    assert result.new_alerts[0].unique_source_count >= 3
+    assert result.new_alerts[0].hot_score >= 70.0
 
 
 def test_snapshot_data_accepts_missing_cfg_and_defaults_source_weights(db):

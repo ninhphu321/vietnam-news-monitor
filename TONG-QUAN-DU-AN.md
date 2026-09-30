@@ -235,6 +235,34 @@ Module [web/signals.py](web/signals.py) + bảng `issue_history`/`signal_events`
 
 **Đã xác minh trên dữ liệu production thật:** cả 2 chỉ số tính đúng và hiện đúng vị trí trên thẻ issue (ảnh chụp DOM thực tế trong quá trình phát triển).
 
+### Coverage Map + "What changed?" (roadmap V3 §25 & §27, Sprint 5)
+
+Cả 2 đều **không thêm bảng DB mới**, cùng lý do như Velocity Engine ở trên — tính thẳng từ dữ liệu đã có mỗi lần build:
+
+- **Coverage Map** (`_coverage_timeline_html` trong [web/generate_site.py](web/generate_site.py)): với mỗi issue, sắp các nguồn theo thời điểm đăng SỚM NHẤT của từng nguồn đó, hiện "nguồn X — HH:MM · đầu tiên", "nguồn Y — HH:MM · +N phút"... Chỉ mô tả **thứ tự**, không kết luận nguồn nào "đúng" (đúng nguyên tắc roadmap). Cần thêm 1 trường `ts` (datetime) vào `Issue.all_articles`/`representative_articles` (trước đây chỉ có `title/url/source`) — [web/exports.py](web/exports.py)'s `issues_json` dựng lại đúng shape 3-trường cũ khi xuất JSON để API công khai không đổi (datetime không serialize JSON được, và cũng không cần thiết ở lớp API đó).
+- **"What changed?"** (`web.issues.issue_diff()`): so issue hiện tại với chính issue đó tính lại **1 giờ trước** (`top_issues(articles, now - 1h, limit=50)` — không phải bảng snapshot riêng, chỉ là gọi lại đúng hàm `top_issues()` đã có với `now` sớm hơn, giống hệt cách `build_site()` vốn đã tính lại Top Issues từ đầu mỗi lần build). `limit=50` (không phải Top 5 mặc định) để 1 issue mới lọt top 5 gần đây nhưng đã tồn tại từ trước vẫn tìm thấy được cho phép so sánh. Trả `None` khi issue chưa tồn tại ở mốc so sánh (hiện "Mới xuất hiện trong giờ qua"), khác với diff 0/0.
+
+### Signal Alert (roadmap V3 §26, Sprint 5) — Telegram
+
+Một tin nhắn Telegram **riêng biệt** với mục TOP TÍN HIỆU (mục 6) — TOP TÍN HIỆU liệt kê Top 5 **mỗi chu kỳ bất kể ngưỡng nào**; Signal Alert chỉ gửi khi 1 issue **vừa** chuyển sang trạng thái ACCELERATING (roadmap V2 §15) **và** vượt cả 2 ngưỡng:
+
+- `source_count >= 3` (khớp `CRISIS_MIN_SOURCES` — không phải số tuỳ tiện).
+- `hot_score >= 70` (SignalScore chuẩn hoá 0-100 **theo đợt tính hiện tại**, nên đây là "rõ ràng dẫn đầu đợt này", không phải ngưỡng tuyệt đối toàn cục).
+
+Cả 2 số cấu hình được qua `SIGNAL_ALERT_MIN_SOURCES`/`SIGNAL_ALERT_MIN_SCORE` (`config.py`), mặc định như trên — chọn trực giác, cùng tinh thần "tinh chỉnh theo dữ liệu thật" như mọi ngưỡng khác trong dự án.
+
+**Chống spam Telegram (roadmap yêu cầu rõ):** không cần cooldown/bảng DB riêng — điều kiện "**vừa** chuyển sang ACCELERATING" (so `status != previous_status` ngay trong `scheduler.snapshot_data()`, đúng chỗ `signal_events` đã ghi transition) tự nhiên chỉ đúng 1 lần cho tới khi issue hạ nhiệt rồi tăng tốc lại — 1 issue tăng tốc liên tục 10 chu kỳ liền chỉ tạo 1 alert, không phải 10.
+
+Module: `web.signals.should_alert()` (điều kiện thuần), `scheduler.snapshot_data()` trả thêm `new_alerts` trong `SnapshotResult` (cùng `ranked_issues` cho TOP TÍN HIỆU), `scheduler.send_signal_alerts()` gửi (best-effort, giống `check_crisis()`), `telegram.format_signal_alert()` định dạng tin.
+
+### Radar (roadmap V3 §21, trang `radar.html`, Sprint 5)
+
+Trang riêng, mục nav "Radar" cạnh "Issues" — chỉ liệt kê những issue trong Top Issues hôm nay đang **thực sự** ACCELERATING (thường 0-1 issue, có thể rỗng — trạng thái rỗng hiện dòng "Hiện không có vấn đề nào..."). Trả lời đúng câu hỏi roadmap đặt ra cho V3: "Vấn đề nào đang tăng tốc và cần chú ý ngay?" — khác với panel "Top Issues hôm nay" ở Tổng quan vốn luôn liệt kê đủ Top 5 bất kể trạng thái.
+
+Dùng lại đúng `_issue_card_html()` (cùng Coverage Map, "what changed", tốc độ 1h, đồng thuận với thẻ ở Tổng quan) nên 2 nơi không bao giờ hiện thông tin lệch nhau cho cùng 1 issue.
+
+**Đã xác minh trên dữ liệu production thật + kịch bản tổng hợp:** dựng site từ 1 kịch bản có issue thật sự tăng tốc (2 chu kỳ cách 20 phút, script kiểm tra), xem DOM thực tế — thẻ hiện đúng badge "↑ Đang tăng tốc", dòng "So với 1 giờ trước: +2 nguồn · +4 bài", và coverage timeline đúng thứ tự nguồn.
+
 ### Các cơ chế đảm bảo chất lượng khác
 
 - **Cửa sổ tính:** đúng 1 ngày dương lịch theo giờ Việt Nam (`Asia/Ho_Chi_Minh`), không phải cửa sổ trượt 48 giờ như bản đầu tiên.
@@ -295,25 +323,25 @@ Dành cho phòng truyền thông/PR ngành ngân hàng - tài chính. Toàn bộ
 
 ## 13. Testing
 
-**255 test** (`pytest`), chạy hoàn toàn offline bằng fixture lấy từ dữ liệu thực tế lúc audit — không cần mạng, mock qua thư viện `responses`.
+**274 test** (`pytest`), chạy hoàn toàn offline bằng fixture lấy từ dữ liệu thực tế lúc audit — không cần mạng, mock qua thư viện `responses`.
 
 | File | Phạm vi |
 |------|---------|
 | `test_crawlers.py`, `test_html_crawlers.py`, `test_fili_crawler.py` | Parse RSS cho 18 nguồn, HTML scrape cho 4 nguồn, JSON API cho FiLi — bao gồm mọi lỗi thật đã phát hiện qua audit (ngày phi chuẩn, encoding sai, thiếu giờ, cấu trúc trang đổi) |
 | `test_database.py` | Dedup theo URL, baseline seeding lần đầu + baseline riêng cho nguồn mới thêm vào DB đã có dữ liệu |
-| `test_telegram.py` | Định dạng tin nhắn, tách tin nóng, chia nhỏ khi vượt 4096 ký tự, retry khi lỗi, mục TOP TÍN HIỆU đứng trước TIN NÓNG/theo nguồn (roadmap V2 §19) kể cả khi phải chia nhỏ tin nhắn |
-| `test_scheduler.py` | Toàn bộ luồng `run_cycle` (dry-run/thành công/lỗi 1 phần/tất cả lỗi), cô lập lỗi từng nguồn, phát hiện + cooldown cảnh báo nguồn chết, lịch quét cố định đúng chu kỳ, `snapshot_data()` trả về đúng được chuyển thẳng vào tham số `top_signals` của Telegram (và vẫn gửi digest bình thường khi `snapshot_data()` thất bại, trả `None`) |
+| `test_telegram.py` | Định dạng tin nhắn, tách tin nóng, chia nhỏ khi vượt 4096 ký tự, retry khi lỗi, mục TOP TÍN HIỆU đứng trước TIN NÓNG/theo nguồn (roadmap V2 §19) kể cả khi phải chia nhỏ tin nhắn, `format_signal_alert()` hiện đúng tiêu đề/số liệu/tốc độ 1h (roadmap V3 §26) |
+| `test_scheduler.py` | Toàn bộ luồng `run_cycle` (dry-run/thành công/lỗi 1 phần/tất cả lỗi), cô lập lỗi từng nguồn, phát hiện + cooldown cảnh báo nguồn chết, lịch quét cố định đúng chu kỳ, `snapshot_data()` trả về `SnapshotResult` được chuyển thẳng vào tham số `top_signals`/`send_signal_alerts()` của Telegram (và vẫn gửi digest bình thường, không gửi alert nào, khi `snapshot_data()` thất bại trả `None`) |
 | `test_backup.py` | Backup có timestamp, tự xoá bản cũ |
 | `test_utils.py` | Chuẩn hoá URL (bỏ `fbclid`/`utm_*`/fragment) |
 | `test_normalization.py` | Chuẩn hoá tiêu đề cho việc so khớp (`core/normalization.py`) — NFC Unicode, không đổi nội dung hiển thị, regression test cho lỗi "xung đột" bị lưu sai dạng Unicode phát hiện trên dữ liệu thật |
-| `test_generate_site.py` | Sinh trang web: gom đúng ngày, escape XSS, cửa sổ 7-tab ngày, nút Quét ngay, phân trang, banner "xem tin mới nhất", tích hợp Top Issues, khung SaaS (sidebar/nav/KPI), trang Brands/Analytics riêng, các file xuất dữ liệu, thẻ issue hiện đúng nhãn Đồng thuận và dòng Tốc độ 1h qua khi có, ẩn dòng tốc độ khi không có (roadmap V3 §22-24) |
-| `test_issues.py` | Cả 8 kịch bản test bắt buộc theo đặc tả Issue Intelligence V3 (gộp đúng issue giống nhau, không gộp nhầm cùng entity khác topic, không gộp nhầm cùng topic khác entity, đa dạng nguồn, chống thiên vị khối lượng, "vì sao hot" đúng số liệu, ổn định xếp hạng, đúng múi giờ) + regression test cho lỗi "HĐQT" + đúng công thức trọng số SignalScore, trọng số nguồn tuỳ chỉnh ảnh hưởng xếp hạng đúng hướng + `media_consensus()` phân loại đúng theo số nguồn (roadmap V3 §24), `top_issues()` gắn đúng `velocity_1h` cho từng issue |
+| `test_generate_site.py` | Sinh trang web: gom đúng ngày, escape XSS, cửa sổ 7-tab ngày, nút Quét ngay, phân trang, banner "xem tin mới nhất", tích hợp Top Issues, khung SaaS (sidebar/nav/KPI), trang Brands/Analytics riêng, các file xuất dữ liệu, thẻ issue hiện đúng nhãn Đồng thuận và dòng Tốc độ 1h qua khi có/ẩn khi không (roadmap V3 §22-24), coverage timeline đúng thứ tự nguồn (§25), dòng "what changed" đúng/ẩn/"mới xuất hiện" (§27), trang Radar liệt kê đúng issue đang tăng tốc + trạng thái rỗng khi không có (§21) |
+| `test_issues.py` | Cả 8 kịch bản test bắt buộc theo đặc tả Issue Intelligence V3 (gộp đúng issue giống nhau, không gộp nhầm cùng entity khác topic, không gộp nhầm cùng topic khác entity, đa dạng nguồn, chống thiên vị khối lượng, "vì sao hot" đúng số liệu, ổn định xếp hạng, đúng múi giờ) + regression test cho lỗi "HĐQT" + đúng công thức trọng số SignalScore, trọng số nguồn tuỳ chỉnh ảnh hưởng xếp hạng đúng hướng + `media_consensus()` phân loại đúng theo số nguồn (roadmap V3 §24), `top_issues()` gắn đúng `velocity_1h` cho từng issue, `issue_diff()` báo đúng tăng trưởng hoặc `None` khi chưa tồn tại 1 giờ trước (§27) |
 | `test_velocity.py` | Velocity Engine (roadmap V3 §22-23): cả 2 khung trống → cooling, chỉ khung hiện tại có bài → emerging, nhanh/chậm hơn khung trước → accelerating/cooling, tốc độ không đổi → peak, cửa sổ tuỳ chỉnh (không cố định 1 giờ), bắt buộc `now` có timezone |
 | `test_analytics.py` | 8 khối phân tích dòng tin ở mục 10 (ai đưa trước, khoảng trống đưa tin, độ trễ, nhịp giờ, khối lượng theo chủ đề, đăng lặp — kể cả case bản tin mẫu theo ngày không bị tính nhầm, đồng xuất hiện, hồ sơ chủ đề) |
 | `test_brandwatch.py` | Từ điển thương hiệu (mã viết hoa phân biệt hoa/thường, ranh giới từ), watchlist tuỳ chỉnh, sắc thái (kể cả case bác bỏ tin đồn và nỗ lực bảo vệ không bị tính tiêu cực), share of voice, ngưỡng cảnh báo khủng hoảng, cooldown + "khẩn" vượt cooldown của "leo thang" trong `scheduler.check_crisis` |
 | `test_datainfra.py` | Bảng `daily_stats`/`issue_history`, `snapshot_data` (kể cả không được raise lỗi — trả `None` khi thất bại thay vì raise, và trả đúng danh sách issue đã xếp hạng kèm trạng thái vòng đời khi thành công, để `run_cycle` chuyển thẳng cho Telegram; vòng đời Signal: lần đầu → emerging, đổi trạng thái → ghi `signal_event`, lặp lại không đổi → không ghi thêm), các hàm xuất `issues.json`/`stats.json`/`feed.xml`, lưu trữ theo tháng (xuất không xoá theo mặc định, xoá + giữ nguyên file khi chạy lại) |
 | `test_source_registry.py` | `source_registry.json`: file thiếu/hỏng/thiếu nguồn đều rơi về mặc định tier A/weight 1.0, không crash |
-| `test_signals.py` | Phân loại vòng đời Signal theo roadmap V2 §15 — lần đầu luôn là emerging, ngưỡng ±15% cho accelerating/cooling, trường hợp biên velocity=0 |
+| `test_signals.py` | Phân loại vòng đời Signal theo roadmap V2 §15 — lần đầu luôn là emerging, ngưỡng ±15% cho accelerating/cooling, trường hợp biên velocity=0; `should_alert()` (roadmap V3 §26) — cần cả 2 ngưỡng cùng lúc, ngưỡng bao gồm cả biên, cấu hình được |
 
 ---
 
@@ -349,11 +377,11 @@ news-monitor/
 │   ├── brandwatch.py                            # share of voice + cảnh báo khủng hoảng (mục 11)
 │   ├── exports.py                                # issues.json/stats.json/feed.xml/brands.json (mục 12)
 │   └── cloudflare-worker/worker.js                # proxy bảo mật cho nút "Quét ngay"
-├── tests/                                           # 255 test, xem mục 13
+├── tests/                                           # 274 test, xem mục 13
 ├── data/news.db                                      # SQLite (local dev; trên CI lấy từ nhánh db-state)
 ├── data/archive/                                  # file lưu trữ theo tháng (--archive-old)
 ├── backup/                                         # snapshot DB có timestamp
-├── site/                                            # HTML/JSON/RSS sinh ra (gitignored)
+├── site/                                            # HTML/JSON/RSS sinh ra (gitignored) — kèm radar.html (roadmap V3 §21)
 ├── .github/workflows/news-crawl.yml                  # toàn bộ pipeline CI/CD
 ├── README.md / GIOI-THIEU.md / GIAO-DIEN.md / TONG-QUAN-DU-AN.md (file này)
 ```
@@ -367,6 +395,8 @@ news-monitor/
 - **`source_registry.json` mặc định trung lập (tất cả tier A)** — thành phần Source Weight của SignalScore chưa có tác dụng thực tế cho tới khi ai đó chủ động phân hạng lại nguồn.
 - **Velocity Engine (mục 9, roadmap V3 §22-23) dùng cửa sổ cố định 1 giờ và ngưỡng ±15% mượn từ vòng đời Signal** — chưa kiểm chứng bằng dữ liệu dán nhãn, cùng tình trạng "cần tinh chỉnh dần" như mọi ngưỡng luật khác. Ngưỡng "Bao phủ rộng" của Media Consensus (≥6 nguồn) cũng chọn theo trực giác (~1/4 số nguồn đang theo dõi), không phải số đã kiểm định.
 - **`velocity_1h` và badge vòng đời Signal có thể "lệch nhau" mà không giải thích tại sao** — 1 issue có thể hiện badge "● Ổn định" (so với chu kỳ trước) trong khi dòng "Tốc độ 1h qua" cho thấy 0 bài/giờ (không có bài nào trong 2 giờ gần nhất), vì 2 chỉ số đo 2 khung thời gian khác nhau (mục 9). Cố ý hiện dưới dạng số thô thay vì badge màu thứ 2 để giảm cảm giác mâu thuẫn, nhưng người đọc kỹ vẫn có thể thấy khó hiểu nếu không đọc phần giải thích này.
+- **Ngưỡng Signal Alert (`SIGNAL_ALERT_MIN_SOURCES=3`/`SIGNAL_ALERT_MIN_SCORE=70`, mục 9) chưa qua kiểm chứng bằng dữ liệu thật vận hành** — cùng tình trạng "cần tinh chỉnh dần" như mọi ngưỡng luật khác. Vì `hot_score` chuẩn hoá theo đợt tính hiện tại (không phải thang tuyệt đối cố định), 1 issue hot_score=70 trong 1 ngày ít tin có thể "yếu hơn thật" so với hot_score=70 trong 1 ngày nhiều tin — đây là giới hạn vốn có của cách chuẩn hoá tương đối, không riêng gì Signal Alert.
+- **Trang Radar chỉ xét Top 5 issue của hôm nay, không quét toàn bộ `issue_history`** — 1 issue từng tăng tốc nhưng rớt khỏi Top 5 (dù vẫn có thể còn "accelerating" về mặt kỹ thuật nếu còn được tính) sẽ không xuất hiện ở Radar; nhất quán với việc Top Issues nói chung chỉ xét phạm vi Top 5 hôm nay (mục 9), không phải 1 thiếu sót riêng của Radar.
 - **"Ngày mới nhất" trễ tối đa ~20 phút sau nửa đêm** cho tới khi có bài đầu tiên của ngày mới (mục 8) — đã thêm banner "xem tin mới nhất" để giảm nhầm lẫn, nhưng chưa sửa tận gốc để trang tự bám theo đồng hồ thật (người dùng đã được hỏi, chọn giữ nguyên).
 - **Chưa có dark mode** ở giao diện hiện tại.
 - **Danh sách từ khoá (`HOT_KEYWORDS`, `_TOPIC_KEYWORDS`, `_GENERIC_ACRONYMS`, sắc thái ở mục 11) là tự chọn tay**, không phải NLP thật — cần tinh chỉnh dần khi phát hiện case sai qua vận hành thực tế, không phải giải pháp hoàn hảo 1 lần là xong. Chưa đo precision/recall trên tập dữ liệu dán nhãn tay, nên không có con số "độ chính xác X%" đáng tin để công bố.

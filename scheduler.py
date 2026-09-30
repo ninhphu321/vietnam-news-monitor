@@ -11,6 +11,7 @@ can never drift apart.
 """
 
 import logging
+from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta
 from typing import Dict, List, Optional, Tuple
 from zoneinfo import ZoneInfo
@@ -29,13 +30,25 @@ from web.analytics import daily_stats_rows
 from web.brands import load_watchlist
 from web.brandwatch import LEVEL_URGENT, crisis_alerts, tag_articles
 from web.issues import Issue, top_issues
-from web.signals import classify_lifecycle
+from web.signals import ACCELERATING, classify_lifecycle, should_alert
 from web.source_registry import load_source_registry, weight_for
 
 logger = logging.getLogger(__name__)
 
 
 CrawlStatus = Dict[str, Tuple[bool, Optional[str]]]
+
+
+@dataclass
+class SnapshotResult:
+    """snapshot_data()'s return value: the ranked issues it just
+    persisted (unchanged shape from before — still what Telegram's
+    top_signals expects, roadmap V2 §19) plus, separately, any issue
+    that *just* transitioned into ACCELERATING this cycle while also
+    passing web.signals.should_alert()'s bar (roadmap V3 §26)."""
+
+    ranked_issues: List[Tuple[Issue, str]] = field(default_factory=list)
+    new_alerts: List[Issue] = field(default_factory=list)
 
 
 def _build_crawlers(cfg: Config):
@@ -232,7 +245,7 @@ STATS_REFRESH_DAYS = 3
 
 def snapshot_data(
     db: Database, now: datetime, cfg: Optional[Config] = None
-) -> Optional[List[Tuple[Issue, str]]]:
+) -> Optional[SnapshotResult]:
     """Persist derived data that would otherwise be lost or recomputed
     from scratch: today's Top Issues (-> issue_history, plus signal
     lifecycle transitions -> signal_events) and per-day source/topic
@@ -246,12 +259,13 @@ def snapshot_data(
     existing callers/tests that predate SignalScore's Source Weight
     component keep working without passing one.
 
-    Returns the same ranked (Issue, lifecycle_status) pairs it just
-    persisted — already computed here, so run_cycle() reuses them for
-    Telegram's "TOP SIGNALS" section (roadmap V2 §19) instead of
+    Returns a SnapshotResult (ranked issues for Telegram's "TOP SIGNALS"
+    section, roadmap V2 §19, plus any new Signal Alert per roadmap V3
+    §26) — already computed here, so run_cycle() reuses both instead of
     recomputing top_issues() a second time — or None if the snapshot
     itself failed, so a broken signal computation degrades Telegram to
-    "no top signals section" rather than taking the whole cycle down."""
+    "no top signals section, no alerts" rather than taking the whole
+    cycle down."""
     try:
         articles = db.get_all_articles()
         today = now.date().isoformat()
@@ -269,6 +283,7 @@ def snapshot_data(
         previous_by_id = {row["issue_id"]: row for row in db.get_issue_history(since_day=today)}
         issue_rows = []
         ranked: List[Tuple[Issue, str]] = []
+        new_alerts: List[Issue] = []
         for rank, i in enumerate(issues, start=1):
             previous = previous_by_id.get(i.issue_id)
             previous_velocity = previous["velocity"] if previous else None
@@ -279,6 +294,20 @@ def snapshot_data(
                     today, i.issue_id, previous_status, status,
                     i.velocity, i.article_count, i.unique_source_count, now,
                 )
+                # Roadmap V3 §26: a real (not every-cycle) transition
+                # into ACCELERATING is exactly what naturally rate-
+                # limits Signal Alerts — an issue that stays
+                # ACCELERATING for several consecutive cycles doesn't
+                # re-alert until it cools down and re-accelerates.
+                min_sources = cfg.signal_alert_min_sources if cfg else None
+                min_score = cfg.signal_alert_min_score if cfg else None
+                alert_kwargs = {}
+                if min_sources is not None:
+                    alert_kwargs["min_sources"] = min_sources
+                if min_score is not None:
+                    alert_kwargs["min_score"] = min_score
+                if status == ACCELERATING and should_alert(i.unique_source_count, i.hot_score, **alert_kwargs):
+                    new_alerts.append(i)
             issue_rows.append({
                 "issue_id": i.issue_id, "title": i.issue_title, "rank": rank,
                 "hot_score": i.hot_score, "article_count": i.article_count,
@@ -298,7 +327,7 @@ def snapshot_data(
         rows = daily_stats_rows(articles, only_days)
         days = only_days if only_days is not None else {date.fromisoformat(r[0]) for r in rows}
         db.replace_daily_stats([d.isoformat() for d in days], rows)
-        return ranked
+        return SnapshotResult(ranked_issues=ranked, new_alerts=new_alerts)
     except Exception:  # noqa: BLE001 - secondary feature, see docstring
         logger.exception("Data snapshot (issue_history/daily_stats) failed; continuing.")
         return None
@@ -340,6 +369,33 @@ def check_crisis(db: Database, cfg: Config, now: datetime) -> None:
         logger.exception("Crisis check failed; continuing.")
 
 
+def send_signal_alerts(cfg: Config, now: datetime, alerts: List[Issue]) -> None:
+    """Roadmap V3 §26: one dedicated Telegram message per issue in
+    `alerts` (already filtered by snapshot_data() to "just transitioned
+    to ACCELERATING this cycle AND passes web.signals.should_alert()")
+    — distinct from the "TOP TÍN HIỆU" section that already leads every
+    regular digest regardless of any threshold. Best-effort like
+    check_crisis(): a failed send is logged and must never affect the
+    primary digest that already went out earlier in run_cycle()."""
+    try:
+        for issue in alerts:
+            try:
+                telegram.send_message(
+                    cfg.telegram_bot_token, cfg.telegram_chat_id,
+                    telegram.format_signal_alert(issue, now),
+                    cfg.request_timeout, cfg.max_retries,
+                )
+            except telegram.TelegramError as exc:
+                logger.error("Failed to send signal alert for %s: %s", issue.issue_id, exc)
+                continue
+            logger.warning(
+                "Signal alert sent: %s (%d bài, %d nguồn, HOT %.0f)",
+                issue.issue_id, issue.article_count, issue.unique_source_count, issue.hot_score,
+            )
+    except Exception:  # noqa: BLE001 - secondary feature, see docstring
+        logger.exception("Signal alert dispatch failed; continuing.")
+
+
 def run_cycle(db: Database, cfg: Config, dry_run: bool = False) -> None:
     tz = ZoneInfo(cfg.timezone)
     now = datetime.now(tz)
@@ -361,7 +417,8 @@ def run_cycle(db: Database, cfg: Config, dry_run: bool = False) -> None:
         if db.insert_if_new(item):
             newly_inserted.append(item)
 
-    top_signals = snapshot_data(db, now, cfg)
+    snapshot_result = snapshot_data(db, now, cfg)
+    top_signals = snapshot_result.ranked_issues if snapshot_result else None
 
     # get_pending() already includes rows from this cycle's inserts (they
     # were just written with sent_at NULL), so it's the single source of
@@ -430,6 +487,7 @@ def run_cycle(db: Database, cfg: Config, dry_run: bool = False) -> None:
         db.mark_sent(sent_urls, sent_at=now)
 
     check_crisis(db, cfg, now)
+    send_signal_alerts(cfg, now, snapshot_result.new_alerts if snapshot_result else [])
 
     # Best-effort, secondary check — must never affect the primary
     # crawl/send outcome above, success or failure.

@@ -96,8 +96,9 @@ def test_run_cycle_passes_snapshot_data_top_signals_to_telegram(db, monkeypatch)
     items = [NewsItem("A", "Tiêu đề 1", "https://x/1", datetime(2026, 9, 14, 10, 0, tzinfo=TZ))]
     monkeypatch.setattr(scheduler, "CRAWLER_CLASSES", [fake_crawler_factory("A", items=items)])
 
-    sentinel = [("fake-issue", "accelerating")]
-    monkeypatch.setattr(scheduler, "snapshot_data", lambda *a, **k: sentinel)
+    sentinel_ranked = [("fake-issue", "accelerating")]
+    sentinel_result = scheduler.SnapshotResult(ranked_issues=sentinel_ranked, new_alerts=[])
+    monkeypatch.setattr(scheduler, "snapshot_data", lambda *a, **k: sentinel_result)
 
     captured = {}
     def fake_format_grouped_articles(*args, **kwargs):
@@ -108,7 +109,43 @@ def test_run_cycle_passes_snapshot_data_top_signals_to_telegram(db, monkeypatch)
 
     scheduler.run_cycle(db, make_cfg(), dry_run=False)
 
-    assert captured["top_signals"] is sentinel
+    assert captured["top_signals"] is sentinel_ranked
+
+
+def test_run_cycle_sends_new_signal_alerts_from_snapshot_data(db, monkeypatch):
+    # Roadmap V3 §26: run_cycle must dispatch snapshot_data()'s new_alerts
+    # through a dedicated Telegram message, separate from the regular
+    # digest send.
+    items = [NewsItem("A", "Tiêu đề 1", "https://x/1", datetime(2026, 9, 14, 10, 0, tzinfo=TZ))]
+    monkeypatch.setattr(scheduler, "CRAWLER_CLASSES", [fake_crawler_factory("A", items=items)])
+
+    fake_issue = object()
+    sentinel_result = scheduler.SnapshotResult(ranked_issues=[], new_alerts=[fake_issue])
+    monkeypatch.setattr(scheduler, "snapshot_data", lambda *a, **k: sentinel_result)
+    monkeypatch.setattr(telegram, "format_grouped_articles", lambda *a, **k: ["msg"])
+    monkeypatch.setattr(telegram, "send_messages", lambda *a, **k: None)
+
+    captured = []
+    monkeypatch.setattr(scheduler, "send_signal_alerts", lambda cfg, now, alerts: captured.append(alerts))
+
+    scheduler.run_cycle(db, make_cfg(), dry_run=False)
+
+    assert captured == [[fake_issue]]
+
+
+def test_run_cycle_sends_no_alerts_when_snapshot_data_fails(db, monkeypatch):
+    items = [NewsItem("A", "Tiêu đề 1", "https://x/1", datetime(2026, 9, 14, 10, 0, tzinfo=TZ))]
+    monkeypatch.setattr(scheduler, "CRAWLER_CLASSES", [fake_crawler_factory("A", items=items)])
+    monkeypatch.setattr(scheduler, "snapshot_data", lambda *a, **k: None)
+    monkeypatch.setattr(telegram, "format_grouped_articles", lambda *a, **k: ["msg"])
+    monkeypatch.setattr(telegram, "send_messages", lambda *a, **k: None)
+
+    captured = []
+    monkeypatch.setattr(scheduler, "send_signal_alerts", lambda cfg, now, alerts: captured.append(alerts))
+
+    scheduler.run_cycle(db, make_cfg(), dry_run=False)
+
+    assert captured == [[]]
 
 
 def test_run_cycle_passes_none_top_signals_when_snapshot_data_fails(db, monkeypatch):

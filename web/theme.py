@@ -24,6 +24,7 @@ FONT_IMPORT = (
 ICONS = """<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false"><defs>
 <symbol id="i-home" viewBox="0 0 24 24"><path d="M3 11l9-8 9 8"/><path d="M5 10v10h14V10"/><path d="M10 20v-6h4v6"/></symbol>
 <symbol id="i-flame" viewBox="0 0 24 24"><path d="M12 3c1 3 5 5 5 10a5 5 0 0 1-10 0c0-2 1-3 2-4 0 2 1 3 2 3 0-3-1-5 1-9z"/></symbol>
+<symbol id="i-radar" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1"/><path d="M12 12L19 7"/></symbol>
 <symbol id="i-news" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M8 9h8M8 13h8M8 17h5"/></symbol>
 <symbol id="i-building" viewBox="0 0 24 24"><path d="M4 21V7l8-4 8 4v14"/><path d="M9 21v-6h6v6M9 10h.01M15 10h.01"/></symbol>
 <symbol id="i-chart" viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-8M22 20H2"/></symbol>
@@ -247,6 +248,11 @@ details.issue-card:target>*:not(summary){display:block!important;}
 .related-row .src{font-family:var(--mono);font-size:11px;color:var(--text-2);flex:0 0 110px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .related-row a{flex:1 1 auto;min-width:0;text-decoration:none;}
 .related-row a:hover{color:var(--accent);text-decoration:underline;}
+.related-time{flex:0 0 auto;margin-left:auto;font-family:var(--mono);font-size:11px;color:var(--muted);}
+/* Coverage Map timeline (roadmap V3 §25) and "what changed" diff (§27) */
+.coverage-timeline{display:flex;flex-direction:column;gap:var(--sp-2);padding:var(--sp-2) 0 var(--sp-4);border-top:1px solid var(--divider);}
+.coverage-time{font-family:var(--mono);font-size:12px;color:var(--text-2);}
+.issue-diff{font-size:12px;color:var(--text-2);padding:0 0 var(--sp-3);}
 @media (max-width:767px){details.issue-card>summary{padding:var(--sp-4);gap:var(--sp-3);}.related-row{flex-direction:column;gap:2px;}
   .related-row .src{flex:none;}}
 
@@ -482,6 +488,7 @@ def render_shell(
     main_items: List[str] = [_nav_item("index.html#overview", "Tổng quan", "home", "home", active)]
     if has_issues:
         main_items.append(_nav_item("index.html#issues", "Issues", "flame", "issues", active))
+        main_items.append(_nav_item("radar.html", "Radar", "radar", "radar", active))
     main_items.append(_nav_item("index.html#news", "Tin tức", "news", "news", active))
 
     analysis = ""

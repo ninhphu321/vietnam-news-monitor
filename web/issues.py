@@ -473,7 +473,15 @@ def top_issues(
         key = g["key"]
         sample_titles = [s["title"] for s in g["samples"]]
         all_sorted = sorted(g["samples"], key=lambda s: s["ts"], reverse=True)
-        articles_out = [{"title": s["title"], "url": s["url"], "source": s["source"]} for s in all_sorted]
+        # "ts" (roadmap V3 §25 Coverage Map) is an internal-only extra
+        # key alongside the original {title, url, source} shape — kept
+        # as a real datetime (not a string) since every other Issue
+        # timestamp field already is; web/exports.py's issues_json
+        # rebuilds the public JSON shape without it so the exported API
+        # doesn't change.
+        articles_out = [
+            {"title": s["title"], "url": s["url"], "source": s["source"], "ts": s["ts"]} for s in all_sorted
+        ]
         entities = [key[1]] if key[0] == "entity_topic" else []
         topics = [key[2]] if key[0] == "entity_topic" else [key[1], key[2]]
 
@@ -511,3 +519,35 @@ def top_issues(
             )
         )
     return issues
+
+
+def issue_diff(
+    issue: Issue,
+    articles: List[dict],
+    now: datetime,
+    since: timedelta = timedelta(hours=1),
+    source_weights: Optional[Dict[str, float]] = None,
+) -> Optional[Dict[str, int]]:
+    """Roadmap V3 §27 "What changed?": how this issue's coverage grew
+    over the last `since` (default 1h), e.g. "+3 nguồn, +11 bài".
+
+    No new snapshot table — Top Issues is already fully recomputed from
+    scratch on every build (same architecture `build_site()` already
+    relies on), so the "1 hour ago" state is just `top_issues()` called
+    again with an earlier `now`. `limit=50` (not the usual Top 5) so an
+    issue that hadn't cracked the top 5 yet an hour ago, but already
+    existed as a qualifying issue, is still found for the diff instead
+    of always looking "brand new".
+
+    Returns None when the issue didn't exist (as a qualifying issue) at
+    `now - since` at all — the caller should treat that as "first
+    appeared within the window", not as a 0/0 diff.
+    """
+    earlier_issues = top_issues(articles, now - since, limit=50, source_weights=source_weights)
+    earlier = next((i for i in earlier_issues if i.issue_id == issue.issue_id), None)
+    if earlier is None:
+        return None
+    return {
+        "sources_delta": issue.unique_source_count - earlier.unique_source_count,
+        "articles_delta": issue.article_count - earlier.article_count,
+    }

@@ -3,7 +3,8 @@ from zoneinfo import ZoneInfo
 
 from config import config
 from models import NewsItem
-from web.generate_site import _tab_window, build_site, group_by_date_and_source, render_day_page
+from web.generate_site import (_tab_window, build_site, group_by_date_and_source, render_day_page,
+                               render_radar_page)
 from web.issues import Issue
 
 TZ = ZoneInfo("Asia/Ho_Chi_Minh")
@@ -410,3 +411,89 @@ def test_issue_card_shows_velocity_1h_when_present():
 def test_issue_card_omits_velocity_1h_line_when_not_provided():
     html = render_day_page(date(2026, 9, 14), {}, [date(2026, 9, 14)], trending=[_issue()])
     assert "bài/giờ" not in html
+
+
+def test_issue_card_shows_coverage_timeline_ordered_by_first_seen():
+    issue = _issue(all_articles=[
+        {"title": "A", "url": "u1", "source": "CafeF", "ts": datetime(2026, 9, 14, 9, 12, tzinfo=TZ)},
+        {"title": "B", "url": "u2", "source": "VnExpress", "ts": datetime(2026, 9, 14, 9, 24, tzinfo=TZ)},
+    ])
+    html = render_day_page(date(2026, 9, 14), {}, [date(2026, 9, 14)], trending=[issue])
+    assert html.index("CafeF") < html.index("VnExpress")
+    assert "đầu tiên" in html
+    assert "+12 phút" in html
+
+
+def test_issue_card_omits_coverage_timeline_when_no_timestamps():
+    html = render_day_page(date(2026, 9, 14), {}, [date(2026, 9, 14)], trending=[_issue()])
+    # "coverage-timeline" alone would also match the CSS class definition
+    # in <style> (always present) — check for the actual element.
+    assert '<div class="coverage-timeline"' not in html
+
+
+def test_issue_card_shows_diff_when_provided():
+    html = render_day_page(
+        date(2026, 9, 14), {}, [date(2026, 9, 14)], trending=[_issue()],
+        diff_by_id={"eximbank-nhan-su": {"sources_delta": 2, "articles_delta": 5}},
+    )
+    assert "So với 1 giờ trước: +2 nguồn · +5 bài" in html
+
+
+def test_issue_card_shows_new_issue_label_when_diff_is_none():
+    html = render_day_page(
+        date(2026, 9, 14), {}, [date(2026, 9, 14)], trending=[_issue()],
+        diff_by_id={"eximbank-nhan-su": None},
+    )
+    assert "Mới xuất hiện trong giờ qua" in html
+
+
+def test_issue_card_omits_diff_line_when_diff_by_id_not_given():
+    html = render_day_page(date(2026, 9, 14), {}, [date(2026, 9, 14)], trending=[_issue()])
+    # "issue-diff" alone would also match the CSS class definition in
+    # <style> (always present) — check for the actual element.
+    assert '<div class="issue-diff"' not in html
+    assert "So với 1 giờ trước" not in html
+
+
+# --- Radar page (roadmap V3 §21, radar.html) ------------------------------
+
+
+NOW_RADAR = datetime(2026, 9, 14, 12, 0, tzinfo=TZ)
+
+
+def test_radar_page_lists_accelerating_issues_with_full_card_detail():
+    issue = _issue(all_articles=[
+        {"title": "A", "url": "u1", "source": "CafeF", "ts": datetime(2026, 9, 14, 9, 0, tzinfo=TZ)},
+    ])
+    html = render_radar_page([issue], {"eximbank-nhan-su": {"sources_delta": 1, "articles_delta": 2}},
+                             True, NOW_RADAR)
+    assert "Radar" in html
+    assert "Đang tăng tốc" in html
+    assert "Eximbank" in html
+    assert "Đang tăng tốc" in html  # lifecycle badge label too
+    assert "So với 1 giờ trước: +1 nguồn · +2 bài" in html
+    assert "coverage-timeline" in html  # reuses the same card as Tổng quan
+
+
+def test_radar_page_shows_empty_state_when_nothing_accelerating():
+    html = render_radar_page([], {}, True, NOW_RADAR)
+    assert "Hiện không có vấn đề nào" in html
+    # "issue-card" alone would also match the CSS class definition in
+    # <style> (always present) — check for the actual element.
+    assert '<details class="issue-card"' not in html
+
+
+def test_build_site_writes_radar_tab(tmp_path, db):
+    # build_site() scores Top Issues against real wall-clock "now" (see
+    # its own docstring), so a fixed past-dated article here never
+    # qualifies as "today" — same limitation every other build_site
+    # test already lives with for has_issues-gated nav items. This only
+    # confirms radar.html itself is always written (has_data gate) and
+    # shows its empty state, not that anything is accelerating.
+    db.insert_if_new(NewsItem("VnExpress", "Tin thường", "https://x/1", datetime(2026, 9, 15, 10, 0, tzinfo=TZ)))
+    out_dir = tmp_path / "site"
+    build_site(db, out_dir=out_dir)
+
+    radar = (out_dir / "radar.html").read_text(encoding="utf-8")
+    assert "Radar" in radar and 'href="index.html"' in radar
+    assert "Hiện không có vấn đề nào" in radar

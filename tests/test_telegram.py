@@ -323,6 +323,26 @@ def test_format_stale_sources_warning_lists_source_and_last_new_time():
 
 
 # ---------------------------------------------------------------------------
+# format_signal_alert — roadmap V3 §26 Signal Alert
+# ---------------------------------------------------------------------------
+
+
+def test_format_signal_alert_includes_title_stats_and_velocity():
+    from web.velocity import VelocityResult
+    issue = _issue(velocity_1h=VelocityResult(current_rate=5.0, previous_rate=1.0, acceleration=5.0, status="accelerating"))
+    text = telegram.format_signal_alert(issue, datetime(2026, 9, 14, 12, 0, tzinfo=TZ))
+    assert "TÍN HIỆU ĐANG TĂNG TỐC" in text
+    assert "Eximbank · Nhân sự lãnh đạo" in text
+    assert "17 bài / 6 nguồn" in text
+    assert "5.0 bài/giờ (trước đó: 1.0)" in text
+
+
+def test_format_signal_alert_omits_velocity_line_when_absent():
+    text = telegram.format_signal_alert(_issue(velocity_1h=None), datetime(2026, 9, 14, 12, 0, tzinfo=TZ))
+    assert "bài/giờ" not in text
+
+
+# ---------------------------------------------------------------------------
 # Sending
 # ---------------------------------------------------------------------------
 

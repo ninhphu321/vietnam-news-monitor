@@ -26,6 +26,7 @@ Mỗi nguồn được audit thực tế trên dữ liệu sống (không đoán
 - Gom bài theo từng nguồn, mỗi nguồn 1 icon riêng để phân biệt nhanh.
 - **"📡 TOP TÍN HIỆU" dẫn đầu tin nhắn** (roadmap V2) — Top 5 issue đang hot nhất hôm nay theo SignalScore, kèm trạng thái (★ Mới xuất hiện / ↑ Đang tăng tốc / ● Ổn định / ↓ Đang hạ nhiệt), để biết ngay chuyện gì đáng chú ý trước khi đọc từng title.
 - **Tự động tách "🚨 TIN NÓNG"** lên đầu tin nhắn — nhận diện bằng bộ từ khoá (khủng hoảng, sụp đổ, tăng vọt, giảm sốc, phá sản...) để bài quan trọng không bị chìm giữa hàng chục tin thường.
+- **"🎯 Tín hiệu đang tăng tốc"** (tin nhắn riêng, roadmap V3) — chỉ gửi khi 1 issue vừa thực sự tăng tốc mạnh (đủ nguồn + đủ điểm), không phải mỗi chu kỳ, để không bị dội thông báo dù có tin dài ngày.
 - Cảnh báo khi 1 nguồn "chết âm thầm" (vẫn phản hồi HTTP 200 nhưng ngừng cập nhật nội dung thật).
 - Có nút "🔄 Quét ngay" trên web để tự kích hoạt quét thủ công bất cứ lúc nào.
 
@@ -41,7 +42,8 @@ Trang tĩnh tự sinh lại sau mỗi lần quét, lưu toàn bộ lịch sử t
   - 15% số bài đề cập
   - 10% trọng số nguồn (`source_registry.json`)
 
-  Mỗi issue kèm vài dòng "Vì sao hot" giải thích ngắn gọn, nhãn vòng đời (Mới xuất hiện/Đang tăng tốc/Ổn định/Đang hạ nhiệt), tốc độ 1 giờ qua + mức độ đồng thuận nguồn (roadmap V3), và bấm vào để xem toàn bộ bài viết liên quan. Cập nhật lại **mỗi lần quét**.
+  Mỗi issue kèm vài dòng "Vì sao hot" giải thích ngắn gọn, nhãn vòng đời (Mới xuất hiện/Đang tăng tốc/Ổn định/Đang hạ nhiệt), tốc độ 1 giờ qua + mức độ đồng thuận nguồn, Coverage Map (nguồn nào đưa trước) + so sánh với 1 giờ trước (roadmap V3), và bấm vào để xem toàn bộ bài viết liên quan. Cập nhật lại **mỗi lần quét**.
+- **📡 Radar** (mục nav riêng, roadmap V3) — chỉ liệt kê những issue **đang thực sự tăng tốc** ngay lúc này (thường 0-1 issue), trả lời đúng câu hỏi "vấn đề nào cần chú ý ngay?" thay vì phải tự lọc trong cả Top 5.
 - Giao diện phong cách biên tập báo chí (viền đen, đổ bóng cứng, không dùng gradient màu mè), hỗ trợ sẵn dark mode theo hệ thống.
 
 ### 🤖 Hạ tầng miễn phí, tự vận hành
@@ -75,7 +77,7 @@ GitHub Pages (trang web) + nhánh db-state (lưu database)
 
 ## Chất lượng & kiểm thử
 
-255 test tự động (`pytest`), chạy offline bằng dữ liệu fixture lấy từ audit thực tế — bao phủ toàn bộ crawler, logic chống trùng, format Telegram, sinh trang web, và thuật toán phát hiện issue.
+274 test tự động (`pytest`), chạy offline bằng dữ liệu fixture lấy từ audit thực tế — bao phủ toàn bộ crawler, logic chống trùng, format Telegram, sinh trang web, và thuật toán phát hiện issue.
 
 ---
 

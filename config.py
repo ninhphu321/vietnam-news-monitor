@@ -93,6 +93,14 @@ class Config:
     crisis_window_minutes: int = field(default_factory=lambda: _env_int("CRISIS_WINDOW_MINUTES", 60))
     crisis_cooldown_hours: int = field(default_factory=lambda: _env_int("CRISIS_COOLDOWN_HOURS", 3))
 
+    # Signal Alert (roadmap V3 §26) — a dedicated Telegram message, rarer
+    # and higher-bar than the regular "TOP TÍN HIỆU" digest section, for
+    # an issue that just started ACCELERATING with enough source
+    # diversity and score to be worth interrupting for. See
+    # web/signals.py's should_alert() docstring for why these defaults.
+    signal_alert_min_sources: int = field(default_factory=lambda: _env_int("SIGNAL_ALERT_MIN_SOURCES", 3))
+    signal_alert_min_score: int = field(default_factory=lambda: _env_int("SIGNAL_ALERT_MIN_SCORE", 70))
+
     # SignalScore's Source Weight component (roadmap V2 §14) — see
     # web/source_registry.py. Missing file/entries default to tier A /
     # weight 1.0, so this is safe to leave unset.

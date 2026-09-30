@@ -18,6 +18,7 @@ from web.issues import (
     _extract_entities,
     _extract_topics,
     _issue_keys,
+    issue_diff,
     media_consensus,
     top_issues,
 )
@@ -397,3 +398,30 @@ def test_top_issues_exposes_a_populated_velocity_1h_per_issue():
     issues = top_issues(articles, now, min_articles=2, min_sources=2)
     assert issues[0].velocity_1h is not None
     assert issues[0].velocity_1h.current_rate == 1.0  # 1 article in the last hour
+
+
+# --- "What changed?" diff (roadmap V3 §27) -------------------------------
+
+
+def test_issue_diff_reports_growth_over_the_window():
+    now = TODAY_9AM + timedelta(hours=2)
+    articles = [
+        _article("VnExpress", "Eximbank tăng lãi suất huy động", "u1", TODAY_9AM),
+        _article("CafeF", "Eximbank điều chỉnh biểu lãi suất tiết kiệm", "u2", TODAY_9AM + timedelta(minutes=10)),
+        # 3rd source joins within the last hour -> should show up as growth.
+        _article("Vietstock", "Eximbank huy động lãi suất mới nhất", "u3", now - timedelta(minutes=10)),
+    ]
+    issues = top_issues(articles, now, min_articles=2, min_sources=2)
+    diff = issue_diff(issues[0], articles, now)
+    assert diff == {"sources_delta": 1, "articles_delta": 1}
+
+
+def test_issue_diff_is_none_when_issue_did_not_qualify_a_window_ago():
+    now = TODAY_9AM + timedelta(minutes=30)
+    articles = [
+        _article("VnExpress", "Eximbank tăng lãi suất huy động", "u1", now - timedelta(minutes=5)),
+        _article("CafeF", "Eximbank điều chỉnh biểu lãi suất tiết kiệm", "u2", now - timedelta(minutes=2)),
+    ]
+    issues = top_issues(articles, now, min_articles=2, min_sources=2)
+    # 1 hour ago, neither article existed yet -> the issue didn't qualify.
+    assert issue_diff(issues[0], articles, now) is None
