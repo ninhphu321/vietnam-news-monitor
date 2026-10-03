@@ -19,6 +19,7 @@ from email.utils import format_datetime
 from typing import List, Sequence
 from xml.sax.saxutils import escape
 
+from web.events import BriefingItem, InformationEvent
 from web.history import Comparison, IssueHistory
 from web.issues import Issue
 
@@ -164,3 +165,37 @@ def issues_history_csv(histories: Sequence[IssueHistory]) -> str:
     for h in histories:
         writer.writerow(asdict(h))
     return buf.getvalue()
+
+
+def events_json(events: Sequence[InformationEvent], briefing: Sequence[BriefingItem], now: datetime) -> str:
+    """Roadmap V6 §66 events export: today's Information Events with their
+    evidence structure, plus which event fills each Daily Briefing slot.
+    Evidence, not a truth score — it says who covered an event, never
+    whether it is correct."""
+    def iso(dt):
+        return dt.isoformat() if dt else None
+
+    payload = {
+        "generated_at": now.isoformat(),
+        "events": [
+            {
+                "id": e.issue_id, "title": e.title, "entity": e.entity, "event_type": e.event_type,
+                "signal_types": e.signal_types, "high_attention": e.high_attention,
+                "lifecycle_status": e.lifecycle_status,
+                "evidence": {
+                    "official_sources": e.evidence.official_sources,
+                    "media_sources": e.evidence.media_sources,
+                    "first_report_source": e.evidence.first_report_source,
+                    "first_report_at": iso(e.evidence.first_report_at),
+                    "first_official_at": iso(e.evidence.first_official_at),
+                },
+            }
+            for e in events
+        ],
+        "briefing": [
+            {"slot": b.key, "heading": b.heading, "event_id": b.event.issue_id if b.event else None}
+            for b in briefing
+        ],
+    }
+    return json.dumps(payload, ensure_ascii=False, indent=2)
+

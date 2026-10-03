@@ -25,6 +25,7 @@ ICONS = """<svg width="0" height="0" style="position:absolute" aria-hidden="true
 <symbol id="i-home" viewBox="0 0 24 24"><path d="M3 11l9-8 9 8"/><path d="M5 10v10h14V10"/><path d="M10 20v-6h4v6"/></symbol>
 <symbol id="i-flame" viewBox="0 0 24 24"><path d="M12 3c1 3 5 5 5 10a5 5 0 0 1-10 0c0-2 1-3 2-4 0 2 1 3 2 3 0-3-1-5 1-9z"/></symbol>
 <symbol id="i-history" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></symbol>
+<symbol id="i-brief" viewBox="0 0 24 24"><rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4h6v3H9zM9 12h6M9 16h4"/></symbol>
 <symbol id="i-radar" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1"/><path d="M12 12L19 7"/></symbol>
 <symbol id="i-news" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M8 9h8M8 13h8M8 17h5"/></symbol>
 <symbol id="i-building" viewBox="0 0 24 24"><path d="M4 21V7l8-4 8 4v14"/><path d="M9 21v-6h6v6M9 10h.01M15 10h.01"/></symbol>
@@ -255,6 +256,11 @@ details.issue-card:target>*:not(summary){display:block!important;}
 .coverage-time{font-family:var(--mono);font-size:12px;color:var(--text-2);}
 .issue-diff{font-size:12px;color:var(--text-2);padding:0 0 var(--sp-3);}
 .media-gap{font-size:12px;color:var(--text-2);padding:0 0 var(--sp-3);}
+.evidence{font-size:12px;color:var(--text-2);padding:0 0 var(--sp-3);}
+/* Daily briefing (roadmap V6 §56) */
+.brief-row{display:flex;gap:var(--sp-3);padding:var(--sp-2) 0;border-top:1px solid var(--divider);font-size:13px;}
+.brief-k{flex:0 0 110px;font-family:var(--mono);font-size:11px;color:var(--muted);padding-top:2px;}
+@media (max-width:767px){.brief-row{flex-direction:column;gap:2px;}.brief-k{flex:none;}}
 /* History page (roadmap V5) */
 .hist-search{width:100%;max-width:420px;padding:8px 12px;margin:0 0 var(--sp-3);border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--surface);}
 .hist-sub{font-family:var(--mono);font-size:12px;color:var(--muted);margin:var(--sp-4) 0 var(--sp-2);}
@@ -497,6 +503,7 @@ def render_shell(
     if has_issues:
         main_items.append(_nav_item("index.html#issues", "Issues", "flame", "issues", active))
         main_items.append(_nav_item("radar.html", "Radar", "radar", "radar", active))
+        main_items.append(_nav_item("briefing.html", "Bản tin", "brief", "briefing", active))
     main_items.append(_nav_item("index.html#news", "Tin tức", "news", "news", active))
 
     analysis = ""

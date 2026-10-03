@@ -323,7 +323,7 @@ Dành cho phòng truyền thông/PR ngành ngân hàng - tài chính. Toàn bộ
 
 ## 13. Testing
 
-**363 test** (`pytest`), chạy hoàn toàn offline bằng fixture lấy từ dữ liệu thực tế lúc audit — không cần mạng, mock qua thư viện `responses`.
+**391 test** (`pytest`), chạy hoàn toàn offline bằng fixture lấy từ dữ liệu thực tế lúc audit — không cần mạng, mock qua thư viện `responses`.
 
 | File | Phạm vi |
 |------|---------|
@@ -342,6 +342,7 @@ Dành cho phòng truyền thông/PR ngành ngân hàng - tài chính. Toàn bộ
 | `test_datainfra.py` | Bảng `daily_stats`/`issue_history`, `snapshot_data` (kể cả không được raise lỗi — trả `None` khi thất bại thay vì raise, và trả đúng danh sách issue đã xếp hạng kèm trạng thái vòng đời khi thành công, để `run_cycle` chuyển thẳng cho Telegram; vòng đời Signal: lần đầu → emerging, đổi trạng thái → ghi `signal_event`, lặp lại không đổi → không ghi thêm), các hàm xuất `issues.json`/`stats.json`/`feed.xml`, lưu trữ theo tháng (xuất không xoá theo mặc định, xoá + giữ nguyên file khi chạy lại) |
 | `test_source_registry.py` | `source_registry.json`: file thiếu/hỏng/thiếu nguồn đều rơi về mặc định tier A/weight 1.0, không crash |
 | `test_signals.py` | Phân loại vòng đời Signal theo roadmap V2 §15 — lần đầu luôn là emerging, ngưỡng ±15% cho accelerating/cooling, trường hợp biên velocity=0; `should_alert()` (roadmap V3 §26) — cần cả 2 ngưỡng cùng lúc, ngưỡng bao gồm cả biên, cấu hình được |
+| `test_events.py`, `test_events_ui.py` | Financial Information Intelligence phase 1 (mục 20) — loại nguồn (mặc định MEDIA, sai loại → MEDIA, registry thật chỉ Chính phủ là OFFICIAL), bằng chứng (tách chính thống/truyền thông, "báo đầu tiên" bỏ qua bài chính thống, thiếu timestamp), loại tín hiệu, "chú ý cao" cần cả nguồn chính thống lẫn truyền thông tăng tốc, 5 vị trí bản tin (chọn đúng sự kiện, "đối tượng mới" không đoán khi thiếu lịch sử), khối bằng chứng trên thẻ issue/Radar, trang Bản tin (escape XSS, ô rỗng), `events.json` |
 | `test_relevance.py` | Bộ lọc kinh tế (mục 19) — dùng chính tiêu đề thật từ đợt audit: tin xã hội bị loại kèm đúng từ khớp, tin kinh tế từng bị loại nhầm được giữ (tỷ phú "bắt đáy" HPG, thanh toán QR, Gelex bị khởi tố, "Vì sao Việt Nam"...), từ kinh tế thắng từ xã hội, tiêu đề tiếng Anh không bị loại, khớp không phân biệt hoa-thường/Unicode, `crawl_all` bỏ tin xã hội và ghi log, `get_all_articles` ẩn bài cũ nhưng không xoá dòng |
 | `test_history.py` | Historical Intelligence (roadmap V5, mục 18) — gộp lịch sử issue (ngày đỉnh khi hoà, hàng cũ thiếu velocity), tìm kiếm (không phân biệt hoa/thường, Unicode tổ hợp/dựng sẵn), dòng thời gian signal, chủ đề tăng nhanh (gộp hạng theo mức tăng tuyệt đối, bỏ chủ đề co lại/quá nhỏ), cửa sổ so sánh ngày/tuần/tháng (không tràn sang kỳ hiện tại), cờ kỳ trước chưa đủ dữ liệu, media gap, `history.json`/`signals.json`/CSV |
 | `test_personal_watchlist.py` | Watchlist cá nhân (roadmap V4 §29-34, mục 17) — file thiếu/hỏng/rỗng đều tắt tính năng, khớp đúng tiêu đề + alias tuỳ chỉnh, mã ngắn khớp phân biệt hoa/thường, đếm đúng số bài/nguồn mới, rỗng khi không khớp gì |
@@ -375,6 +376,7 @@ news-monitor/
 │   ├── generate_site.py                  # lắp ráp nội dung từng trang, gọi render_shell
 │   ├── issues.py                          # Issue Intelligence + SignalScore (Entity/Topic/Issue) + Media Consensus (mục 9)
 │   ├── signals.py                          # phân loại vòng đời Signal (mục 9)
+│   ├── events.py                            # Information Event, bằng chứng, loại tín hiệu, bản tin (mục 20)
 │   ├── history.py                           # Historical Intelligence: lịch sử issue/signal, so sánh kỳ, Media Memory (mục 18)
 │   ├── velocity.py                          # Velocity Engine 1h (mục 9, roadmap V3 §22-23)
 │   ├── source_registry.py                   # tải source_registry.json
@@ -384,7 +386,7 @@ news-monitor/
 │   ├── brandwatch.py                            # share of voice + cảnh báo khủng hoảng (mục 11)
 │   ├── exports.py                                # issues.json/stats.json/feed.xml/brands.json (mục 12)
 │   └── cloudflare-worker/worker.js                # proxy bảo mật cho nút "Quét ngay"
-├── tests/                                           # 363 test, xem mục 13
+├── tests/                                           # 391 test, xem mục 13
 ├── data/news.db                                      # SQLite (local dev; trên CI lấy từ nhánh db-state)
 ├── data/archive/                                  # file lưu trữ theo tháng (--archive-old)
 ├── backup/                                         # snapshot DB có timestamp
@@ -518,3 +520,32 @@ Yêu cầu: "chỉ những tin tức liên quan kinh tế, hạn chế tin xã h
 - Chưa lọc **quảng cáo/PR** (vd tin ngân hàng tài trợ "hành trình tiếp sức đến trường", khai trương khách sạn, tặng quà khi gửi tiết kiệm) — đó là loại nhiễu khác, không phải tin xã hội, nên ngoài phạm vi yêu cầu này.
 - Tiêu đề tiếng Anh (VnExpress Intl) không bao giờ bị loại (từ khoá tiếng Việt không áp dụng).
 - Báo Đầu tư mỗi lần quét mất ~45 giây vì phải tải từng trang bài để lấy giờ đăng (không có giờ ở trang danh sách) — chậm nhưng chưa gây lỗi.
+
+---
+
+## 20. Financial Information Intelligence — phase 1 (roadmap V6 §48-56)
+
+**Phạm vi đã chọn:** bạn bỏ qua câu hỏi phạm vi nên làm theo phương án khuyến nghị — **phase 1 trên 23 nguồn hiện có**, chưa thêm crawler nguồn chính thống mới. Phần cấu trúc (loại nguồn, bằng chứng, loại tín hiệu, bản tin) dựng sẵn để khi có nguồn thật thì cắm vào, không phải làm lại.
+
+**Chuỗi dữ liệu** (`web/events.py`): `ĐỐI TƯỢNG → SỰ KIỆN → TRUYỀN THÔNG → ĐA DẠNG NGUỒN → TÍN HIỆU`. **Information Event** không phải kho dữ liệu mới mà là góc nhìn dẫn xuất từ Issue (entity + topic đã có từ tiêu đề, mục 9) kèm thông tin "ai đưa tin thuộc loại nguồn nào". Tính lại mỗi lần build, giống Velocity/diff — **không tạo bảng** `entities`/`events`/`event_sources`/`sources` như roadmap §50/§54 gợi ý (cùng lý do mục 9: suy ra được thì không lưu trùng).
+
+**Loại nguồn** (§49-50, `source_registry.json` thêm trường `type`): `MEDIA`/`OFFICIAL`/`REGULATORY`/`CORPORATE`/`MARKET`/`MACRO`. Hiện 22 nguồn là `MEDIA`, riêng **Chính phủ** (baochinhphu.vn, cổng thông tin của chính phủ, đăng lại chỉ đạo/điều hành) là `OFFICIAL`. 4 loại còn lại loader chấp nhận nhưng chưa dùng cho tới khi có crawler thật. Loại sai/thiếu → `MEDIA` (cùng nguyên tắc "gõ sai không làm hỏng" như tier/weight). Đây mô tả **loại thông tin**, không xếp hạng nguồn nào tốt hơn.
+
+**Bằng chứng thông tin** (§52, hiện trên mỗi thẻ issue ở Tổng quan và Radar): "nguồn chính thống: có (Chính phủ) / chưa phát hiện tiêu đề khớp · truyền thông: N nguồn · báo đầu tiên: X lúc HH:MM". Là **cấu trúc bằng chứng, không phải điểm tin cậy**: chỉ nói ai đã đưa tin và theo thứ tự nào, không nói tin đúng hay sai. "Chưa phát hiện" nghĩa là chưa có *tiêu đề khớp* từ nguồn chính thống đang cấu hình, không khẳng định không tồn tại thông báo chính thức. "Báo đầu tiên" bỏ qua bài của nguồn chính thống.
+
+**Loại tín hiệu** (§53): `MEDIA_SIGNAL` (chỉ truyền thông), `OFFICIAL_SIGNAL` (có nguồn chính thống), 1 sự kiện có thể mang cả hai. **"Chú ý cao"** = có nguồn chính thống **và** truyền thông đang tăng tốc (vòng đời ACCELERATING hoặc tốc độ 1 giờ tăng tốc). Nhãn kèm chú thích "không phải dự báo giá hay thị trường" ngay trong tooltip — roadmap cấm suy ra cổ phiếu sẽ tăng/giảm.
+
+**Bản tin hôm nay** (§56, trang `briefing.html`, nav "Bản tin" cạnh Radar): 5 vị trí cố định — sự kiện mới nổi đáng chú ý, vấn đề tăng tốc nhanh nhất, được nhiều nguồn đưa nhất, tín hiệu từ đối tượng mới, tín hiệu từ nguồn chính thống. Mỗi mục có: sự kiện, bằng chứng, báo đầu tiên, giờ bắt đầu, trạng thái, loại tín hiệu, danh sách nguồn. **Không AI tóm tắt.** Vị trí không có gì phù hợp thì ghi rõ ("Hiện không có vấn đề nào đang tăng tốc") thay vì lấp bằng thứ yếu hơn. "Đối tượng mới" = thực thể chưa từng có mặt trong Top Issues của các ngày trước; chưa có lịch sử các ngày trước thì ghi "chưa đủ lịch sử" chứ không đoán.
+
+**Xuất dữ liệu:** `events.json` (§66): các sự kiện hôm nay kèm bằng chứng, loại tín hiệu, cờ chú ý cao, và sự kiện nào lấp vị trí nào của bản tin.
+
+**Đã xác minh trên dữ liệu production thật:** dựng site từ bản sao DB — bản tin ra đúng 5 vị trí, 1 issue thật được nguồn Chính phủ đưa hiện đúng "chính thống + truyền thông", các vị trí không có dữ liệu hiện ghi chú rỗng.
+
+**Cố ý chưa làm:**
+- **Crawler nguồn chính thống mới** (cơ quan quản lý, công bố thông tin doanh nghiệp, sàn, vĩ mô — §49): mỗi nguồn phải audit trang thật, có thể dính JS/chống bot; làm từng nguồn sau khi bạn chọn nguồn nào. Hiện **chỉ 1/23 nguồn là OFFICIAL**, nên "nguồn chính thống" mới là tín hiệu mỏng — đừng đọc "chưa phát hiện" như bằng chứng vắng mặt.
+- **Bảng DB cho event graph/source hierarchy** (§50, §54) và migration (roadmap DevOps V4).
+- **Trang Financial Radar 6 khu vực** (§55) — Tổng quan + Radar + Bản tin + Lịch sử đã phủ phần lớn; khu "Market/Macro" cần nguồn dữ liệu mới.
+- **Lớp AI tuỳ chọn** (§57) — roadmap coi là tuỳ chọn và chỉ được đặt trên dữ liệu có cấu trúc; chưa có nhu cầu.
+- **"Independent sources"** của §52: không biết quan hệ sở hữu/đăng lại giữa các báo từ tiêu đề nên không tách được với "media sources"; chỉ báo số nguồn truyền thông khác nhau.
+
+**Giới hạn đã biết:** 1 trong 23 nguồn là `OFFICIAL` và nó cũng là 1 trang tin tức (đăng lại chỉ đạo, không phải văn bản gốc) — gán nhãn `OFFICIAL` là phán đoán, sửa trong `source_registry.json`. "Đối tượng mới" so theo tên hiển thị của entity nên 2 cách viết khác nhau của cùng 1 tổ chức có thể bị coi là 2 đối tượng.

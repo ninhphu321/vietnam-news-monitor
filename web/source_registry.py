@@ -12,6 +12,15 @@ adjust later from observed results rather than an AI agent guessing
 A source missing from the file (a newly-added crawler, or a stale file)
 defaults to tier A / weight 1.0 too — a silent typo in the registry must
 never zero out or crash on a source's contribution to a signal.
+
+Roadmap V6 §49-50 adds a `type` per source (what KIND of information it
+is, not how good it is): MEDIA, OFFICIAL, REGULATORY, CORPORATE, MARKET,
+MACRO. Today all 23 sources are MEDIA except "Chính phủ" (baochinhphu.vn,
+the government's own portal — it republishes directives, so a match there
+counts as an official-source signal). The other types are accepted by the
+loader but unused until real official/regulatory/corporate crawlers exist.
+An unknown or missing type falls back to MEDIA, same "never crash on a
+typo" rule as tier/weight.
 """
 
 import json
@@ -20,6 +29,11 @@ from typing import Dict, Optional
 
 DEFAULT_TIER = "A"
 DEFAULT_WEIGHT = 1.0
+
+MEDIA = "MEDIA"
+OFFICIAL = "OFFICIAL"
+SOURCE_TYPES = (MEDIA, OFFICIAL, "REGULATORY", "CORPORATE", "MARKET", "MACRO")
+DEFAULT_TYPE = MEDIA
 
 
 def load_source_registry(path: Optional[Path]) -> Dict[str, dict]:
@@ -45,3 +59,9 @@ def tier_for(source: str, registry: Dict[str, dict]) -> str:
     entry = registry.get(source) or {}
     tier = entry.get("tier", DEFAULT_TIER)
     return tier if isinstance(tier, str) and tier else DEFAULT_TIER
+
+
+def type_for(source: str, registry: Dict[str, dict]) -> str:
+    entry = registry.get(source) or {}
+    kind = entry.get("type", DEFAULT_TYPE)
+    return kind if kind in SOURCE_TYPES else DEFAULT_TYPE

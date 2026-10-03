@@ -33,7 +33,9 @@ from web.analytics import Analytics, IssueStreak, compute_analytics, issue_strea
 from web.brands import BrandIndex, Watchlist, load_watchlist
 from web.brandwatch import (BrandStat, CrisisAlert, Tagged, crisis_alerts, share_of_voice,
                             tag_articles, tags_by_url)
-from web.exports import (brands_json, feed_xml, history_json, issues_history_csv, issues_json,
+from web.events import (MEDIA_SIGNAL, OFFICIAL_SIGNAL, BriefingItem, InformationEvent, build_briefing,
+                        build_events)
+from web.exports import (brands_json, events_json, feed_xml, history_json, issues_history_csv, issues_json,
                          signals_json, stats_json)
 from web.history import (Comparison, IssueHistory, SignalTimeline, TopicGrowth, compare_periods,
                          fastest_growing_topics, issue_histories, major_sources, missing_major_sources,
@@ -366,6 +368,30 @@ def _media_gap_html(issue: Issue, majors: Optional[List[str]]) -> str:
             f'chưa phát hiện bài khớp từ: {escape(", ".join(missing))}</div>')
 
 
+_SIGNAL_TYPE_LABELS = {MEDIA_SIGNAL: "truyền thông", OFFICIAL_SIGNAL: "chính thống"}
+
+
+def _evidence_html(event: Optional[InformationEvent]) -> str:
+    """Roadmap V6 §52 "Information Evidence" — who covered the event and
+    in what order. Evidence structure, deliberately not a truth/confidence
+    score. "chưa phát hiện" = no matching TITLE from a configured official
+    source; it does not claim no official statement exists."""
+    if event is None:
+        return ""
+    ev = event.evidence
+    official = (f'có ({escape(", ".join(ev.official_sources))})' if ev.has_official
+                else "chưa phát hiện tiêu đề khớp")
+    first = ""
+    if ev.first_report_at is not None and ev.first_report_source:
+        first = f' · báo đầu tiên: {escape(ev.first_report_source)} {ev.first_report_at.strftime("%H:%M")}'
+    attention = ""
+    if event.high_attention:
+        attention = (' · <b title="Có nguồn chính thống và truyền thông đang tăng tốc. '
+                     'Không phải dự báo giá hay thị trường.">chú ý cao</b>')
+    return (f'<div class="evidence">Bằng chứng thông tin — nguồn chính thống: {official} · '
+            f'truyền thông: {len(ev.media_sources)} nguồn{first}{attention}</div>')
+
+
 # Distinguishes "caller has no diff data at all" (omit the section) from
 # "caller computed a diff and it's None" (issue_diff()'s own meaning:
 # didn't exist as a qualifying issue 1h ago -> render "mới xuất hiện").
@@ -378,6 +404,7 @@ def _issue_card_html(
     lifecycle_status: Optional[str] = None,
     diff: Optional[Dict[str, int]] = _DIFF_NOT_PROVIDED,
     majors: Optional[List[str]] = None,
+    event: Optional[InformationEvent] = None,
 ) -> str:
     # The compact (collapsed) card caps Why Hot at 2 bullets to hit the
     # spec's ~180-220px target height — the full list (already <=4
@@ -427,6 +454,7 @@ def _issue_card_html(
         f'<div class="issue-detail">'
         f'<div class="issue-metrics">{metrics}</div>'
         f'{diff_html}'
+        f'{_evidence_html(event)}'
         f'{_media_gap_html(issue, majors)}'
         f'{_source_coverage_html(issue)}'
         f'{_coverage_timeline_html(issue)}'
@@ -441,6 +469,7 @@ def _top_issues_html(
     lifecycle_by_id: Optional[Dict[str, str]] = None,
     diff_by_id: Optional[Dict[str, Optional[Dict[str, int]]]] = None,
     majors: Optional[List[str]] = None,
+    events_by_id: Optional[Dict[str, InformationEvent]] = None,
 ) -> str:
     """The "TOP ISSUES" panel — only rendered on the latest day's page
     (see build_site), since it is scored against *today* (Asia/Ho_Chi_Minh)
@@ -454,7 +483,7 @@ def _top_issues_html(
         _issue_card_html(
             rank, issue, lifecycle_by_id.get(issue.issue_id),
             diff=(diff_by_id[issue.issue_id] if diff_by_id and issue.issue_id in diff_by_id else _DIFF_NOT_PROVIDED),
-            majors=majors,
+            majors=majors, event=(events_by_id or {}).get(issue.issue_id),
         )
         for rank, issue in enumerate(issues, start=1)
     )
@@ -1016,6 +1045,7 @@ def render_day_page(
     lifecycle_by_id: Optional[Dict[str, str]] = None,
     diff_by_id: Optional[Dict[str, Optional[Dict[str, int]]]] = None,
     majors: Optional[List[str]] = None,
+    events_by_id: Optional[Dict[str, InformationEvent]] = None,
 ) -> str:
     now = datetime.now(ZoneInfo(config.timezone))
     is_latest = trending is not None
@@ -1048,7 +1078,7 @@ def render_day_page(
         '<div id="news-pagination" class="pagination"></div></section>'
     )
 
-    issues_panel = _top_issues_html(issues, "col-8", lifecycle_by_id, diff_by_id, majors) if issues else ""
+    issues_panel = _top_issues_html(issues, "col-8", lifecycle_by_id, diff_by_id, majors, events_by_id) if issues else ""
     side_panel = _sources_panel(sources, "col-4" if issues else "col-12")
     grid = f'<div class="content-grid">{issues_panel}{side_panel}</div>' if (issues_panel or side_panel) else ""
 
@@ -1278,12 +1308,53 @@ def render_history_page(
     )
 
 
+def _briefing_item_html(n: int, item: BriefingItem) -> str:
+    head = (f'<h2 class="panel-title"><span class="issue-rank">{n:02d}</span> '
+            f'{escape(item.heading)}</h2>')
+    if item.event is None:
+        return (f'<section class="panel col-12">{head}'
+                f'<p class="an-empty">{escape(item.empty_note)}</p></section>')
+    e, issue, ev = item.event, item.event.issue, item.event.evidence
+    types = " + ".join(_SIGNAL_TYPE_LABELS[t] for t in e.signal_types) or "—"
+    official = (f'có ({escape(", ".join(ev.official_sources))})' if ev.has_official
+                else "chưa phát hiện tiêu đề khớp")
+    first = (f'{escape(ev.first_report_source)} lúc {ev.first_report_at.strftime("%H:%M")}'
+             if ev.first_report_at is not None and ev.first_report_source else "—")
+    rows = (
+        ("Sự kiện", f"<b>{escape(e.title)}</b>"),
+        ("Bằng chứng", f"{len(ev.media_sources)} nguồn truyền thông · nguồn chính thống: {official}"),
+        ("Báo đầu tiên", first),
+        ("Bắt đầu", issue.first_seen_at.strftime("%H:%M")),
+        ("Trạng thái", _status_text(e.lifecycle_status)),
+        ("Loại tín hiệu", escape(types) + (" · <b>chú ý cao</b>" if e.high_attention else "")),
+        ("Nguồn", escape(", ".join(issue.sources))),
+    )
+    body = "".join(f'<div class="brief-row"><span class="brief-k">{k}</span><span>{v}</span></div>' for k, v in rows)
+    return f'<section class="panel col-12">{head}{body}</section>'
+
+
+def render_briefing_page(briefing: List[BriefingItem], has_issues: bool, now: datetime) -> str:
+    """Daily Briefing (roadmap V6 §56, briefing.html): five fixed slots,
+    each backed by structured data only — no AI summary. A slot with
+    nothing to report says so rather than being padded."""
+    body = (_page_head("Bản tin hôm nay", f"Financial Radar ngày {now.strftime('%d/%m/%Y')} — 5 điểm đáng biết, "
+                       "mỗi điểm kèm bằng chứng (ai đưa tin, từ khi nào). Đây là mô tả dòng thông tin, "
+                       "không phải dự báo thị trường.")
+            + "".join(_briefing_item_html(n, item) for n, item in enumerate(briefing, start=1)))
+    return render_shell(
+        active="briefing", title="Bản tin — Vietnam News Monitor", crumb="Bản tin", body=body,
+        now_label=now.strftime("%H:%M"), has_data=True, has_issues=has_issues,
+        footer=f"Tự động cập nhật mỗi {config.crawl_interval_minutes} phút qua GitHub Actions.",
+    )
+
+
 def render_radar_page(
     accelerating: List[Issue],
     diff_by_id: Dict[str, Optional[Dict[str, int]]],
     has_issues: bool,
     now: datetime,
     majors: Optional[List[str]] = None,
+    events_by_id: Optional[Dict[str, InformationEvent]] = None,
 ) -> str:
     """The Radar tab (radar.html, roadmap V3 §21 "News Radar"): today's
     Top Issues that are currently ACCELERATING (roadmap V2 §15
@@ -1303,7 +1374,7 @@ def render_radar_page(
     if accelerating:
         cards = "".join(
             _issue_card_html(rank, issue, ACCELERATING, diff=diff_by_id.get(issue.issue_id, _DIFF_NOT_PROVIDED),
-                             majors=majors)
+                             majors=majors, event=(events_by_id or {}).get(issue.issue_id))
             for rank, issue in enumerate(accelerating, start=1)
         )
         panel = (
@@ -1353,6 +1424,10 @@ def build_site(db: Database, out_dir: Path = SITE_DIR) -> None:
     # why this needs no new snapshot table).
     diff_by_id = {i.issue_id: issue_diff(i, articles, now, source_weights=source_weights) for i in trending}
     majors = major_sources(articles, now)
+    # Roadmap V6 phase 1 (web/events.py): evidence + briefing, derived each build.
+    events = build_events(trending, registry, lifecycle_by_id)
+    events_by_id = {e.issue_id: e for e in events}
+    briefing = build_briefing(events, db.get_issue_history(), now.date())
     prev_day = (now - timedelta(days=1)).date()
     prev_total = sum(
         1 for a in articles
@@ -1380,6 +1455,7 @@ def build_site(db: Database, out_dir: Path = SITE_DIR) -> None:
                 lifecycle_by_id=(lifecycle_by_id if is_latest else None),
                 diff_by_id=(diff_by_id if is_latest else None),
                 majors=(majors if is_latest else None),
+                events_by_id=(events_by_id if is_latest else None),
             ),
             encoding="utf-8",
         )
@@ -1388,7 +1464,8 @@ def build_site(db: Database, out_dir: Path = SITE_DIR) -> None:
     (out_dir / "index.html").write_text(
         render_day_page(latest, latest_sources, all_dates, trending=trending, has_analytics=has_data,
                         brand_tags=brand_tags, prev_total=prev_total,
-                        lifecycle_by_id=lifecycle_by_id, diff_by_id=diff_by_id, majors=majors), encoding="utf-8"
+                        lifecycle_by_id=lifecycle_by_id, diff_by_id=diff_by_id, majors=majors,
+                        events_by_id=events_by_id), encoding="utf-8"
     )
 
     # Tells GitHub Pages not to run this through Jekyll (irrelevant here
@@ -1415,23 +1492,26 @@ def build_site(db: Database, out_dir: Path = SITE_DIR) -> None:
         (out_dir / "issues.json").write_text(issues_json(trending, now), encoding="utf-8")
         accelerating = [i for i in trending if lifecycle_by_id.get(i.issue_id) == ACCELERATING]
         (out_dir / "radar.html").write_text(
-            render_radar_page(accelerating, diff_by_id, bool(trending), now, majors), encoding="utf-8"
+            render_radar_page(accelerating, diff_by_id, bool(trending), now, majors, events_by_id), encoding="utf-8"
         )
         history_rows = db.get_issue_history()
-        events = db.get_signal_events()
+        signal_events = db.get_signal_events()
+        (out_dir / "briefing.html").write_text(
+            render_briefing_page(briefing, bool(trending), now), encoding="utf-8")
+        (out_dir / "events.json").write_text(events_json(events, briefing, now), encoding="utf-8")
         (out_dir / "stats.json").write_text(stats_json(daily_stats, history_rows, now), encoding="utf-8")
 
         # Roadmap V5 (web/history.py): history page + its raw-data exports.
-        comparisons = compare_periods(articles, history_rows, events, now, tagged)
+        comparisons = compare_periods(articles, history_rows, signal_events, now, tagged)
         stats90 = share_of_voice(tagged, index, watch, now, 90)
         (out_dir / "history.html").write_text(
-            render_history_page(history_rows, events, daily_stats, comparisons, stats30, stats90, now,
+            render_history_page(history_rows, signal_events, daily_stats, comparisons, stats30, stats90, now,
                                 has_issues=bool(trending)),
             encoding="utf-8",
         )
         histories = issue_histories(history_rows)
         (out_dir / "history.json").write_text(history_json(histories, comparisons, now), encoding="utf-8")
-        (out_dir / "signals.json").write_text(signals_json(events, now), encoding="utf-8")
+        (out_dir / "signals.json").write_text(signals_json(signal_events, now), encoding="utf-8")
         (out_dir / "issues_history.csv").write_text(issues_history_csv(histories), encoding="utf-8", newline="")
         (out_dir / "feed.xml").write_text(feed_xml(articles, config.site_url, now), encoding="utf-8")
 

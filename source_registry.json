@@ -1,93 +1,116 @@
 {
   "VnExpress": {
+    "type": "MEDIA",
     "tier": "A",
     "weight": 1.0
   },
   "Tuổi Trẻ": {
+    "type": "MEDIA",
     "tier": "A",
     "weight": 1.0
   },
   "CafeF": {
+    "type": "MEDIA",
     "tier": "A",
     "weight": 1.0
   },
   "Vietstock": {
+    "type": "MEDIA",
     "tier": "A",
     "weight": 1.0
   },
   "Thanh Niên": {
+    "type": "MEDIA",
     "tier": "A",
     "weight": 1.0
   },
   "Dân Trí": {
+    "type": "MEDIA",
     "tier": "A",
     "weight": 1.0
   },
   "VnEconomy": {
+    "type": "MEDIA",
     "tier": "A",
     "weight": 1.0
   },
   "Znews": {
+    "type": "MEDIA",
     "tier": "A",
     "weight": 1.0
   },
   "Tiền Phong": {
+    "type": "MEDIA",
     "tier": "A",
     "weight": 1.0
   },
   "VietnamPlus": {
+    "type": "MEDIA",
     "tier": "A",
     "weight": 1.0
   },
   "Nhân Dân": {
+    "type": "MEDIA",
     "tier": "A",
     "weight": 1.0
   },
   "Chính phủ": {
+    "type": "OFFICIAL",
     "tier": "A",
     "weight": 1.0
   },
   "VTV": {
+    "type": "MEDIA",
     "tier": "A",
     "weight": 1.0
   },
   "VietnamBiz": {
+    "type": "MEDIA",
     "tier": "A",
     "weight": 1.0
   },
   "CafeBiz": {
+    "type": "MEDIA",
     "tier": "A",
     "weight": 1.0
   },
   "Đầu tư Chứng khoán": {
+    "type": "MEDIA",
     "tier": "A",
     "weight": 1.0
   },
   "Diễn đàn Doanh nghiệp": {
+    "type": "MEDIA",
     "tier": "A",
     "weight": 1.0
   },
   "Báo Đầu tư": {
+    "type": "MEDIA",
     "tier": "A",
     "weight": 1.0
   },
   "FiLi": {
+    "type": "MEDIA",
     "tier": "A",
     "weight": 1.0
   },
   "VietnamNet": {
+    "type": "MEDIA",
     "tier": "A",
     "weight": 1.0
   },
   "Người Quan Sát": {
+    "type": "MEDIA",
     "tier": "A",
     "weight": 1.0
   },
   "SGGP": {
+    "type": "MEDIA",
     "tier": "A",
     "weight": 1.0
   },
   "VnExpress Intl": {
+    "type": "MEDIA",
     "tier": "A",
     "weight": 1.0
   }
