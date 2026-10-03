@@ -4,16 +4,22 @@ is reusable outside the website (Excel/Power BI, Slack/Feedly, scripts):
   issues.json — today's Top Issues with all four HotScore components
   stats.json  — daily per-source / per-topic counts and issue history
   feed.xml    — RSS 2.0 of the newest articles across all sources
+  history.json / signals.json / issues_history.csv — roadmap V5: per-issue
+                history, the signal_events log, and a CSV of the same
 
 Pure functions returning strings/dicts; build_site does the file I/O.
 """
 
+import csv
+import io
 import json
+from dataclasses import asdict
 from datetime import datetime, timezone
 from email.utils import format_datetime
-from typing import List
+from typing import List, Sequence
 from xml.sax.saxutils import escape
 
+from web.history import Comparison, IssueHistory
 from web.issues import Issue
 
 FEED_ITEMS = 100
@@ -125,3 +131,36 @@ def brands_json(stats7, stats30, alerts, watch, now: datetime) -> str:
         "note": "Tone labels are keyword-based estimates from headlines only.",
     }
     return json.dumps(payload, ensure_ascii=False, indent=2)
+
+
+def history_json(histories: Sequence[IssueHistory], comparisons: Sequence[Comparison], now: datetime) -> str:
+    """Roadmap V5 §45 history.json: one summary per issue that ever made a
+    Top 5 (web/history.py documents what that does and doesn't cover)
+    plus the day/week/month comparisons."""
+    payload = {
+        "generated_at": now.isoformat(),
+        "issues": [asdict(h) for h in histories],
+        "comparisons": [asdict(c) for c in comparisons],
+    }
+    return json.dumps(payload, ensure_ascii=False, indent=2)
+
+
+def signals_json(events: Sequence[dict], now: datetime) -> str:
+    """Roadmap V5 §45 signals.json: the append-only signal_events log
+    (every real lifecycle transition), oldest first."""
+    payload = {
+        "generated_at": now.isoformat(),
+        "events": sorted(events, key=lambda e: e["occurred_at"]),
+    }
+    return json.dumps(payload, ensure_ascii=False, indent=2)
+
+
+def issues_history_csv(histories: Sequence[IssueHistory]) -> str:
+    """Roadmap V5 §45 CSV export of the same per-issue summaries."""
+    fields = list(IssueHistory.__dataclass_fields__)
+    buf = io.StringIO()
+    writer = csv.DictWriter(buf, fieldnames=fields, lineterminator="\n")
+    writer.writeheader()
+    for h in histories:
+        writer.writerow(asdict(h))
+    return buf.getvalue()

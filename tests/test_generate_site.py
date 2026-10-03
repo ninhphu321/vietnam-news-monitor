@@ -1,10 +1,11 @@
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from zoneinfo import ZoneInfo
 
 from config import config
 from models import NewsItem
 from web.generate_site import (_tab_window, build_site, group_by_date_and_source, render_day_page,
-                               render_radar_page)
+                               render_history_page, render_radar_page)
+from web.history import compare_periods
 from web.issues import Issue
 
 TZ = ZoneInfo("Asia/Ho_Chi_Minh")
@@ -497,3 +498,109 @@ def test_build_site_writes_radar_tab(tmp_path, db):
     radar = (out_dir / "radar.html").read_text(encoding="utf-8")
     assert "Radar" in radar and 'href="index.html"' in radar
     assert "Hiện không có vấn đề nào" in radar
+
+
+# --- Media Gap on the issue card (roadmap V5 §43) --------------------------
+
+
+def test_issue_card_lists_major_sources_with_no_matching_article():
+    issue = _issue(sources=["VnExpress", "CafeF"])
+    html = render_day_page(date(2026, 9, 14), {}, [date(2026, 9, 14)], trending=[issue],
+                           majors=["VnExpress", "CafeF", "Vietstock", "Dân Trí"])
+    assert "2/4 nguồn lớn đã có bài" in html
+    assert "chưa phát hiện bài khớp từ: Vietstock, Dân Trí" in html
+
+
+def test_issue_card_omits_media_gap_when_every_major_source_covered_it():
+    issue = _issue(sources=["VnExpress", "CafeF"])
+    html = render_day_page(date(2026, 9, 14), {}, [date(2026, 9, 14)], trending=[issue],
+                           majors=["VnExpress", "CafeF"])
+    assert '<div class="media-gap"' not in html
+
+
+def test_issue_card_omits_media_gap_when_no_majors_given():
+    html = render_day_page(date(2026, 9, 14), {}, [date(2026, 9, 14)], trending=[_issue()])
+    assert '<div class="media-gap"' not in html
+
+
+# --- History page (roadmap V5, history.html) --------------------------------
+
+NOW_HIST = datetime(2026, 9, 17, 15, 0, tzinfo=TZ)
+
+
+def _hist_row(day, issue_id="eximbank-tang-von", title="Eximbank · Tăng vốn", articles=5, status="peak"):
+    return {"day": day, "issue_id": issue_id, "title": title, "rank": 1, "hot_score": 80.0,
+            "article_count": articles, "source_count": 3, "first_seen_at": f"{day}T09:12:00+07:00",
+            "last_seen_at": f"{day}T11:00:00+07:00", "velocity": 1.5, "signal_status": status}
+
+
+def _hist_page(rows=(), events=(), stats=()):
+    comparisons = compare_periods([], list(rows), list(events), NOW_HIST)
+    return render_history_page(list(rows), list(events), list(stats), comparisons, [], [], NOW_HIST)
+
+
+def test_history_page_lists_issue_summaries_with_a_search_box():
+    html = _hist_page(rows=[_hist_row("2026-09-16", articles=4), _hist_row("2026-09-17", articles=9)])
+    assert "Eximbank · Tăng vốn" in html
+    assert 'id="hist-q"' in html
+    assert 'data-search="eximbank · tăng vốn"' in html
+    assert ">13<" in html  # total articles across both days
+
+
+def test_history_page_escapes_titles_in_the_search_attribute():
+    html = _hist_page(rows=[_hist_row("2026-09-17", title='A" onmouseover="x<script>')])
+    assert 'onmouseover="x' not in html.replace("&quot;", "")
+    assert "<script>x" not in html
+
+
+def test_history_page_shows_the_signal_timeline_in_order():
+    events = [
+        {"day": "2026-09-17", "issue_id": "eximbank-tang-von", "from_status": None, "to_status": "emerging",
+         "velocity": 1.0, "article_count": 3, "source_count": 2, "occurred_at": "2026-09-17T09:12:00+07:00"},
+        {"day": "2026-09-17", "issue_id": "eximbank-tang-von", "from_status": "emerging", "to_status": "accelerating",
+         "velocity": 2.0, "article_count": 6, "source_count": 3, "occurred_at": "2026-09-17T10:15:00+07:00"},
+    ]
+    html = _hist_page(rows=[_hist_row("2026-09-17")], events=events)
+    assert html.index("Mới xuất hiện 09:12") < html.index("Đang tăng tốc 10:15")
+
+
+def test_history_page_shows_empty_states_without_any_history():
+    html = _hist_page()
+    assert "Chưa có lịch sử issue" in html
+    assert "Chưa có thay đổi trạng thái nào" in html
+    assert 'id="hist-q"' not in html  # nothing to search
+
+
+def test_history_page_compares_periods():
+    html = _hist_page()
+    assert "Hôm nay vs hôm qua" in html and "Tuần này vs tuần trước" in html and "Tháng này vs tháng trước" in html
+
+
+def test_build_site_writes_history_page_and_its_exports(tmp_path, db):
+    import json
+
+    db.insert_if_new(NewsItem("VnExpress", "Tin thường", "https://x/1", datetime(2026, 9, 15, 10, 0, tzinfo=TZ)))
+    out_dir = tmp_path / "site"
+    build_site(db, out_dir=out_dir)
+
+    page = (out_dir / "history.html").read_text(encoding="utf-8")
+    assert "Lịch sử" in page and 'href="history.json"' in page
+    assert "issues" in json.loads((out_dir / "history.json").read_text(encoding="utf-8"))
+    assert "events" in json.loads((out_dir / "signals.json").read_text(encoding="utf-8"))
+    assert (out_dir / "issues_history.csv").read_text(encoding="utf-8").startswith("issue_id,")
+
+    analytics = (out_dir / "analytics.html").read_text(encoding="utf-8")
+    assert 'href="history.html"' in analytics
+
+
+def test_history_page_withholds_the_delta_when_the_previous_period_is_not_covered():
+    html = _hist_page()  # no articles -> collection start unknown -> nothing covered
+    assert "chưa tính mức thay đổi" in html
+
+
+def test_history_page_shows_deltas_when_the_previous_period_is_covered():
+    old = NOW_HIST - timedelta(days=100)
+    articles = [{"source": "A", "title": "t", "url": "u", "published_at": old, "first_seen_at": old}]
+    comparisons = compare_periods(articles, [], [], NOW_HIST)
+    html = render_history_page([], [], [], comparisons, [], [], NOW_HIST)
+    assert "chưa tính mức thay đổi" not in html

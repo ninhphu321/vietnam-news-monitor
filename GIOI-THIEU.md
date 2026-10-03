@@ -45,6 +45,7 @@ Trang tĩnh tự sinh lại sau mỗi lần quét, lưu toàn bộ lịch sử t
 
   Mỗi issue kèm vài dòng "Vì sao hot" giải thích ngắn gọn, nhãn vòng đời (Mới xuất hiện/Đang tăng tốc/Ổn định/Đang hạ nhiệt), tốc độ 1 giờ qua + mức độ đồng thuận nguồn, Coverage Map (nguồn nào đưa trước) + so sánh với 1 giờ trước (roadmap V3), và bấm vào để xem toàn bộ bài viết liên quan. Cập nhật lại **mỗi lần quét**.
 - **📡 Radar** (mục nav riêng, roadmap V3) — chỉ liệt kê những issue **đang thực sự tăng tốc** ngay lúc này (thường 0-1 issue), trả lời đúng câu hỏi "vấn đề nào cần chú ý ngay?" thay vì phải tự lọc trong cả Top 5.
+- **🕘 Lịch sử** (mục nav riêng, roadmap V5) — so sánh hôm nay/tuần/tháng với kỳ trước, tìm lại 1 issue từng nổi (phát hiện lúc nào, nổi mấy ngày, đỉnh khi nào), xem 1 issue đã đổi trạng thái ra sao theo giờ, và "trí nhớ" báo chí 30/90 ngày (issue/chủ đề/thương hiệu/nguồn nổi bật). Có thể tải dữ liệu thô dạng JSON/CSV.
 - Giao diện phong cách biên tập báo chí (viền đen, đổ bóng cứng, không dùng gradient màu mè), hỗ trợ sẵn dark mode theo hệ thống.
 
 ### 🤖 Hạ tầng miễn phí, tự vận hành
@@ -78,7 +79,7 @@ GitHub Pages (trang web) + nhánh db-state (lưu database)
 
 ## Chất lượng & kiểm thử
 
-286 test tự động (`pytest`), chạy offline bằng dữ liệu fixture lấy từ audit thực tế — bao phủ toàn bộ crawler, logic chống trùng, format Telegram, sinh trang web, và thuật toán phát hiện issue.
+326 test tự động (`pytest`), chạy offline bằng dữ liệu fixture lấy từ audit thực tế — bao phủ toàn bộ crawler, logic chống trùng, format Telegram, sinh trang web, và thuật toán phát hiện issue.
 
 ---
 

@@ -323,7 +323,7 @@ Dành cho phòng truyền thông/PR ngành ngân hàng - tài chính. Toàn bộ
 
 ## 13. Testing
 
-**286 test** (`pytest`), chạy hoàn toàn offline bằng fixture lấy từ dữ liệu thực tế lúc audit — không cần mạng, mock qua thư viện `responses`.
+**326 test** (`pytest`), chạy hoàn toàn offline bằng fixture lấy từ dữ liệu thực tế lúc audit — không cần mạng, mock qua thư viện `responses`.
 
 | File | Phạm vi |
 |------|---------|
@@ -342,6 +342,7 @@ Dành cho phòng truyền thông/PR ngành ngân hàng - tài chính. Toàn bộ
 | `test_datainfra.py` | Bảng `daily_stats`/`issue_history`, `snapshot_data` (kể cả không được raise lỗi — trả `None` khi thất bại thay vì raise, và trả đúng danh sách issue đã xếp hạng kèm trạng thái vòng đời khi thành công, để `run_cycle` chuyển thẳng cho Telegram; vòng đời Signal: lần đầu → emerging, đổi trạng thái → ghi `signal_event`, lặp lại không đổi → không ghi thêm), các hàm xuất `issues.json`/`stats.json`/`feed.xml`, lưu trữ theo tháng (xuất không xoá theo mặc định, xoá + giữ nguyên file khi chạy lại) |
 | `test_source_registry.py` | `source_registry.json`: file thiếu/hỏng/thiếu nguồn đều rơi về mặc định tier A/weight 1.0, không crash |
 | `test_signals.py` | Phân loại vòng đời Signal theo roadmap V2 §15 — lần đầu luôn là emerging, ngưỡng ±15% cho accelerating/cooling, trường hợp biên velocity=0; `should_alert()` (roadmap V3 §26) — cần cả 2 ngưỡng cùng lúc, ngưỡng bao gồm cả biên, cấu hình được |
+| `test_history.py` | Historical Intelligence (roadmap V5, mục 18) — gộp lịch sử issue (ngày đỉnh khi hoà, hàng cũ thiếu velocity), tìm kiếm (không phân biệt hoa/thường, Unicode tổ hợp/dựng sẵn), dòng thời gian signal, chủ đề tăng nhanh (gộp hạng theo mức tăng tuyệt đối, bỏ chủ đề co lại/quá nhỏ), cửa sổ so sánh ngày/tuần/tháng (không tràn sang kỳ hiện tại), cờ kỳ trước chưa đủ dữ liệu, media gap, `history.json`/`signals.json`/CSV |
 | `test_personal_watchlist.py` | Watchlist cá nhân (roadmap V4 §29-34, mục 17) — file thiếu/hỏng/rỗng đều tắt tính năng, khớp đúng tiêu đề + alias tuỳ chỉnh, mã ngắn khớp phân biệt hoa/thường, đếm đúng số bài/nguồn mới, rỗng khi không khớp gì |
 
 ---
@@ -372,6 +373,7 @@ news-monitor/
 │   ├── generate_site.py                  # lắp ráp nội dung từng trang, gọi render_shell
 │   ├── issues.py                          # Issue Intelligence + SignalScore (Entity/Topic/Issue) + Media Consensus (mục 9)
 │   ├── signals.py                          # phân loại vòng đời Signal (mục 9)
+│   ├── history.py                           # Historical Intelligence: lịch sử issue/signal, so sánh kỳ, Media Memory (mục 18)
 │   ├── velocity.py                          # Velocity Engine 1h (mục 9, roadmap V3 §22-23)
 │   ├── source_registry.py                   # tải source_registry.json
 │   ├── analytics.py                          # phân tích dòng tin (mục 10)
@@ -380,7 +382,7 @@ news-monitor/
 │   ├── brandwatch.py                            # share of voice + cảnh báo khủng hoảng (mục 11)
 │   ├── exports.py                                # issues.json/stats.json/feed.xml/brands.json (mục 12)
 │   └── cloudflare-worker/worker.js                # proxy bảo mật cho nút "Quét ngay"
-├── tests/                                           # 286 test, xem mục 13
+├── tests/                                           # 326 test, xem mục 13
 ├── data/news.db                                      # SQLite (local dev; trên CI lấy từ nhánh db-state)
 ├── data/archive/                                  # file lưu trữ theo tháng (--archive-old)
 ├── backup/                                         # snapshot DB có timestamp
@@ -459,3 +461,29 @@ Cấu hình qua `.env` (copy từ `.env.example`) — bắt buộc `TELEGRAM_BOT
 **Luồng gửi Telegram** (`scheduler.send_personal_watchlist_alert`, gọi ngay sau `send_signal_alerts` trong `run_cycle`): nếu không cấu hình file (`PERSONAL_WATCHLIST_PATH`) thì bỏ qua hoàn toàn, không tốn gì ngoài 1 lần kiểm tra file tồn tại. Nếu có khớp, gửi đúng 1 tin "📡 MY RADAR" liệt kê từng thực thể + số bài/nguồn mới — **không gửi nguyên title** (đúng yêu cầu roadmap "Không gửi toàn bộ title", vì title đã có trong digest chính rồi). Bước phụ best-effort: lỗi chỉ ghi log, không ảnh hưởng digest chính.
 
 **Đã xác minh trên dữ liệu production thật:** nạp [personal_watchlist.example.json](personal_watchlist.example.json) (đúng ví dụ mẫu của roadmap) và so khớp với tiêu đề thật trong 1 ngày — ra đúng kết quả hợp lý (vd "Lãi suất" khớp 13 bài/6 nguồn), tin Telegram hiện đúng định dạng.
+
+---
+
+## 18. Historical Intelligence (roadmap V5, trang `history.html`)
+
+Nav mới "Lịch sử" (nhóm Phân tích, cạnh Analytics). Toàn bộ tính trong [web/history.py](web/history.py) từ dữ liệu crawl job **đã** ghi sẵn (`issue_history`, `signal_events`, `daily_stats`, bài thô) — **không thêm bảng DB nào**, cùng lý do như Velocity Engine (mục 9): cái gì suy ra được thì không lưu trùng.
+
+**Trang Lịch sử gồm:**
+- **So sánh theo kỳ** (§44): hôm nay/hôm qua, tuần này/tuần trước, tháng này/tháng trước × 5 chỉ số (bài viết, nguồn có bài, issue lọt Top 5, lượt nhắc thương hiệu, signal chuyển sang tăng tốc). Kỳ trước được cắt đúng bằng thời gian đã trôi qua của kỳ hiện tại (15h hôm nay so với 15h hôm qua), không so ngày dang dở với ngày trọn vẹn.
+- **Lịch sử issue + ô tìm kiếm** (§40): mỗi issue từng lọt Top 5 → lần đầu phát hiện, số ngày, tổng bài, số nguồn tối đa/ngày, ngày đỉnh, tốc độ đỉnh, trạng thái gần nhất. Tìm ngay trên trình duyệt (không gọi server), không phân biệt hoa/thường và dạng Unicode (dùng chung `normalize_for_matching`).
+- **Dòng thời gian Signal** (§39): mỗi (ngày, issue) các lần đổi trạng thái theo thứ tự — "★ Mới xuất hiện 09:12 → ↑ Đang tăng tốc 10:15 → ● Ổn định 12:10" — từ `signal_events`.
+- **Media Memory 30/90 ngày** (§41): issue nhiều bài nhất, issue bền nhất (nhiều ngày lọt Top 5), chủ đề tăng nhanh nhất (nửa sau so nửa đầu kỳ, xếp theo mức tăng tuyệt đối và có ngưỡng tối thiểu để chủ đề 1→3 bài không lấn át đợt tăng thật), thương hiệu được nhắc nhiều nhất, nguồn đăng nhiều nhất (lịch sử nguồn, §47).
+- **Media Gap** (§43) nằm ở thẻ issue (Tổng quan và Radar), không ở trang Lịch sử: "5/10 nguồn lớn đã có bài · chưa phát hiện bài khớp từ: …". Nguồn lớn = 10 nguồn đăng nhiều nhất 7 ngày (cùng định nghĩa `coverage_gaps` ở mục 10). Cố ý chỉ nói "chưa phát hiện bài khớp", không bao giờ "bỏ qua tin" — so khớp theo tiêu đề có thể sót.
+
+**Xuất dữ liệu** (§45), cạnh các file HTML mỗi lần build: `history.json` (tóm tắt từng issue + 3 phép so sánh), `signals.json` (toàn bộ `signal_events`, cũ trước), `issues_history.csv`. Phần "entities.json"/"sources.json" của roadmap đã có sẵn dưới dạng `brands.json` (thương hiệu) và `stats.json` (đếm theo nguồn/chủ đề mỗi ngày) nên không nhân đôi.
+
+**Chuyện thật đã bắt được khi chạy trên dữ liệu production:** hệ thống mới thu thập vài tuần, nên "tháng này vs tháng trước" ra +39260% (tháng trước chỉ có 5 bài vì chưa chạy). Đã thêm `Comparison.previous_covered`: nếu lúc bắt đầu thu thập (tính theo `first_seen_at`, không phải `published_at` — feed như VTV chứa bài cũ hàng tuần) muộn hơn đầu kỳ trước thì trang ghi "Hệ thống chỉ bắt đầu thu thập từ dd/mm…" và **không hiện % thay đổi** thay vì số vô nghĩa.
+
+**Cố ý chưa làm (đúng ranh giới Sprint 7/8 của roadmap):**
+- **Tầng API tách khỏi web (§46)** — roadmap xếp ở Sprint 8. Các file JSON/CSV ở trên chính là "API" của 1 site tĩnh GitHub Pages; dựng backend thật sẽ phá kiến trúc zero-server hiện tại, chỉ nên làm khi có nhu cầu thật.
+- **Source Behavior (§42)** — mục 10 (Analytics) đã có đủ: ai đưa trước, độ trễ, nhịp đăng, đăng lặp, trùng phủ, hồ sơ chủ đề. Roadmap nói rõ "V5 không cần rewrite", chỉ cần gom lại; chưa gom thành 1 trang riêng.
+- **Entity history theo thời gian** chỉ ở mức Media Memory (thương hiệu được nhắc nhiều 30/90 ngày) và `brands.json`; chưa có biểu đồ riêng từng thực thể.
+
+**Giới hạn đã biết của lịch sử:** `issue_history` chỉ gồm issue từng lọt Top 5 (mỗi ngày 1 dòng/issue, giữ số liệu của chu kỳ cuối) — "Lịch sử issue" nghĩa là lịch sử các issue từng lọt Top 5, không phải mọi issue từng tồn tại. "Nguồn tối đa/ngày" thay cho "tổng nguồn" vì bảng chỉ lưu số đếm, không lưu danh sách nguồn nên không cộng dồn không trùng được. Không có trạng thái ARCHIVED (xem mục 9). Roadmap §40 cấm gọi "sự kiện quan trọng nhất" khi chưa có định nghĩa — trang không xếp hạng độ quan trọng.
+
+**Lưu trữ lâu dài (§47 "không mất dữ liệu cũ"):** `issue_history`, `signal_events`, `daily_stats` không bao giờ bị xoá tự động; bài thô chỉ rời DB khi chạy `main.py --archive-old --delete-archived` (mục 12, mặc định chỉ xuất ra file `.jsonl.gz`, không xoá).

@@ -24,6 +24,7 @@ FONT_IMPORT = (
 ICONS = """<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false"><defs>
 <symbol id="i-home" viewBox="0 0 24 24"><path d="M3 11l9-8 9 8"/><path d="M5 10v10h14V10"/><path d="M10 20v-6h4v6"/></symbol>
 <symbol id="i-flame" viewBox="0 0 24 24"><path d="M12 3c1 3 5 5 5 10a5 5 0 0 1-10 0c0-2 1-3 2-4 0 2 1 3 2 3 0-3-1-5 1-9z"/></symbol>
+<symbol id="i-history" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></symbol>
 <symbol id="i-radar" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1"/><path d="M12 12L19 7"/></symbol>
 <symbol id="i-news" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M8 9h8M8 13h8M8 17h5"/></symbol>
 <symbol id="i-building" viewBox="0 0 24 24"><path d="M4 21V7l8-4 8 4v14"/><path d="M9 21v-6h6v6M9 10h.01M15 10h.01"/></symbol>
@@ -253,6 +254,13 @@ details.issue-card:target>*:not(summary){display:block!important;}
 .coverage-timeline{display:flex;flex-direction:column;gap:var(--sp-2);padding:var(--sp-2) 0 var(--sp-4);border-top:1px solid var(--divider);}
 .coverage-time{font-family:var(--mono);font-size:12px;color:var(--text-2);}
 .issue-diff{font-size:12px;color:var(--text-2);padding:0 0 var(--sp-3);}
+.media-gap{font-size:12px;color:var(--text-2);padding:0 0 var(--sp-3);}
+/* History page (roadmap V5) */
+.hist-search{width:100%;max-width:420px;padding:8px 12px;margin:0 0 var(--sp-3);border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--surface);}
+.hist-sub{font-family:var(--mono);font-size:12px;color:var(--muted);margin:var(--sp-4) 0 var(--sp-2);}
+.tl-step{white-space:nowrap;}
+.tl-arrow{color:var(--muted);padding:0 var(--sp-1);}
+.hist-scroll{overflow-x:auto;}
 @media (max-width:767px){details.issue-card>summary{padding:var(--sp-4);gap:var(--sp-3);}.related-row{flex-direction:column;gap:2px;}
   .related-row .src{flex:none;}}
 
@@ -497,6 +505,7 @@ def render_shell(
             '<div class="nav-group-title">Phân tích</div><nav class="nav" aria-label="Phân tích">'
             + _nav_item("brands.html", "Brands", "building", "brands", active)
             + _nav_item("analytics.html", "Analytics", "chart", "analytics", active)
+            + _nav_item("history.html", "Lịch sử", "history", "history", active)
             + "</nav>"
         )
     data_links = ""

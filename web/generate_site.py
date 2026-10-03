@@ -22,17 +22,22 @@ from collections import Counter, defaultdict
 from datetime import date, datetime, timedelta
 from html import escape
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
 from zoneinfo import ZoneInfo
 
 from config import config
+from core.normalization import normalize_for_matching
 from crawlers import CRAWLER_CLASSES
 from database import Database
 from web.analytics import Analytics, IssueStreak, compute_analytics, issue_streaks, trend_from_stats
 from web.brands import BrandIndex, Watchlist, load_watchlist
 from web.brandwatch import (BrandStat, CrisisAlert, Tagged, crisis_alerts, share_of_voice,
                             tag_articles, tags_by_url)
-from web.exports import brands_json, feed_xml, issues_json, stats_json
+from web.exports import (brands_json, feed_xml, history_json, issues_history_csv, issues_json,
+                         signals_json, stats_json)
+from web.history import (Comparison, IssueHistory, SignalTimeline, TopicGrowth, compare_periods,
+                         fastest_growing_topics, issue_histories, major_sources, missing_major_sources,
+                         period_issue_histories, signal_timelines, top_sources)
 from web.issues import (BROAD_COVERAGE, MULTI_SOURCE, SINGLE_SOURCE, Issue, issue_diff,
                         media_consensus, top_issues)
 from web.signals import ACCELERATING, LIFECYCLE_LABELS
@@ -346,6 +351,21 @@ _MEDIA_CONSENSUS_LABELS = {
 }
 
 
+def _media_gap_html(issue: Issue, majors: Optional[List[str]]) -> str:
+    """Roadmap V5 §43 Media Gap: which tracked major outlets have no
+    matching article for this issue. Wording stays at "chưa phát hiện
+    bài khớp" — a title-only match can miss coverage, so this never
+    claims an outlet ignored the story."""
+    if not majors:
+        return ""
+    missing = missing_major_sources(issue.sources, majors)
+    if not missing:
+        return ""
+    covered = len(majors) - len(missing)
+    return (f'<div class="media-gap">{covered}/{len(majors)} nguồn lớn đã có bài · '
+            f'chưa phát hiện bài khớp từ: {escape(", ".join(missing))}</div>')
+
+
 # Distinguishes "caller has no diff data at all" (omit the section) from
 # "caller computed a diff and it's None" (issue_diff()'s own meaning:
 # didn't exist as a qualifying issue 1h ago -> render "mới xuất hiện").
@@ -357,6 +377,7 @@ def _issue_card_html(
     issue: Issue,
     lifecycle_status: Optional[str] = None,
     diff: Optional[Dict[str, int]] = _DIFF_NOT_PROVIDED,
+    majors: Optional[List[str]] = None,
 ) -> str:
     # The compact (collapsed) card caps Why Hot at 2 bullets to hit the
     # spec's ~180-220px target height — the full list (already <=4
@@ -406,6 +427,7 @@ def _issue_card_html(
         f'<div class="issue-detail">'
         f'<div class="issue-metrics">{metrics}</div>'
         f'{diff_html}'
+        f'{_media_gap_html(issue, majors)}'
         f'{_source_coverage_html(issue)}'
         f'{_coverage_timeline_html(issue)}'
         f'<div class="related-articles">{_related_articles_html(issue.all_articles)}</div>'
@@ -418,6 +440,7 @@ def _top_issues_html(
     width_class: str = "col-8",
     lifecycle_by_id: Optional[Dict[str, str]] = None,
     diff_by_id: Optional[Dict[str, Optional[Dict[str, int]]]] = None,
+    majors: Optional[List[str]] = None,
 ) -> str:
     """The "TOP ISSUES" panel — only rendered on the latest day's page
     (see build_site), since it is scored against *today* (Asia/Ho_Chi_Minh)
@@ -431,6 +454,7 @@ def _top_issues_html(
         _issue_card_html(
             rank, issue, lifecycle_by_id.get(issue.issue_id),
             diff=(diff_by_id[issue.issue_id] if diff_by_id and issue.issue_id in diff_by_id else _DIFF_NOT_PROVIDED),
+            majors=majors,
         )
         for rank, issue in enumerate(issues, start=1)
     )
@@ -991,6 +1015,7 @@ def render_day_page(
     prev_total: Optional[int] = None,
     lifecycle_by_id: Optional[Dict[str, str]] = None,
     diff_by_id: Optional[Dict[str, Optional[Dict[str, int]]]] = None,
+    majors: Optional[List[str]] = None,
 ) -> str:
     now = datetime.now(ZoneInfo(config.timezone))
     is_latest = trending is not None
@@ -1023,7 +1048,7 @@ def render_day_page(
         '<div id="news-pagination" class="pagination"></div></section>'
     )
 
-    issues_panel = _top_issues_html(issues, "col-8", lifecycle_by_id, diff_by_id) if issues else ""
+    issues_panel = _top_issues_html(issues, "col-8", lifecycle_by_id, diff_by_id, majors) if issues else ""
     side_panel = _sources_panel(sources, "col-4" if issues else "col-12")
     grid = f'<div class="content-grid">{issues_panel}{side_panel}</div>' if (issues_panel or side_panel) else ""
 
@@ -1085,11 +1110,180 @@ def render_analytics_page(an: Analytics, streaks: List[IssueStreak], trend, now:
     )
 
 
+# --------------------------------------------------------------- history page
+# Filters the issue-history table in place by toggling `hidden` on rows —
+# titles are never injected into the DOM from JS, only matched against a
+# server-escaped data-search attribute.
+_HISTORY_SCRIPT = """
+(function(){
+  var q=document.getElementById('hist-q'); if(!q) return;
+  var rows=[].slice.call(document.querySelectorAll('tr[data-search]'));
+  q.addEventListener('input',function(){
+    var v=q.value.normalize('NFC').toLowerCase().trim();
+    rows.forEach(function(r){ r.hidden = !!v && r.getAttribute('data-search').indexOf(v)===-1; });
+  });
+})();
+"""
+
+
+def _fmt_iso(iso: str) -> str:
+    try:
+        return datetime.fromisoformat(iso).strftime("%d/%m %H:%M")
+    except ValueError:
+        return iso[5:10].replace("-", "/") if len(iso) >= 10 else iso
+
+
+def _fmt_day(day: str) -> str:
+    return f"{day[8:10]}/{day[5:7]}" if len(day) >= 10 else day
+
+
+def _status_text(status: Optional[str]) -> str:
+    return escape(LIFECYCLE_LABELS.get(status, "—")) if status else "—"
+
+
+def _hist_comparison_block(comparisons: List[Comparison]) -> str:
+    parts = []
+    for c in comparisons:
+        metrics = (
+            ("Bài viết", c.current.articles, c.previous.articles),
+            ("Nguồn có bài", c.current.sources, c.previous.sources),
+            ("Issue lọt Top 5", c.current.issues, c.previous.issues),
+            ("Lượt nhắc thương hiệu", c.current.mentions, c.previous.mentions),
+            ("Signal chuyển sang tăng tốc", c.current.accelerations, c.previous.accelerations),
+        )
+        delta = (lambda cur, prev: _delta(cur, prev)) if c.previous_covered else (lambda cur, prev: "—")
+        rows = [(label, cur, prev, delta(cur, prev)) for label, cur, prev in metrics]
+        warn = "" if c.previous_covered else (
+            '<p class="an-note">Hệ thống chỉ bắt đầu thu thập từ '
+            f'{escape(_fmt_day(c.collection_start) if c.collection_start else "—")}, nên kỳ trước chưa đầy đủ — '
+            'chưa tính mức thay đổi để tránh số liệu gây hiểu lầm.</p>')
+        parts.append(f'<div class="hist-sub">{escape(c.label)}</div>' + warn + _an_table(
+            ["Chỉ số", c.current_label, c.previous_label, "Thay đổi"], rows, num_cols=(1, 2, 3)))
+    return _an_block(
+        "So sánh theo kỳ",
+        "Kỳ trước được cắt đúng bằng khoảng thời gian đã trôi qua của kỳ hiện tại (vd 15h hôm nay so với 15h hôm qua), "
+        "để 1 ngày/tuần/tháng còn dang dở không bị so với cả kỳ trước đã trọn vẹn.",
+        "".join(parts), is_open=True)
+
+
+def _hist_issue_search_block(histories: List[IssueHistory]) -> str:
+    if not histories:
+        return _an_block("Lịch sử issue", "", '<p class="an-empty">Chưa có lịch sử issue.</p>', is_open=True)
+    rows = []
+    for h in histories:
+        search = escape(normalize_for_matching(h.title), quote=True)
+        peak_v = f"{h.peak_velocity:.1f}" if h.peak_velocity is not None else "—"
+        rows.append(
+            f'<tr data-search="{search}"><td>{escape(h.title)}</td><td>{_fmt_iso(h.first_detected)}</td>'
+            f'<td class="num">{h.days_active}</td><td class="num">{h.total_articles}</td>'
+            f'<td class="num">{h.max_sources}</td><td>{_fmt_day(h.peak_day)} ({h.peak_articles} bài)</td>'
+            f'<td class="num">{peak_v}</td><td>{_status_text(h.latest_status)}</td></tr>')
+    head = "".join(f"<th>{c}</th>" for c in (
+        "Issue", "Phát hiện lần đầu", "Số ngày", "Tổng bài", "Nguồn tối đa/ngày", "Ngày đỉnh", "Tốc độ đỉnh", "Trạng thái gần nhất"))
+    body = (
+        '<input id="hist-q" class="hist-search" type="search" placeholder="Tìm issue (vd: Eximbank, lãi suất)…" '
+        'aria-label="Tìm issue trong lịch sử">'
+        f'<div class="hist-scroll"><table class="an-table"><thead><tr>{head}</tr></thead>'
+        f'<tbody>{"".join(rows)}</tbody></table></div>')
+    return _an_block(
+        "Lịch sử issue",
+        "Chỉ gồm issue từng lọt Top 5 trong ngày. \"Nguồn tối đa/ngày\" là số nguồn nhiều nhất trong 1 ngày "
+        "(không cộng dồn giữa các ngày vì sẽ đếm trùng). Không phải xếp hạng độ quan trọng.",
+        body, is_open=True)
+
+
+def _hist_timeline_block(timelines: List[SignalTimeline]) -> str:
+    if not timelines:
+        return _an_block("Dòng thời gian Signal", "", '<p class="an-empty">Chưa có thay đổi trạng thái nào được ghi lại.</p>')
+    rows = []
+    for t in timelines:
+        steps = '<span class="tl-arrow">→</span>'.join(
+            f'<span class="tl-step">{_status_text(status)} {_fmt_iso(at)[-5:]}</span>' for status, at in t.steps)
+        rows.append((escape(t.title), _fmt_day(t.day), steps))
+    return _an_block(
+        "Dòng thời gian Signal",
+        "Mỗi lần trạng thái vòng đời đổi trong ngày (từ bảng signal_events). Không có trạng thái \"lưu trữ\": issue "
+        "rớt khỏi Top 5 chỉ đơn giản không còn xuất hiện ở các ngày sau.",
+        _an_table(["Issue", "Ngày", "Diễn biến"], rows))
+
+
+def _hist_memory_block(days: int, period_histories: List[IssueHistory], growth: List[TopicGrowth],
+                       sov: List[BrandStat], sources: List[Tuple[str, int]]) -> str:
+    empty = '<p class="an-empty">Chưa có dữ liệu.</p>'
+    top = sorted(period_histories, key=lambda h: (-h.total_articles, h.title))[:8]
+    persistent = sorted(period_histories, key=lambda h: (-h.days_active, -h.total_articles, h.title))[:8]
+    mentioned = [s for s in sov if s.mentions][:8]
+    parts = [
+        '<div class="hist-sub">Issue có nhiều bài nhất</div>' + (
+            _an_table(["Issue", "Tổng bài", "Số ngày"], [(escape(h.title), h.total_articles, h.days_active) for h in top],
+                      num_cols=(1, 2)) if top else empty),
+        '<div class="hist-sub">Issue bền nhất (nhiều ngày lọt Top 5)</div>' + (
+            _an_table(["Issue", "Số ngày", "Tổng bài"], [(escape(h.title), h.days_active, h.total_articles) for h in persistent],
+                      num_cols=(1, 2)) if persistent else empty),
+        '<div class="hist-sub">Chủ đề tăng nhanh nhất (nửa sau so với nửa đầu kỳ)</div>' + (
+            _an_table(["Chủ đề", "Nửa đầu", "Nửa sau", "Tăng"],
+                      [(escape(g.name), g.earlier, g.recent, "mới" if g.pct is None else f"+{g.pct * 100:.0f}%") for g in growth],
+                      num_cols=(1, 2, 3)) if growth else '<p class="an-empty">Chưa đủ dữ liệu để so 2 nửa kỳ.</p>'),
+        '<div class="hist-sub">Thương hiệu được nhắc nhiều nhất</div>' + (
+            _an_table(["Thương hiệu", "Lượt nhắc", "Nguồn"], [(escape(s.brand), s.mentions, s.sources) for s in mentioned],
+                      num_cols=(1, 2)) if mentioned else '<p class="an-empty">Chưa có tin nhắc tới thương hiệu theo dõi.</p>'),
+        '<div class="hist-sub">Nguồn đăng nhiều nhất</div>' + (
+            _an_table(["Nguồn", "Bài"], [(escape(n), c) for n, c in sources], num_cols=(1,)) if sources else empty),
+    ]
+    return _an_block(
+        f"Media Memory — {days} ngày qua",
+        "Báo chí tài chính đã nói về gì trong kỳ này. Số liệu chỉ đếm từ dữ liệu đã thu thập, không phải toàn bộ báo chí.",
+        "".join(parts))
+
+
+def render_history_page(
+    history_rows: List[dict], events: List[dict], daily_stats: List[dict], comparisons: List[Comparison],
+    sov30: List[BrandStat], sov90: List[BrandStat], now: datetime, has_issues: bool = False,
+) -> str:
+    """The History tab (history.html, roadmap V5 §38-45): "what has been
+    happening" rather than just "today". All derived in web/history.py
+    from data the crawl job already persists — no new tables."""
+    today = now.date()
+    histories = issue_histories(history_rows)
+    titles = {h.issue_id: h.title for h in histories}
+    first_day = min((r["day"] for r in history_rows), default=None)
+    cards = _kpi_grid([
+        _kpi_card("Issue từng lọt Top 5", str(len(histories)), "tính từ khi bắt đầu ghi lịch sử"),
+        _kpi_card("Số ngày có lịch sử", str(len({r["day"] for r in history_rows})),
+                  f"từ {_fmt_day(first_day)}" if first_day else "chưa có"),
+        _kpi_card("Lần đổi trạng thái", str(len(events)), "ghi trong signal_events"),
+        _kpi_card("Nguồn theo dõi", str(len(_SOURCE_ORDER)), "nguồn báo"),
+    ])
+    blocks = [
+        _hist_comparison_block(comparisons),
+        _hist_issue_search_block(histories),
+        _hist_timeline_block(signal_timelines(events, titles)),
+    ]
+    for days, sov in ((30, sov30), (90, sov90)):
+        blocks.append(_hist_memory_block(
+            days, period_issue_histories(history_rows, today, days),
+            fastest_growing_topics(daily_stats, today, days), sov, top_sources(daily_stats, today, days)))
+    body = (_page_head("Lịch sử", "Dòng tin đã diễn biến thế nào: so sánh theo kỳ, lịch sử issue và signal, Media Memory 30/90 ngày.")
+            + cards
+            + '<section id="history" class="section"><p class="section-note">Dữ liệu thô: '
+              '<a href="history.json">history.json</a> · <a href="signals.json">signals.json</a> · '
+              '<a href="issues_history.csv">issues_history.csv</a> · <a href="stats.json">stats.json</a> · '
+              '<a href="brands.json">brands.json</a></p>'
+            + f'<div class="an-grid">{"".join(blocks)}</div></section>')
+    return render_shell(
+        active="history", title="Lịch sử — Vietnam News Monitor", crumb="Lịch sử", body=body,
+        now_label=now.strftime("%H:%M"), has_data=True, has_issues=has_issues,
+        scripts=f"<script>{_HISTORY_SCRIPT}</script>",
+        footer=f"Tự động cập nhật mỗi {config.crawl_interval_minutes} phút qua GitHub Actions.",
+    )
+
+
 def render_radar_page(
     accelerating: List[Issue],
     diff_by_id: Dict[str, Optional[Dict[str, int]]],
     has_issues: bool,
     now: datetime,
+    majors: Optional[List[str]] = None,
 ) -> str:
     """The Radar tab (radar.html, roadmap V3 §21 "News Radar"): today's
     Top Issues that are currently ACCELERATING (roadmap V2 §15
@@ -1108,7 +1302,8 @@ def render_radar_page(
     """
     if accelerating:
         cards = "".join(
-            _issue_card_html(rank, issue, ACCELERATING, diff=diff_by_id.get(issue.issue_id, _DIFF_NOT_PROVIDED))
+            _issue_card_html(rank, issue, ACCELERATING, diff=diff_by_id.get(issue.issue_id, _DIFF_NOT_PROVIDED),
+                             majors=majors)
             for rank, issue in enumerate(accelerating, start=1)
         )
         panel = (
@@ -1157,6 +1352,7 @@ def build_site(db: Database, out_dir: Path = SITE_DIR) -> None:
     # its own state 1h ago (see web.issues.issue_diff's docstring for
     # why this needs no new snapshot table).
     diff_by_id = {i.issue_id: issue_diff(i, articles, now, source_weights=source_weights) for i in trending}
+    majors = major_sources(articles, now)
     prev_day = (now - timedelta(days=1)).date()
     prev_total = sum(
         1 for a in articles
@@ -1183,6 +1379,7 @@ def build_site(db: Database, out_dir: Path = SITE_DIR) -> None:
                 prev_total=(prev_total if is_latest else None),
                 lifecycle_by_id=(lifecycle_by_id if is_latest else None),
                 diff_by_id=(diff_by_id if is_latest else None),
+                majors=(majors if is_latest else None),
             ),
             encoding="utf-8",
         )
@@ -1191,7 +1388,7 @@ def build_site(db: Database, out_dir: Path = SITE_DIR) -> None:
     (out_dir / "index.html").write_text(
         render_day_page(latest, latest_sources, all_dates, trending=trending, has_analytics=has_data,
                         brand_tags=brand_tags, prev_total=prev_total,
-                        lifecycle_by_id=lifecycle_by_id, diff_by_id=diff_by_id), encoding="utf-8"
+                        lifecycle_by_id=lifecycle_by_id, diff_by_id=diff_by_id, majors=majors), encoding="utf-8"
     )
 
     # Tells GitHub Pages not to run this through Jekyll (irrelevant here
@@ -1218,11 +1415,24 @@ def build_site(db: Database, out_dir: Path = SITE_DIR) -> None:
         (out_dir / "issues.json").write_text(issues_json(trending, now), encoding="utf-8")
         accelerating = [i for i in trending if lifecycle_by_id.get(i.issue_id) == ACCELERATING]
         (out_dir / "radar.html").write_text(
-            render_radar_page(accelerating, diff_by_id, bool(trending), now), encoding="utf-8"
+            render_radar_page(accelerating, diff_by_id, bool(trending), now, majors), encoding="utf-8"
         )
-        (out_dir / "stats.json").write_text(
-            stats_json(daily_stats, db.get_issue_history(), now), encoding="utf-8"
+        history_rows = db.get_issue_history()
+        events = db.get_signal_events()
+        (out_dir / "stats.json").write_text(stats_json(daily_stats, history_rows, now), encoding="utf-8")
+
+        # Roadmap V5 (web/history.py): history page + its raw-data exports.
+        comparisons = compare_periods(articles, history_rows, events, now, tagged)
+        stats90 = share_of_voice(tagged, index, watch, now, 90)
+        (out_dir / "history.html").write_text(
+            render_history_page(history_rows, events, daily_stats, comparisons, stats30, stats90, now,
+                                has_issues=bool(trending)),
+            encoding="utf-8",
         )
+        histories = issue_histories(history_rows)
+        (out_dir / "history.json").write_text(history_json(histories, comparisons, now), encoding="utf-8")
+        (out_dir / "signals.json").write_text(signals_json(events, now), encoding="utf-8")
+        (out_dir / "issues_history.csv").write_text(issues_history_csv(histories), encoding="utf-8", newline="")
         (out_dir / "feed.xml").write_text(feed_xml(articles, config.site_url, now), encoding="utf-8")
 
 
