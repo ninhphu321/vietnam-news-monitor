@@ -1102,7 +1102,8 @@ def render_day_page(
     )
 
 
-def render_brands_page(stats7, stats30, alerts, watch, index, now: datetime, window_minutes: int) -> str:
+def render_brands_page(stats7, stats30, alerts, watch, index, now: datetime, window_minutes: int,
+                       has_issues: bool = False) -> str:
     tracked = [s for s in stats7 if s.mentions]
     mentions = sum(s.mentions for s in stats7)
     negative = sum(s.negative for s in stats7)
@@ -1116,12 +1117,13 @@ def render_brands_page(stats7, stats30, alerts, watch, index, now: datetime, win
             + _brands_body(stats7, stats30, alerts, watch, index, window_minutes))
     return render_shell(
         active="brands", title="Brands — Vietnam News Monitor", crumb="Brands", body=body,
-        now_label=now.strftime("%H:%M"), has_data=True, has_issues=False,
+        now_label=now.strftime("%H:%M"), has_data=True, has_issues=has_issues,
         footer="Sắc thái tin là ước lượng bằng từ khoá từ tiêu đề — cần người xác nhận trước khi hành động.",
     )
 
 
-def render_analytics_page(an: Analytics, streaks: List[IssueStreak], trend, now: datetime) -> str:
+def render_analytics_page(an: Analytics, streaks: List[IssueStreak], trend, now: datetime,
+                          has_issues: bool = False) -> str:
     """The separate ANALYTICS tab (analytics.html) — kept off the home
     page on purpose so the home page stays a fast news reader."""
     reposts_total = sum(r["reposts"] for r in an.repost_stats)
@@ -1135,7 +1137,7 @@ def render_analytics_page(an: Analytics, streaks: List[IssueStreak], trend, now:
             + cards + _analytics_body(an, streaks, trend))
     return render_shell(
         active="analytics", title="Analytics — Vietnam News Monitor", crumb="Analytics", body=body,
-        now_label=now.strftime("%H:%M"), has_data=True, has_issues=False,
+        now_label=now.strftime("%H:%M"), has_data=True, has_issues=has_issues,
         footer=f"Tự động cập nhật mỗi {config.crawl_interval_minutes} phút qua GitHub Actions.",
     )
 
@@ -1479,13 +1481,14 @@ def build_site(db: Database, out_dir: Path = SITE_DIR) -> None:
         daily_stats = db.get_daily_stats()
         trend = trend_from_stats(daily_stats, now.date()) if daily_stats else None
         (out_dir / "analytics.html").write_text(
-            render_analytics_page(analytics, streaks, trend, now), encoding="utf-8"
+            render_analytics_page(analytics, streaks, trend, now, has_issues=bool(trending)), encoding="utf-8"
         )
         stats7 = share_of_voice(tagged, index, watch, now, 7)
         stats30 = share_of_voice(tagged, index, watch, now, 30)
         alerts = crisis_alerts(tagged, now, watch, index, config.crisis_window_minutes, config.crisis_min_sources)
         (out_dir / "brands.html").write_text(
-            render_brands_page(stats7, stats30, alerts, watch, index, now, config.crisis_window_minutes),
+            render_brands_page(stats7, stats30, alerts, watch, index, now, config.crisis_window_minutes,
+                               has_issues=bool(trending)),
             encoding="utf-8",
         )
         (out_dir / "brands.json").write_text(brands_json(stats7, stats30, alerts, watch, now), encoding="utf-8")

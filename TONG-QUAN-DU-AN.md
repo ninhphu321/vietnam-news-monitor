@@ -464,6 +464,8 @@ Cấu hình qua `.env` (copy từ `.env.example`) — bắt buộc `TELEGRAM_BOT
 
 **Luồng gửi Telegram** (`scheduler.send_personal_watchlist_alert`, gọi ngay sau `send_signal_alerts` trong `run_cycle`): nếu không cấu hình file (`PERSONAL_WATCHLIST_PATH`) thì bỏ qua hoàn toàn, không tốn gì ngoài 1 lần kiểm tra file tồn tại. Nếu có khớp, gửi đúng 1 tin "📡 MY RADAR" liệt kê từng thực thể + số bài/nguồn mới — **không gửi nguyên title** (đúng yêu cầu roadmap "Không gửi toàn bộ title", vì title đã có trong digest chính rồi). Bước phụ best-effort: lỗi chỉ ghi log, không ảnh hưởng digest chính.
 
+**Giới hạn phát hiện khi rà soát lại (2026-10-03): tính năng không chạy trên GitHub Actions.** Production của dự án chạy qua Actions, mà `personal_watchlist.json` bị gitignore nên không có trong bản checkout, và workflow chỉ truyền 2 secret Telegram — `load_personal_watchlist` luôn trả `None` ở đó. Hiện chỉ chạy khi tự chạy app trên máy/VPS. Cách sửa nếu cần: lưu nội dung JSON vào 1 GitHub Secret (vd `PERSONAL_WATCHLIST_JSON`), cho `Config` đọc thẳng biến môi trường đó, và thêm 1 dòng `env:` vào bước "Run one crawl cycle" — vẫn riêng tư vì Secret không lộ ra repo public. Chưa làm vì phải sửa workflow CI và bạn tự thêm Secret.
+
 **Đã xác minh trên dữ liệu production thật:** nạp [personal_watchlist.example.json](personal_watchlist.example.json) (đúng ví dụ mẫu của roadmap) và so khớp với tiêu đề thật trong 1 ngày — ra đúng kết quả hợp lý (vd "Lãi suất" khớp 13 bài/6 nguồn), tin Telegram hiện đúng định dạng.
 
 ---

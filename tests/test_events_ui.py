@@ -102,3 +102,30 @@ def test_events_json_handles_missing_times():
     events = build_events([issue], REGISTRY)
     e = json.loads(events_json(events, [], NOW))["events"][0]
     assert e["evidence"]["first_report_at"] is None
+
+
+# --- nav consistency (regression: Analytics/Brands used to hardcode has_issues=False) ----------
+def test_analytics_and_brands_pages_keep_the_issues_radar_and_briefing_nav_when_issues_exist():
+    from web.analytics import compute_analytics
+    from web.brands import load_watchlist
+    from web.generate_site import render_analytics_page, render_brands_page
+
+    index, watch = load_watchlist(None)
+    for html in (
+        render_analytics_page(compute_analytics([], NOW), [], None, NOW, has_issues=True),
+        render_brands_page([], [], [], watch, index, NOW, 60, has_issues=True),
+    ):
+        assert 'href="radar.html"' in html and 'href="briefing.html"' in html
+
+
+def test_analytics_and_brands_pages_hide_those_nav_items_when_there_are_no_issues():
+    from web.analytics import compute_analytics
+    from web.brands import load_watchlist
+    from web.generate_site import render_analytics_page, render_brands_page
+
+    index, watch = load_watchlist(None)
+    for html in (
+        render_analytics_page(compute_analytics([], NOW), [], None, NOW),
+        render_brands_page([], [], [], watch, index, NOW, 60),
+    ):
+        assert 'href="radar.html"' not in html

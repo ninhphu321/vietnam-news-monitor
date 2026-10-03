@@ -190,6 +190,8 @@ rồi sửa danh sách `entities` theo ý bạn, ví dụ:
 
 **File này đã có sẵn trong `.gitignore` — không bao giờ bị commit lên GitHub.** Đây là quyết định cố ý: repo của dự án là public, nên danh sách "tôi đang quan tâm công ty/mã nào" là thông tin cá nhân, không nên công khai cho cả internet xem (xem TONG-QUAN-DU-AN.md mục 17 để hiểu đầy đủ lý do). Vì vậy tính năng này **chỉ gửi qua Telegram**, không có trang web nào hiển thị lại danh sách hay dữ liệu liên quan — không cấu hình file này thì tính năng tự động tắt, không ảnh hưởng gì tới phần còn lại của hệ thống.
 
+> **Giới hạn quan trọng:** file này bị gitignore nên **không có trên GitHub Actions** — tính năng chỉ chạy khi bạn tự chạy app trên máy/VPS (`python main.py`), còn bản deploy qua Actions thì tự động bỏ qua nó. Muốn chạy trên Actions cần đưa nội dung file vào 1 GitHub Secret và sửa workflow (chưa làm — xem TONG-QUAN-DU-AN.md mục 17).
+
 Mỗi chu kỳ có bài mới khớp với 1 mục trong `entities`, bạn sẽ nhận thêm 1 tin nhắn "📡 MY RADAR" riêng (tách biệt với digest chính) liệt kê tên + số bài/nguồn mới — không gửi lại nguyên title (đã có trong digest chính rồi).
 
 ## Chỉ tin kinh tế (bộ lọc tiêu đề)
