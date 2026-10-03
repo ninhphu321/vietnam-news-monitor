@@ -12,10 +12,11 @@ Quét đồng thời 23 chuyên mục kinh tế/tài chính, mỗi nguồn có c
 | Cách lấy dữ liệu | Số nguồn | Ví dụ |
 |---|---|---|
 | RSS feed chuẩn | 18 | VnExpress, CafeF, Tuổi Trẻ, Vietstock, VietnamNet, Người Quan Sát... |
-| Scrape HTML (không có RSS) | 4 | CafeBiz, Đầu tư Chứng khoán, Diễn đàn Doanh nghiệp, Báo Đầu tư |
-| JSON API ẩn sau ứng dụng web (SPA) | 1 | FiLi |
+| Scrape HTML (không có RSS) | 5 | CafeBiz, Đầu tư Chứng khoán, Diễn đàn Doanh nghiệp, Báo Đầu tư, FiLi |
 
 Mỗi nguồn được audit thực tế trên dữ liệu sống (không đoán cấu trúc), tự phát hiện khi selector/feed thay đổi và báo lỗi thay vì âm thầm im lặng.
+
+**Chỉ tin kinh tế:** bộ lọc theo tiêu đề tự loại tin ngoài lề (thời tiết, xổ số, hình sự, kỷ luật Đảng...) ngay lúc quét, theo nguyên tắc thận trọng — nghi ngờ thì giữ, để không giấu nhầm tin kinh tế thật.
 
 ### ⏱️ Quét tự động mỗi 20 phút, cả ngày lẫn đêm
 - **GitHub Actions** chạy `workflow_dispatch` được kích hoạt bởi **cron-job.org** đúng lịch mỗi 20 phút (đáng tin cậy hơn lịch `schedule` gốc của GitHub, vốn có thể trễ hàng giờ với tần suất quét dày).
@@ -79,7 +80,7 @@ GitHub Pages (trang web) + nhánh db-state (lưu database)
 
 ## Chất lượng & kiểm thử
 
-326 test tự động (`pytest`), chạy offline bằng dữ liệu fixture lấy từ audit thực tế — bao phủ toàn bộ crawler, logic chống trùng, format Telegram, sinh trang web, và thuật toán phát hiện issue.
+363 test tự động (`pytest`), chạy offline bằng dữ liệu fixture lấy từ audit thực tế — bao phủ toàn bộ crawler, logic chống trùng, format Telegram, sinh trang web, và thuật toán phát hiện issue.
 
 ---
 

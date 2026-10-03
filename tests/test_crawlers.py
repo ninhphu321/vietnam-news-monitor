@@ -239,3 +239,43 @@ def test_crawler_error_does_not_leak_as_empty_success():
         assert items == []
     except CrawlerError:
         pass
+
+
+# --- multi-feed sources (Người Quan Sát merges 5 economy category feeds) -----------------
+
+
+@responses.activate
+def test_multi_feed_source_merges_feeds_and_dedupes_urls():
+    crawler = NguoiQuanSatCrawler(timeout=5, max_retries=1)
+    body = load_fixture("nguoiquansat.rss")
+    for url in (crawler.feed_url, *crawler.extra_feed_urls):
+        responses.add(responses.GET, url, body=body, status=200, content_type="application/rss+xml")
+
+    items = crawler.crawl()
+
+    # Every feed serves the same 2 articles here -> merged once, not 5x.
+    assert len(items) == 2
+    assert len(responses.calls) == 1 + len(crawler.extra_feed_urls)
+
+
+@responses.activate
+def test_multi_feed_source_survives_one_dead_category():
+    crawler = NguoiQuanSatCrawler(timeout=5, max_retries=1)
+    responses.add(responses.GET, crawler.feed_url, status=500)
+    for url in crawler.extra_feed_urls:
+        responses.add(responses.GET, url, body=load_fixture("nguoiquansat.rss"), status=200)
+    assert len(crawler.crawl()) == 2
+
+
+@responses.activate
+def test_multi_feed_source_fails_when_every_feed_is_down():
+    crawler = NguoiQuanSatCrawler(timeout=5, max_retries=1)
+    for url in (crawler.feed_url, *crawler.extra_feed_urls):
+        responses.add(responses.GET, url, status=500)
+    with pytest.raises(CrawlerError):
+        crawler.crawl()
+
+
+def test_nguoiquansat_no_longer_uses_the_catch_all_homepage_feed():
+    crawler = NguoiQuanSatCrawler(timeout=5, max_retries=1)
+    assert all("trang-chu" not in u for u in (crawler.feed_url, *crawler.extra_feed_urls))

@@ -21,6 +21,7 @@ from apscheduler.triggers.cron import CronTrigger
 
 from backup import backup_database
 from config import Config
+from core.relevance import drop_reason
 from crawlers import CRAWLER_CLASSES
 from crawlers.base import CrawlerError
 from database import Database
@@ -63,6 +64,22 @@ def _build_crawlers(cfg: Config):
     ]
 
 
+def _drop_non_economic(items: List[NewsItem]) -> Tuple[List[NewsItem], List[Tuple[str, str]]]:
+    """Economy-only feed (user request 2026-10): split a crawler's items
+    into (kept, [(title, matched social term)]) — see core/relevance.py for
+    the rule and why it is conservative. Dropped items never reach the DB
+    or Telegram; the names are logged each cycle so a bad drop is visible
+    in the Actions log, and the term lists are one file to tune."""
+    kept, dropped = [], []
+    for item in items:
+        reason = drop_reason(item.title)
+        if reason:
+            dropped.append((item.title, reason))
+        else:
+            kept.append(item)
+    return kept, dropped
+
+
 def crawl_all(cfg: Config) -> Tuple[Dict[str, List[NewsItem]], CrawlStatus]:
     """Run every crawler, isolating failures per source.
 
@@ -78,9 +95,15 @@ def crawl_all(cfg: Config) -> Tuple[Dict[str, List[NewsItem]], CrawlStatus]:
         name = crawler.source_name
         try:
             items = crawler.crawl()
+            items, dropped = _drop_non_economic(items)
             items_by_source[name] = items
             status[name] = (True, None)
             logger.info("%s: %d articles found", name, len(items))
+            if dropped:
+                logger.info(
+                    "%s: skipped %d non-economic article(s): %s", name, len(dropped),
+                    "; ".join(f"[{reason}] {title[:70]}" for title, reason in dropped[:3]),
+                )
         except CrawlerError as exc:
             items_by_source[name] = []
             status[name] = (False, str(exc))

@@ -81,13 +81,13 @@ Nhánh `main` (code) và nhánh `db-state` (chỉ chứa 1 file `data/news.db`, 
 | 16 | Đầu tư Chứng khoán | HTML scrape | Trang danh sách thiếu giờ cho 1 số bài → fallback fetch trang chi tiết từng bài để lấy giờ thật |
 | 17 | Diễn đàn Doanh nghiệp | HTML scrape | Cùng cơ chế fallback fetch trang chi tiết như trên |
 | 18 | Báo Đầu tư | HTML scrape | Không có `published_at` cho bất kỳ bài nào (giới hạn của chính trang nguồn) — cùng cơ chế fallback, và khi fallback cũng thất bại thì dùng `first_seen_at` để không mất bài |
-| 19 | FiLi | **JSON API** (reverse-engineered) | Trang chuyên mục là SPA AngularJS — endpoint thật là `POST /_Partials/ListPageArticle`; tham số `channelid` phải là chuỗi nhiều ID (chuyên mục cha + toàn bộ chuyên mục con) chứ không phải 1 ID đơn — phát hiện bằng cách soi network request thật của trang |
+| 19 | FiLi | **HTML scrape** | Trước 2026-10-03 là JSON API (SPA AngularJS); trang đã đổi sang HTML render sẵn và API cũ trả 405 nên viết lại. Giờ đăng dạng "4 giờ trước" hoặc "dd/mm/yyyy HH:MM" — chi tiết mục 19 |
 | 20 | VietnamNet | RSS | Feed ~1000 bài (tới đầu tháng 8), an toàn nhờ dedup + baseline riêng cho nguồn mới |
-| 21 | Người Quan Sát | RSS | Chuyên tài chính/chứng khoán/BĐS |
+| 21 | Người Quan Sát | RSS (5 feed gộp) | Gộp 5 feed chuyên mục kinh tế (tài chính-ngân hàng, vĩ mô, doanh nghiệp, chứng khoán, BĐS) thay vì feed trang chủ lẫn chính trị/hình sự — mục 19 |
 | 22 | SGGP | RSS | Dùng `kinh-te-89.rss` (`kinhte-3.rss` thực chất là mục Đô thị) |
 | 23 | VnExpress Intl | RSS | Tiêu đề tiếng Anh, không vào được issue (engine từ khoá tiếng Việt) |
 
-**Tổng: 18 RSS + 4 HTML scrape + 1 JSON API = 23 nguồn.** (4 nguồn RSS mới thêm 2026-09-24: VietnamNet, Người Quan Sát, SGGP, VnExpress Intl.)
+**Tổng: 18 RSS + 5 HTML scrape = 23 nguồn.** (4 nguồn RSS mới thêm 2026-09-24: VietnamNet, Người Quan Sát, SGGP, VnExpress Intl. FiLi chuyển từ JSON API sang HTML scrape 2026-10-03.)
 
 Tất cả crawler kế thừa `crawlers/base.py` (`RSSCrawlerBase` hoặc `BaseCrawler`), implement 1 phương thức `fetch()` trả về `List[NewsItem]`. Thêm nguồn mới = viết 1 file `crawlers/<site>.py` + thêm vào `crawlers/__init__.py`, không cần sửa gì khác.
 
@@ -323,11 +323,11 @@ Dành cho phòng truyền thông/PR ngành ngân hàng - tài chính. Toàn bộ
 
 ## 13. Testing
 
-**326 test** (`pytest`), chạy hoàn toàn offline bằng fixture lấy từ dữ liệu thực tế lúc audit — không cần mạng, mock qua thư viện `responses`.
+**363 test** (`pytest`), chạy hoàn toàn offline bằng fixture lấy từ dữ liệu thực tế lúc audit — không cần mạng, mock qua thư viện `responses`.
 
 | File | Phạm vi |
 |------|---------|
-| `test_crawlers.py`, `test_html_crawlers.py`, `test_fili_crawler.py` | Parse RSS cho 18 nguồn, HTML scrape cho 4 nguồn, JSON API cho FiLi — bao gồm mọi lỗi thật đã phát hiện qua audit (ngày phi chuẩn, encoding sai, thiếu giờ, cấu trúc trang đổi) |
+| `test_crawlers.py`, `test_html_crawlers.py`, `test_fili_crawler.py` | Parse RSS cho 18 nguồn, HTML scrape cho 5 nguồn (gồm FiLi: giờ tương đối/tuyệt đối), nguồn gộp nhiều feed (dedupe, sống sót khi 1 feed chết, chỉ lỗi khi tất cả chết) — bao gồm mọi lỗi thật đã phát hiện qua audit (ngày phi chuẩn, encoding sai, thiếu giờ, cấu trúc trang đổi) |
 | `test_database.py` | Dedup theo URL, baseline seeding lần đầu + baseline riêng cho nguồn mới thêm vào DB đã có dữ liệu |
 | `test_telegram.py` | Định dạng tin nhắn, tách tin nóng, chia nhỏ khi vượt 4096 ký tự, retry khi lỗi, mục TOP TÍN HIỆU đứng trước TIN NÓNG/theo nguồn (roadmap V2 §19) kể cả khi phải chia nhỏ tin nhắn, `format_signal_alert()` hiện đúng tiêu đề/số liệu/tốc độ 1h (roadmap V3 §26) |
 | `test_scheduler.py` | Toàn bộ luồng `run_cycle` (dry-run/thành công/lỗi 1 phần/tất cả lỗi), cô lập lỗi từng nguồn, phát hiện + cooldown cảnh báo nguồn chết, lịch quét cố định đúng chu kỳ, `snapshot_data()` trả về `SnapshotResult` được chuyển thẳng vào tham số `top_signals`/`send_signal_alerts()` của Telegram (và vẫn gửi digest bình thường, không gửi alert nào, khi `snapshot_data()` thất bại trả `None`) |
@@ -342,6 +342,7 @@ Dành cho phòng truyền thông/PR ngành ngân hàng - tài chính. Toàn bộ
 | `test_datainfra.py` | Bảng `daily_stats`/`issue_history`, `snapshot_data` (kể cả không được raise lỗi — trả `None` khi thất bại thay vì raise, và trả đúng danh sách issue đã xếp hạng kèm trạng thái vòng đời khi thành công, để `run_cycle` chuyển thẳng cho Telegram; vòng đời Signal: lần đầu → emerging, đổi trạng thái → ghi `signal_event`, lặp lại không đổi → không ghi thêm), các hàm xuất `issues.json`/`stats.json`/`feed.xml`, lưu trữ theo tháng (xuất không xoá theo mặc định, xoá + giữ nguyên file khi chạy lại) |
 | `test_source_registry.py` | `source_registry.json`: file thiếu/hỏng/thiếu nguồn đều rơi về mặc định tier A/weight 1.0, không crash |
 | `test_signals.py` | Phân loại vòng đời Signal theo roadmap V2 §15 — lần đầu luôn là emerging, ngưỡng ±15% cho accelerating/cooling, trường hợp biên velocity=0; `should_alert()` (roadmap V3 §26) — cần cả 2 ngưỡng cùng lúc, ngưỡng bao gồm cả biên, cấu hình được |
+| `test_relevance.py` | Bộ lọc kinh tế (mục 19) — dùng chính tiêu đề thật từ đợt audit: tin xã hội bị loại kèm đúng từ khớp, tin kinh tế từng bị loại nhầm được giữ (tỷ phú "bắt đáy" HPG, thanh toán QR, Gelex bị khởi tố, "Vì sao Việt Nam"...), từ kinh tế thắng từ xã hội, tiêu đề tiếng Anh không bị loại, khớp không phân biệt hoa-thường/Unicode, `crawl_all` bỏ tin xã hội và ghi log, `get_all_articles` ẩn bài cũ nhưng không xoá dòng |
 | `test_history.py` | Historical Intelligence (roadmap V5, mục 18) — gộp lịch sử issue (ngày đỉnh khi hoà, hàng cũ thiếu velocity), tìm kiếm (không phân biệt hoa/thường, Unicode tổ hợp/dựng sẵn), dòng thời gian signal, chủ đề tăng nhanh (gộp hạng theo mức tăng tuyệt đối, bỏ chủ đề co lại/quá nhỏ), cửa sổ so sánh ngày/tuần/tháng (không tràn sang kỳ hiện tại), cờ kỳ trước chưa đủ dữ liệu, media gap, `history.json`/`signals.json`/CSV |
 | `test_personal_watchlist.py` | Watchlist cá nhân (roadmap V4 §29-34, mục 17) — file thiếu/hỏng/rỗng đều tắt tính năng, khớp đúng tiêu đề + alias tuỳ chỉnh, mã ngắn khớp phân biệt hoa/thường, đếm đúng số bài/nguồn mới, rỗng khi không khớp gì |
 
@@ -366,6 +367,7 @@ news-monitor/
 ├── personal_watchlist.example.json   # mẫu cho personal_watchlist.json (gitignored — mục 17)
 ├── source_registry.json              # phân hạng + trọng số nguồn cho SignalScore (mục 9)
 ├── core/
+│   ├── relevance.py                   # bộ lọc chỉ tin kinh tế (mục 19)
 │   └── normalization.py               # chuẩn hoá NFC tiêu đề cho việc so khớp (roadmap V1 §6)
 ├── crawlers/                            # 23 crawler, 1 file/nguồn + base.py
 ├── web/
@@ -382,7 +384,7 @@ news-monitor/
 │   ├── brandwatch.py                            # share of voice + cảnh báo khủng hoảng (mục 11)
 │   ├── exports.py                                # issues.json/stats.json/feed.xml/brands.json (mục 12)
 │   └── cloudflare-worker/worker.js                # proxy bảo mật cho nút "Quét ngay"
-├── tests/                                           # 326 test, xem mục 13
+├── tests/                                           # 363 test, xem mục 13
 ├── data/news.db                                      # SQLite (local dev; trên CI lấy từ nhánh db-state)
 ├── data/archive/                                  # file lưu trữ theo tháng (--archive-old)
 ├── backup/                                         # snapshot DB có timestamp
@@ -487,3 +489,32 @@ Nav mới "Lịch sử" (nhóm Phân tích, cạnh Analytics). Toàn bộ tính 
 **Giới hạn đã biết của lịch sử:** `issue_history` chỉ gồm issue từng lọt Top 5 (mỗi ngày 1 dòng/issue, giữ số liệu của chu kỳ cuối) — "Lịch sử issue" nghĩa là lịch sử các issue từng lọt Top 5, không phải mọi issue từng tồn tại. "Nguồn tối đa/ngày" thay cho "tổng nguồn" vì bảng chỉ lưu số đếm, không lưu danh sách nguồn nên không cộng dồn không trùng được. Không có trạng thái ARCHIVED (xem mục 9). Roadmap §40 cấm gọi "sự kiện quan trọng nhất" khi chưa có định nghĩa — trang không xếp hạng độ quan trọng.
 
 **Lưu trữ lâu dài (§47 "không mất dữ liệu cũ"):** `issue_history`, `signal_events`, `daily_stats` không bao giờ bị xoá tự động; bài thô chỉ rời DB khi chạy `main.py --archive-old --delete-archived` (mục 12, mặc định chỉ xuất ra file `.jsonl.gz`, không xoá).
+
+---
+
+## 19. Chỉ tin kinh tế — bộ lọc và rà soát nguồn (2026-10-03)
+
+Yêu cầu: "chỉ những tin tức liên quan kinh tế, hạn chế tin xã hội". Làm theo đúng thứ tự: **audit dữ liệu thật trước, rồi mới viết bộ lọc.**
+
+**Kết quả audit (crawl thật cả 23 nguồn + 2.191 bài đã lưu):**
+- Mọi nguồn đều đã trỏ vào chuyên mục kinh tế, và phần lớn tin đúng là kinh tế. Tin ngoài lề thật chỉ chiếm **~0,5%**: thời tiết/mưa lũ, xổ số/Vietlott, kỷ luật Đảng, tìm người mất tích, tin phần mềm iOS.
+- **Bài học đắt giá:** thử bộ lọc kiểu "tiêu đề phải chứa từ khoá kinh tế" cho thấy sẽ loại nhầm ~1/3 tin kinh tế thật ("EVN thoát lỗ", "Quy hoạch điện 8", "Gelex bị khởi tố", "metro 26.000 tỷ"...) vì từ vựng kinh tế quá rộng. Nên thiết kế ngược lại.
+- Nhiều tin "xã hội" trông có vẻ vậy nhưng thật ra là tin kinh doanh: chuỗi phòng gym đóng cửa, iPhone 18 (sức mua, bán lẻ), thời trang nhanh bị áp phí, thanh toán QR của du khách. Các từ này **không** nằm trong danh sách loại.
+
+**Quy tắc ([core/relevance.py](core/relevance.py), thuần từ khoá trên tiêu đề, không AI):** loại tin ⇔ tiêu đề khớp **từ xã hội rõ ràng** (`SOCIAL_TERMS`) **VÀ không** khớp **bất kỳ từ kinh tế nào** (`ECON_TERMS`, cố ý rất rộng). Tiêu đề không khớp danh sách nào → **giữ** (nghi ngờ thì giữ: loại nhầm giấu mất tin kinh tế thật, giữ nhầm chỉ thừa 1 dòng). Từ khớp theo ranh giới từ trên văn bản NFC-thường (nên "sao việt" không khớp nhầm trong "Vì sao Việt Nam…" — lỗi thật bắt được khi chạy lại trên dữ liệu lịch sử).
+
+**Áp dụng ở 2 chỗ:**
+1. **Lúc crawl** (`scheduler.crawl_all`): tin bị loại không vào DB, không gửi Telegram. Mỗi chu kỳ ghi log tên + từ khớp (`skipped N non-economic article(s): [mưa lớn] ...`) nên loại nhầm sẽ thấy ngay trong log Actions.
+2. **Lúc đọc** (`Database.get_all_articles`): bài cũ đã lưu mà nay bị coi là ngoài lề biến mất khỏi site/issue/analytics/brands. Dòng trong bảng `news` **không bị sửa hay xoá** (dữ liệu thô giữ nguyên, đổi từ khoá thì bài hiện lại).
+
+**Rà soát nguồn — các lỗi thật tìm ra và đã sửa:**
+- **FiLi hỏng hoàn toàn**: API `POST /_Partials/ListPageArticle` đã trả 405, trang chuyển từ SPA sang HTML render sẵn (không có RSS). Viết lại thành crawler HTML (`article.search-card-item`); giờ đăng là "4 giờ trước" hoặc "02/10/2026 20:58", crawler đổi cả hai ra thời điểm thật. Mỗi trang chỉ liệt kê 10 bài (trước đây xin được 50) — đủ cho nhịp 20 phút của 1 chuyên mục, nhưng nếu 1 đợt >10 bài trong 20 phút thì phần dư bị sót.
+- **Người Quan Sát dùng feed trang chủ** (`/rss/trang-chu`): 23/40 bài không thuộc chuyên mục kinh tế nào (kỷ luật Đảng, hình sự, giáo dục, quân sự Nga, nhà sách...). Đổi sang gộp 5 feed chuyên mục kinh tế của chính họ (tài chính-ngân hàng, vĩ mô, doanh nghiệp, chứng khoán, bất động sản), dedup theo URL. `RSSCrawlerBase` hỗ trợ `extra_feed_urls`; 1 feed con chết không làm hỏng cả nguồn (chỉ lỗi khi **tất cả** feed chết).
+
+**Lưu ý khi triển khai:** Người Quan Sát tăng từ ~40 lên ~200 bài/lần quét. Vì nguồn này đã có trong DB nên cơ chế baseline (chỉ áp cho nguồn hoàn toàn mới) không chặn — chu kỳ đầu sau khi triển khai có thể gửi 1 lần ~100-160 bài cũ hơn của nguồn này lên Telegram (tự chia nhỏ tin nhắn). Chỉ xảy ra 1 lần.
+
+**Chưa làm / giới hạn:**
+- Bộ lọc **cố ý thận trọng** (~0,5% bài bị loại). Nếu thấy còn lọt tin xã hội, thêm từ vào `SOCIAL_TERMS`; nếu muốn chặt hơn nữa (vd bắt buộc có từ kinh tế với nguồn tổng hợp) thì đổi quy tắc — cần cân nhắc vì sẽ loại nhầm.
+- Chưa lọc **quảng cáo/PR** (vd tin ngân hàng tài trợ "hành trình tiếp sức đến trường", khai trương khách sạn, tặng quà khi gửi tiết kiệm) — đó là loại nhiễu khác, không phải tin xã hội, nên ngoài phạm vi yêu cầu này.
+- Tiêu đề tiếng Anh (VnExpress Intl) không bao giờ bị loại (từ khoá tiếng Việt không áp dụng).
+- Báo Đầu tư mỗi lần quét mất ~45 giây vì phải tải từng trang bài để lấy giờ đăng (không có giờ ở trang danh sách) — chậm nhưng chưa gây lỗi.
