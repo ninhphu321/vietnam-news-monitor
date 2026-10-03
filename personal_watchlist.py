@@ -41,8 +41,14 @@ class PersonalWatchlistMatch:
     new_source_count: int
 
 
-def load_personal_watchlist(path: Optional[Path]) -> Optional[BrandIndex]:
-    """Reads the local personal watchlist file. Returns None (feature
+def load_personal_watchlist(path: Optional[Path], raw_json: Optional[str] = None) -> Optional[BrandIndex]:
+    """Reads the personal watchlist from `raw_json` when given (the
+    PERSONAL_WATCHLIST_JSON environment variable — how it reaches GitHub
+    Actions, where the gitignored file does not exist, via a repository
+    Secret), otherwise from the local file at `path`. A non-empty
+    `raw_json` wins and is never silently replaced by the file: invalid
+    JSON there disables the feature rather than quietly using a stale
+    file. Returns None (feature
     disabled) when the file is missing, unreadable, or lists no
     entities — deliberately the opposite default from
     web.brands.load_watchlist(), whose empty watchlist means "track
@@ -50,11 +56,16 @@ def load_personal_watchlist(path: Optional[Path]) -> Optional[BrandIndex]:
     there is no built-in dictionary of "things you personally care
     about" to fall back to, so nothing is watched until the user
     explicitly lists something in their own private file."""
-    if not path or not Path(path).exists():
-        return None
     try:
-        data = json.loads(Path(path).read_text(encoding="utf-8"))
+        if raw_json and raw_json.strip():
+            data = json.loads(raw_json)
+        elif path and Path(path).exists():
+            data = json.loads(Path(path).read_text(encoding="utf-8"))
+        else:
+            return None
     except (OSError, ValueError):
+        return None
+    if not isinstance(data, dict):
         return None
 
     entities = [n for n in (data.get("entities") or []) if isinstance(n, str)]

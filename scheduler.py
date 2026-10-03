@@ -429,7 +429,7 @@ def send_personal_watchlist_alert(cfg: Config, now: datetime, newly_inserted: Li
     check. Best-effort like check_crisis()/send_signal_alerts(): a
     failure here must never affect the primary digest."""
     try:
-        index = load_personal_watchlist(cfg.personal_watchlist_path)
+        index = load_personal_watchlist(cfg.personal_watchlist_path, cfg.personal_watchlist_json)
         if index is None:
             return
         matches = match_new_articles(index, newly_inserted)
@@ -440,7 +440,10 @@ def send_personal_watchlist_alert(cfg: Config, now: datetime, newly_inserted: Li
             telegram.format_personal_watchlist_alert(matches, now),
             cfg.request_timeout, cfg.max_retries,
         )
-        logger.info("Personal watchlist alert sent: %s", [m.entity for m in matches])
+        # Counts only, never the entity names: on GitHub Actions in a public
+        # repo this log is world-readable, and the names are exactly the
+        # private information this feature exists to protect.
+        logger.info("Personal watchlist alert sent (%d watched item(s) matched).", len(matches))
     except telegram.TelegramError as exc:
         logger.error("Failed to send personal watchlist alert: %s", exc)
     except Exception:  # noqa: BLE001 - secondary feature, see docstring

@@ -323,7 +323,7 @@ Dành cho phòng truyền thông/PR ngành ngân hàng - tài chính. Toàn bộ
 
 ## 13. Testing
 
-**393 test** (`pytest`), chạy hoàn toàn offline bằng fixture lấy từ dữ liệu thực tế lúc audit — không cần mạng, mock qua thư viện `responses`.
+**400 test** (`pytest`), chạy hoàn toàn offline bằng fixture lấy từ dữ liệu thực tế lúc audit — không cần mạng, mock qua thư viện `responses`.
 
 | File | Phạm vi |
 |------|---------|
@@ -386,7 +386,7 @@ news-monitor/
 │   ├── brandwatch.py                            # share of voice + cảnh báo khủng hoảng (mục 11)
 │   ├── exports.py                                # issues.json/stats.json/feed.xml/brands.json (mục 12)
 │   └── cloudflare-worker/worker.js                # proxy bảo mật cho nút "Quét ngay"
-├── tests/                                           # 393 test, xem mục 13
+├── tests/                                           # 400 test, xem mục 13
 ├── data/news.db                                      # SQLite (local dev; trên CI lấy từ nhánh db-state)
 ├── data/archive/                                  # file lưu trữ theo tháng (--archive-old)
 ├── backup/                                         # snapshot DB có timestamp
@@ -464,7 +464,9 @@ Cấu hình qua `.env` (copy từ `.env.example`) — bắt buộc `TELEGRAM_BOT
 
 **Luồng gửi Telegram** (`scheduler.send_personal_watchlist_alert`, gọi ngay sau `send_signal_alerts` trong `run_cycle`): nếu không cấu hình file (`PERSONAL_WATCHLIST_PATH`) thì bỏ qua hoàn toàn, không tốn gì ngoài 1 lần kiểm tra file tồn tại. Nếu có khớp, gửi đúng 1 tin "📡 MY RADAR" liệt kê từng thực thể + số bài/nguồn mới — **không gửi nguyên title** (đúng yêu cầu roadmap "Không gửi toàn bộ title", vì title đã có trong digest chính rồi). Bước phụ best-effort: lỗi chỉ ghi log, không ảnh hưởng digest chính.
 
-**Giới hạn phát hiện khi rà soát lại (2026-10-03): tính năng không chạy trên GitHub Actions.** Production của dự án chạy qua Actions, mà `personal_watchlist.json` bị gitignore nên không có trong bản checkout, và workflow chỉ truyền 2 secret Telegram — `load_personal_watchlist` luôn trả `None` ở đó. Hiện chỉ chạy khi tự chạy app trên máy/VPS. Cách sửa nếu cần: lưu nội dung JSON vào 1 GitHub Secret (vd `PERSONAL_WATCHLIST_JSON`), cho `Config` đọc thẳng biến môi trường đó, và thêm 1 dòng `env:` vào bước "Run one crawl cycle" — vẫn riêng tư vì Secret không lộ ra repo public. Chưa làm vì phải sửa workflow CI và bạn tự thêm Secret.
+**Chạy trên GitHub Actions (đã sửa 2026-10-04).** Rà soát lại phát hiện: production của dự án chạy qua Actions, mà `personal_watchlist.json` bị gitignore nên không có trong checkout và workflow chỉ truyền 2 secret Telegram — tính năng luôn tắt ở đó. Cách làm: nội dung JSON nằm trong GitHub Secret `PERSONAL_WATCHLIST_JSON`, workflow truyền nó thành biến môi trường cùng tên, `Config.personal_watchlist_json` đọc nó, `load_personal_watchlist(path, raw_json)` ưu tiên biến môi trường hơn file (JSON sai → tắt, không âm thầm dùng file cũ; Secret chưa đặt đến job dưới dạng chuỗi rỗng nên rơi về file). Vẫn riêng tư vì Secret không lộ ra repo public.
+
+**Lỗi riêng tư bắt được khi làm việc này:** `send_personal_watchlist_alert` từng ghi **tên các thực thể khớp** vào log. Trên Actions ở repo public log đó ai cũng đọc được — đúng thông tin tính năng này sinh ra để giấu. Nay chỉ ghi số lượng mục khớp (có test chốt).
 
 **Đã xác minh trên dữ liệu production thật:** nạp [personal_watchlist.example.json](personal_watchlist.example.json) (đúng ví dụ mẫu của roadmap) và so khớp với tiêu đề thật trong 1 ngày — ra đúng kết quả hợp lý (vd "Lãi suất" khớp 13 bài/6 nguồn), tin Telegram hiện đúng định dạng.
 

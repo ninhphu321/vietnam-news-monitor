@@ -92,6 +92,10 @@ jobs:
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          # Optional. The personal watchlist is gitignored, so it only reaches
+          # this job through a repository Secret (README, "Watchlist cá nhân").
+          # Unset/empty = the feature is simply off.
+          PERSONAL_WATCHLIST_JSON: ${{ secrets.PERSONAL_WATCHLIST_JSON }}
         run: python main.py --run-once
 
       - name: Push updated database to db-state branch

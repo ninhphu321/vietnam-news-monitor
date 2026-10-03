@@ -118,6 +118,11 @@ class Config:
             os.getenv("PERSONAL_WATCHLIST_PATH", str(BASE_DIR / "personal_watchlist.json"))
         )
     )
+    # The same watchlist as raw JSON text, for GitHub Actions: the file is
+    # gitignored so it is absent from the checkout, but a repository Secret
+    # exposed as this env var keeps it private (Secrets never reach the
+    # public repo). When non-empty it takes precedence over the file.
+    personal_watchlist_json: str = field(default_factory=lambda: os.getenv("PERSONAL_WATCHLIST_JSON", ""))
 
     archive_dir: Path = field(default_factory=lambda: BASE_DIR / "data" / "archive")
     archive_keep_days: int = field(default_factory=lambda: _env_int("ARCHIVE_KEEP_DAYS", 90))

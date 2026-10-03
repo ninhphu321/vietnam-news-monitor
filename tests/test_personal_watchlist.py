@@ -87,3 +87,64 @@ def test_match_new_articles_empty_when_nothing_matches(tmp_path):
     path.write_text(json.dumps({"entities": ["Vietcombank"]}), encoding="utf-8")
     index = load_personal_watchlist(path)
     assert match_new_articles(index, [_item("VnExpress", "Tin không liên quan")]) == []
+
+
+# --- Secret path for GitHub Actions (PERSONAL_WATCHLIST_JSON) ----------------------
+def test_raw_json_is_used_when_there_is_no_file(tmp_path):
+    index = load_personal_watchlist(tmp_path / "missing.json", '{"entities": ["Vietcombank"]}')
+    assert index is not None and index.detect("Vietcombank tăng lãi suất") == ["Vietcombank"]
+
+
+def test_raw_json_takes_precedence_over_the_file(tmp_path):
+    path = tmp_path / "personal_watchlist.json"
+    path.write_text(json.dumps({"entities": ["FPT"]}), encoding="utf-8")
+    index = load_personal_watchlist(path, '{"entities": ["ACB"]}')
+    assert index.detect("ACB báo lãi") == ["ACB"]
+    assert index.detect("FPT báo lãi") == []
+
+
+def test_invalid_raw_json_disables_the_feature_instead_of_falling_back_to_the_file(tmp_path):
+    path = tmp_path / "personal_watchlist.json"
+    path.write_text(json.dumps({"entities": ["FPT"]}), encoding="utf-8")
+    assert load_personal_watchlist(path, "{not json") is None
+
+
+def test_blank_raw_json_falls_back_to_the_file(tmp_path):
+    # An unset GitHub Secret reaches the job as an empty string, not as "missing".
+    path = tmp_path / "personal_watchlist.json"
+    path.write_text(json.dumps({"entities": ["FPT"]}), encoding="utf-8")
+    assert load_personal_watchlist(path, "   ").detect("FPT báo lãi") == ["FPT"]
+    assert load_personal_watchlist(tmp_path / "missing.json", "") is None
+
+
+def test_raw_json_that_is_not_an_object_disables_the_feature():
+    assert load_personal_watchlist(None, '["Vietcombank"]') is None
+
+
+def test_config_reads_the_secret_from_the_environment(monkeypatch):
+    from config import Config
+    monkeypatch.setenv("PERSONAL_WATCHLIST_JSON", '{"entities": ["ACB"]}')
+    assert Config().personal_watchlist_json == '{"entities": ["ACB"]}'
+    monkeypatch.delenv("PERSONAL_WATCHLIST_JSON")
+    assert Config().personal_watchlist_json == ""
+
+
+def test_run_cycle_alert_works_from_the_secret_and_never_logs_the_watched_names(db, monkeypatch, caplog):
+    # On GitHub Actions in a public repo the job log is world-readable, so
+    # the private entity names must not appear in it.
+    import scheduler
+    import telegram
+    from config import Config
+
+    sent = []
+    monkeypatch.setattr(telegram, "send_message", lambda *a, **k: sent.append(a[2]))
+    cfg = Config(telegram_bot_token="t", telegram_chat_id="c", request_timeout=1, max_retries=1,
+                 personal_watchlist_path=None, personal_watchlist_json='{"entities": ["Vietcombank"]}')
+    items = [NewsItem("A", "Vietcombank tăng lãi suất", "https://x/1", datetime(2026, 9, 14, 10, 0, tzinfo=TZ))]
+
+    with caplog.at_level("DEBUG"):
+        scheduler.send_personal_watchlist_alert(cfg, datetime(2026, 9, 14, 12, 0, tzinfo=TZ), items)
+
+    assert any("Vietcombank" in text for text in sent)       # the Telegram message carries it...
+    assert "Vietcombank" not in caplog.text                  # ...the log does not
+    assert "1 watched item" in caplog.text
