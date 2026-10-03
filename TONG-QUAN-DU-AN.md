@@ -323,7 +323,7 @@ Dành cho phòng truyền thông/PR ngành ngân hàng - tài chính. Toàn bộ
 
 ## 13. Testing
 
-**391 test** (`pytest`), chạy hoàn toàn offline bằng fixture lấy từ dữ liệu thực tế lúc audit — không cần mạng, mock qua thư viện `responses`.
+**393 test** (`pytest`), chạy hoàn toàn offline bằng fixture lấy từ dữ liệu thực tế lúc audit — không cần mạng, mock qua thư viện `responses`.
 
 | File | Phạm vi |
 |------|---------|
@@ -386,7 +386,7 @@ news-monitor/
 │   ├── brandwatch.py                            # share of voice + cảnh báo khủng hoảng (mục 11)
 │   ├── exports.py                                # issues.json/stats.json/feed.xml/brands.json (mục 12)
 │   └── cloudflare-worker/worker.js                # proxy bảo mật cho nút "Quét ngay"
-├── tests/                                           # 391 test, xem mục 13
+├── tests/                                           # 393 test, xem mục 13
 ├── data/news.db                                      # SQLite (local dev; trên CI lấy từ nhánh db-state)
 ├── data/archive/                                  # file lưu trữ theo tháng (--archive-old)
 ├── backup/                                         # snapshot DB có timestamp
