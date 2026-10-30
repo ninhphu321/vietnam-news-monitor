@@ -26,6 +26,7 @@ from pathlib import Path
 from typing import Dict, Iterable, List, Optional, Set, Tuple
 from zoneinfo import ZoneInfo
 
+from core.relevance import is_economic
 from models import NewsItem
 from utils import normalize_url
 
@@ -187,6 +188,10 @@ class Database:
                 ORDER BY first_seen_at DESC
                 """
             ).fetchall()
+        # Economy-only view (core/relevance.py): rows stored before that
+        # filter existed — or before its term lists were tuned — stay in
+        # the table untouched (raw data is never rewritten) but are kept
+        # out of every derived view (site, issues, analytics, brands).
         return [
             {
                 "source": r["source"],
@@ -196,6 +201,7 @@ class Database:
                 "first_seen_at": datetime.fromisoformat(r["first_seen_at"]),
             }
             for r in rows
+            if is_economic(r["title"])
         ]
 
     def count_all(self) -> int:
