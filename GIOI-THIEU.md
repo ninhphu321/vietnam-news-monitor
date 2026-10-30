@@ -12,8 +12,7 @@ Quét đồng thời 23 chuyên mục kinh tế/tài chính, mỗi nguồn có c
 | Cách lấy dữ liệu | Số nguồn | Ví dụ |
 |---|---|---|
 | RSS feed chuẩn | 18 | VnExpress, CafeF, Tuổi Trẻ, Vietstock, VietnamNet, Người Quan Sát... |
-| Scrape HTML (không có RSS) | 4 | CafeBiz, Đầu tư Chứng khoán, Diễn đàn Doanh nghiệp, Báo Đầu tư |
-| JSON API ẩn sau ứng dụng web (SPA) | 1 | FiLi |
+| Scrape HTML (không có RSS) | 5 | CafeBiz, Đầu tư Chứng khoán, Diễn đàn Doanh nghiệp, Báo Đầu tư, FiLi |
 
 Mỗi nguồn được audit thực tế trên dữ liệu sống (không đoán cấu trúc), tự phát hiện khi selector/feed thay đổi và báo lỗi thay vì âm thầm im lặng.
 
@@ -73,7 +72,7 @@ GitHub Pages (trang web) + nhánh db-state (lưu database)
 
 ## Chất lượng & kiểm thử
 
-201 test tự động (`pytest`), chạy offline bằng dữ liệu fixture lấy từ audit thực tế — bao phủ toàn bộ crawler, logic chống trùng, format Telegram, sinh trang web, và thuật toán phát hiện issue.
+206 test tự động (`pytest`), chạy offline bằng dữ liệu fixture lấy từ audit thực tế — bao phủ toàn bộ crawler, logic chống trùng, format Telegram, sinh trang web, và thuật toán phát hiện issue.
 
 ---
 

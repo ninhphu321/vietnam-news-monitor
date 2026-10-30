@@ -81,13 +81,13 @@ Nhánh `main` (code) và nhánh `db-state` (chỉ chứa 1 file `data/news.db`, 
 | 16 | Đầu tư Chứng khoán | HTML scrape | Trang danh sách thiếu giờ cho 1 số bài → fallback fetch trang chi tiết từng bài để lấy giờ thật |
 | 17 | Diễn đàn Doanh nghiệp | HTML scrape | Cùng cơ chế fallback fetch trang chi tiết như trên |
 | 18 | Báo Đầu tư | HTML scrape | Không có `published_at` cho bất kỳ bài nào (giới hạn của chính trang nguồn) — cùng cơ chế fallback, và khi fallback cũng thất bại thì dùng `first_seen_at` để không mất bài |
-| 19 | FiLi | **JSON API** (reverse-engineered) | Trang chuyên mục là SPA AngularJS — endpoint thật là `POST /_Partials/ListPageArticle`; tham số `channelid` phải là chuỗi nhiều ID (chuyên mục cha + toàn bộ chuyên mục con) chứ không phải 1 ID đơn — phát hiện bằng cách soi network request thật của trang |
+| 19 | FiLi | **HTML scrape** | Trước 2026-10-03 là JSON API (SPA AngularJS); trang đã đổi sang HTML render sẵn và API cũ trả 405 (nguồn không ra bài nào từ 21/09) nên viết lại. Giờ đăng dạng "4 giờ trước" hoặc "dd/mm/yyyy HH:MM" |
 | 20 | VietnamNet | RSS | Feed ~1000 bài (tới đầu tháng 8), an toàn nhờ dedup + baseline riêng cho nguồn mới |
-| 21 | Người Quan Sát | RSS | Chuyên tài chính/chứng khoán/BĐS |
+| 21 | Người Quan Sát | RSS (5 feed gộp) | Gộp 5 feed chuyên mục kinh tế (tài chính-ngân hàng, vĩ mô, doanh nghiệp, chứng khoán, BĐS) thay vì feed trang chủ lẫn chính trị/hình sự (23/40 bài không thuộc chuyên mục kinh tế nào). `RSSCrawlerBase` hỗ trợ `extra_feed_urls`: 1 feed con chết không làm hỏng cả nguồn, chỉ lỗi khi tất cả chết |
 | 22 | SGGP | RSS | Dùng `kinh-te-89.rss` (`kinhte-3.rss` thực chất là mục Đô thị) |
 | 23 | VnExpress Intl | RSS | Tiêu đề tiếng Anh, không vào được issue (engine từ khoá tiếng Việt) |
 
-**Tổng: 18 RSS + 4 HTML scrape + 1 JSON API = 23 nguồn.** (4 nguồn RSS mới thêm 2026-09-24: VietnamNet, Người Quan Sát, SGGP, VnExpress Intl.)
+**Tổng: 18 RSS + 5 HTML scrape = 23 nguồn.** (4 nguồn RSS mới thêm 2026-09-24: VietnamNet, Người Quan Sát, SGGP, VnExpress Intl. FiLi chuyển từ JSON API sang HTML scrape 2026-10-03.)
 
 Tất cả crawler kế thừa `crawlers/base.py` (`RSSCrawlerBase` hoặc `BaseCrawler`), implement 1 phương thức `fetch()` trả về `List[NewsItem]`. Thêm nguồn mới = viết 1 file `crawlers/<site>.py` + thêm vào `crawlers/__init__.py`, không cần sửa gì khác.
 
@@ -257,11 +257,11 @@ Dành cho phòng truyền thông/PR ngành ngân hàng - tài chính. Toàn bộ
 
 ## 13. Testing
 
-**201 test** (`pytest`), chạy hoàn toàn offline bằng fixture lấy từ dữ liệu thực tế lúc audit — không cần mạng, mock qua thư viện `responses`.
+**206 test** (`pytest`), chạy hoàn toàn offline bằng fixture lấy từ dữ liệu thực tế lúc audit — không cần mạng, mock qua thư viện `responses`.
 
 | File | Phạm vi |
 |------|---------|
-| `test_crawlers.py`, `test_html_crawlers.py`, `test_fili_crawler.py` | Parse RSS cho 18 nguồn, HTML scrape cho 4 nguồn, JSON API cho FiLi — bao gồm mọi lỗi thật đã phát hiện qua audit (ngày phi chuẩn, encoding sai, thiếu giờ, cấu trúc trang đổi) |
+| `test_crawlers.py`, `test_html_crawlers.py`, `test_fili_crawler.py` | Parse RSS cho 18 nguồn, HTML scrape cho 5 nguồn (gồm FiLi: giờ tương đối/tuyệt đối), nguồn gộp nhiều feed (dedupe, sống sót khi 1 feed chết, chỉ lỗi khi tất cả chết) — bao gồm mọi lỗi thật đã phát hiện qua audit (ngày phi chuẩn, encoding sai, thiếu giờ, cấu trúc trang đổi) |
 | `test_database.py` | Dedup theo URL, baseline seeding lần đầu + baseline riêng cho nguồn mới thêm vào DB đã có dữ liệu |
 | `test_telegram.py` | Định dạng tin nhắn, tách tin nóng, chia nhỏ khi vượt 4096 ký tự, retry khi lỗi |
 | `test_scheduler.py` | Toàn bộ luồng `run_cycle` (dry-run/thành công/lỗi 1 phần/tất cả lỗi), cô lập lỗi từng nguồn, phát hiện + cooldown cảnh báo nguồn chết, lịch quét cố định đúng chu kỳ |
@@ -301,7 +301,7 @@ news-monitor/
 │   ├── brandwatch.py                        # share of voice + cảnh báo khủng hoảng (mục 11)
 │   ├── exports.py                            # issues.json/stats.json/feed.xml/brands.json (mục 12)
 │   └── cloudflare-worker/worker.js            # proxy bảo mật cho nút "Quét ngay"
-├── tests/                                       # 201 test, xem mục 13
+├── tests/                                       # 206 test, xem mục 13
 ├── data/news.db                                  # SQLite (local dev; trên CI lấy từ nhánh db-state)
 ├── data/archive/                                  # file lưu trữ theo tháng (--archive-old)
 ├── backup/                                         # snapshot DB có timestamp

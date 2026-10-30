@@ -22,7 +22,7 @@ import logging
 import time
 from abc import ABC, abstractmethod
 from datetime import datetime, timezone
-from typing import List, Optional
+from typing import List, Optional, Tuple
 from zoneinfo import ZoneInfo
 
 import feedparser
@@ -118,13 +118,37 @@ class RSSCrawlerBase(BaseCrawler):
     """Shared RSS-based crawl implementation.
 
     Subclasses set: source_name, source_url (the human category page,
-    used only for display/error messages), feed_url.
+    used only for display/error messages), feed_url, and optionally
+    extra_feed_urls — more feeds of the SAME outlet merged into one
+    source (e.g. several economy categories when the outlet has no
+    single economy feed and its catch-all feed mixes in politics/crime).
     """
 
     feed_url: str
+    extra_feed_urls: Tuple[str, ...] = ()
 
     def crawl(self) -> List[NewsItem]:
-        raw = self._fetch(self.feed_url)
+        urls = (self.feed_url, *self.extra_feed_urls)
+        items_by_url = {}
+        failures = []
+        for url in urls:
+            try:
+                for item in self._crawl_feed(url):
+                    items_by_url.setdefault(item.url, item)
+            except CrawlerError as exc:
+                if len(urls) == 1:
+                    raise
+                # One dead category must not blind the whole source (spec
+                # section 12 isolation applies inside a source too) — but
+                # it is logged, and an all-feeds-down source still fails.
+                failures.append(exc)
+                logger.warning("%s: feed %s failed, continuing with the others: %s", self.source_name, url, exc)
+        if len(failures) == len(urls):
+            raise failures[-1]
+        return list(items_by_url.values())
+
+    def _crawl_feed(self, url: str) -> List[NewsItem]:
+        raw = self._fetch(url)
         raw = self._preprocess_raw(raw)
         parsed = feedparser.parse(raw)
 
@@ -136,7 +160,7 @@ class RSSCrawlerBase(BaseCrawler):
         items: List[NewsItem] = []
         for entry in parsed.entries:
             title = normalize_title(getattr(entry, "title", "") or "")
-            link = normalize_url(getattr(entry, "link", "") or "", base_url=self.feed_url)
+            link = normalize_url(getattr(entry, "link", "") or "", base_url=url)
             if not title or not link:
                 # Skip malformed entries rather than failing the whole
                 # source over one bad item.

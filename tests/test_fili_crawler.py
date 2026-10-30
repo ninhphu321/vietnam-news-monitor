@@ -1,92 +1,89 @@
-"""Tests for the FiLi crawler (crawlers/fili.py) — a JSON API, not
-RSS or HTML scraping (see module docstring for the audit: the category
-page is an AngularJS SPA, so the real data comes from a POST endpoint
-found by inspecting the site's own network requests).
+"""Tests for the FiLi crawler (crawlers/fili.py) — HTML scraping.
+
+The site used to be an AngularJS SPA fed by a POST JSON endpoint; a live
+audit on 2026-10-03 found that endpoint dead (405) and the category page
+now server-rendered, so the crawler was rewritten (see its docstring).
+The fixture is real markup from that audit, trimmed to 3 articles: two
+with relative times ("N giờ trước") and one with an absolute time.
 """
 
-import json
+from datetime import datetime
+from zoneinfo import ZoneInfo
 
 import pytest
 import responses
+from freezegun import freeze_time
 
 from crawlers.base import CrawlerError
 from crawlers.fili import FiliCrawler
 from tests.conftest import load_fixture
 
+TZ = ZoneInfo("Asia/Ho_Chi_Minh")
+URL = "https://fili.vn/ngan-hang-bao-hiem.htm"
 
-def _fixture_json():
-    return json.loads(load_fixture("fili_articles.json"))
+
+def _page():
+    return load_fixture("fili_page.html")
 
 
 @responses.activate
-def test_fili_parses_items_and_dotnet_dates():
-    crawler = FiliCrawler(timeout=5, max_retries=1)
-    responses.add(
-        responses.POST, "https://fili.vn/_Partials/ListPageArticle",
-        json=_fixture_json(), status=200,
-    )
+@freeze_time("2026-10-03 12:00:00+00:00")
+def test_fili_parses_titles_urls_and_both_time_formats():
+    responses.add(responses.GET, URL, body=_page(), status=200)
+    items = FiliCrawler(timeout=5, max_retries=1).crawl()
 
-    items = crawler.crawl()
-
-    assert len(items) == 2
+    assert len(items) == 3
     for item in items:
         assert item.source == "FiLi"
-        assert item.url.startswith("https://fili.vn/")
-        assert item.published_at is not None
-        assert item.published_at.tzinfo is not None
+        assert item.url.startswith("https://fili.vn/2026/10/")
+        assert item.published_at is not None and item.published_at.tzinfo is not None
 
-    eximbank = next(i for i in items if i.title.startswith("Trước thềm"))
-    assert eximbank.published_at.hour == 18 and eximbank.published_at.minute == 31
-
-
-@responses.activate
-def test_fili_sends_the_correct_channel_ids_and_url():
-    """Regression guard: sending just the category's own ID (734)
-    instead of ",734,757,3113,758," (734 plus its sub-categories)
-    matches nothing server-side — verified against the live site by
-    capturing its own request. A wrong channelid must be caught here,
-    not rediscovered by silent "0 articles" in production."""
-    crawler = FiliCrawler(timeout=5, max_retries=1)
-    responses.add(
-        responses.POST, "https://fili.vn/_Partials/ListPageArticle",
-        json=_fixture_json(), status=200,
-    )
-
-    crawler.crawl()
-
-    assert len(responses.calls) == 1
-    sent_body = json.loads(responses.calls[0].request.body)
-    assert sent_body["channelid"] == ",734,757,3113,758,"
+    first = items[0]
+    assert first.title.startswith("Tập trung tín dụng")
+    # "4 giờ trước" resolved against the (frozen) crawl moment: 12:00 UTC = 19:00 ICT.
+    assert first.published_at == datetime(2026, 10, 3, 15, 0, tzinfo=TZ)
+    # Absolute form "02/10/2026 20:58" is read as Vietnam local time.
+    absolute = next(i for i in items if i.title.startswith("CEO Jens Lottner"))
+    assert absolute.published_at == datetime(2026, 10, 2, 20, 58, tzinfo=TZ)
 
 
 @responses.activate
-def test_fili_raises_when_response_has_no_articles_key():
-    crawler = FiliCrawler(timeout=5, max_retries=1)
-    responses.add(
-        responses.POST, "https://fili.vn/_Partials/ListPageArticle",
-        json={"unexpected": "shape"}, status=200,
-    )
+def test_fili_decodes_html_entities_in_titles():
+    responses.add(responses.GET, URL, body=_page(), status=200)
+    titles = [i.title for i in FiliCrawler(timeout=5, max_retries=1).crawl()]
+    assert any('"giải ngân nhanh"' in t for t in titles)  # &quot; in the markup
+    assert all("&" not in t for t in titles)
+
+
+@responses.activate
+def test_fili_leaves_unparseable_times_as_none():
+    html = ('<article class="search-card-item"><h3 class="search-card-title">'
+            '<a href="/2026/10/x-1.htm">Tin không rõ giờ</a></h3><time>vừa xong</time></article>')
+    responses.add(responses.GET, URL, body=html, status=200)
+    [item] = FiliCrawler(timeout=5, max_retries=1).crawl()
+    assert item.published_at is None
+
+
+@responses.activate
+def test_fili_dedupes_a_url_listed_twice():
+    card = ('<article class="search-card-item"><h3 class="search-card-title">'
+            '<a href="/2026/10/x-1.htm">Tin lặp</a></h3><time>1 giờ trước</time></article>')
+    responses.add(responses.GET, URL, body=card * 2, status=200)
+    assert len(FiliCrawler(timeout=5, max_retries=1).crawl()) == 1
+
+
+@responses.activate
+def test_fili_raises_when_no_articles_are_found():
+    """Same loud failure the other HTML crawlers give when a redesign
+    changes the markup — never a silent "0 new articles"."""
+    responses.add(responses.GET, URL, body="<html><body><p>đã đổi giao diện</p></body></html>", status=200)
     with pytest.raises(CrawlerError):
-        crawler.crawl()
-
-
-@responses.activate
-def test_fili_raises_when_articles_list_is_empty():
-    """The exact failure mode hit during audit when channelid was
-    wrong: HTTP 200, well-formed JSON, but zero articles."""
-    crawler = FiliCrawler(timeout=5, max_retries=1)
-    responses.add(
-        responses.POST, "https://fili.vn/_Partials/ListPageArticle",
-        json={"LsArticles": [], "Totalrow": 0}, status=200,
-    )
-    with pytest.raises(CrawlerError):
-        crawler.crawl()
+        FiliCrawler(timeout=5, max_retries=1).crawl()
 
 
 @responses.activate
 def test_fili_raises_after_exhausting_retries_on_http_error():
-    crawler = FiliCrawler(timeout=1, max_retries=2)
-    responses.add(responses.POST, "https://fili.vn/_Partials/ListPageArticle", status=500)
-    responses.add(responses.POST, "https://fili.vn/_Partials/ListPageArticle", status=500)
+    responses.add(responses.GET, URL, status=500)
+    responses.add(responses.GET, URL, status=500)
     with pytest.raises(CrawlerError):
-        crawler.crawl()
+        FiliCrawler(timeout=1, max_retries=2).crawl()
