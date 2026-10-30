@@ -1,4 +1,4 @@
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from zoneinfo import ZoneInfo
 
 from config import config
@@ -350,9 +350,14 @@ def test_build_site_writes_analytics_tab_and_data_exports(tmp_path, db):
 def test_build_site_writes_brands_tab_with_share_of_voice_and_export(tmp_path, db):
     import json
 
+    # build_site() scores the 7/30-day share-of-voice windows against the real
+    # clock, so these articles must be recent relative to *now* — fixed dates
+    # silently fall out of the window as time passes (this test broke on its
+    # own once a month had gone by).
+    recent = datetime.now(TZ) - timedelta(hours=3)
     for i, src in enumerate(["CafeF", "VnExpress", "Dân Trí"]):
         db.insert_if_new(NewsItem(src, f"Techcombank vinh danh lần {i}", f"https://x/t{i}",
-                                  datetime(2026, 9, 15, 10, i, tzinfo=TZ)))
+                                  recent + timedelta(minutes=i)))
     out_dir = tmp_path / "site"
     build_site(db, out_dir=out_dir)
 
