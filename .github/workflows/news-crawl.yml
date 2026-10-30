@@ -1,5 +1,13 @@
 name: Crawl news
 
+# 2026-10-30: trang GitHub Pages bị "đóng băng" — bước Deploy báo "Reported
+# success!" nhưng site đứng yên nhiều giờ, rồi chuyển sang "Deployment failed".
+# Log cho thấy Pages gắn mỗi deployment với MÃ COMMIT (`ID: <sha>`); workflow
+# này chạy từ cùng 1 commit của `main` suốt hàng nghìn lần nên cùng 1 "danh
+# tính" deployment bị ghi đè mãi cho tới khi kẹt. Commit này chỉ thêm ghi chú để
+# đổi SHA của `main` (=> deployment mới, sạch trạng thái); không đổi hành vi.
+# Nếu lỗi lặp lại: đẩy thêm 1 commit bất kỳ lên `main` là đủ.
+
 # File renamed from crawl.yml -> news-crawl.yml on 2026-09-15: the
 # schedule trigger had gone stale (no automatic run for ~6h after a
 # cron edit) and disabling+re-enabling the workflow in the UI didn't
