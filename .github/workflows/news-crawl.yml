@@ -117,11 +117,33 @@ jobs:
           NEWS_SCAN_WORKER_URL: ${{ vars.NEWS_SCAN_WORKER_URL }}
         run: python -m web.generate_site
 
+      # Durable fix for the Pages freeze (see the notes at the top of this
+      # file): every run publishes the site as a brand-new, parentless commit
+      # on the `gh-pages` branch, so the deployment identity is NEVER reused.
+      # Built with git plumbing exactly like the db-state push above — no
+      # checkout, `main`'s working tree is untouched. This only takes effect
+      # once Settings > Pages > Source is switched to "Deploy from a branch"
+      # (gh-pages, / root); until then it is a harmless extra branch.
+      - name: Publish site to gh-pages branch (unique commit every run)
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          export GIT_DIR="$PWD/.git" GIT_WORK_TREE="$PWD/site" GIT_INDEX_FILE="$RUNNER_TEMP/pages.index"
+          (cd site && git add -A -f .)
+          TREE=$(git write-tree)
+          COMMIT=$(git commit-tree "$TREE" -m "chore: publish site [bot] run ${GITHUB_RUN_ID}")
+          git push --force origin "$COMMIT:refs/heads/gh-pages"
+
+      # Legacy path (Source = "GitHub Actions"). Kept so the site keeps
+      # updating until Settings is switched; `continue-on-error` so that once
+      # it IS switched to the branch, this step failing cannot redden the run.
       - name: Upload site to GitHub Pages
+        continue-on-error: true
         uses: actions/upload-pages-artifact@v3
         with:
           path: site
 
       - name: Deploy to GitHub Pages
         id: deploy_pages
+        continue-on-error: true
         uses: actions/deploy-pages@v4
