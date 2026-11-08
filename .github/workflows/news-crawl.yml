@@ -7,6 +7,8 @@ name: Crawl news
 # tính" deployment bị ghi đè mãi cho tới khi kẹt. Commit này chỉ thêm ghi chú để
 # đổi SHA của `main` (=> deployment mới, sạch trạng thái); không đổi hành vi.
 # Nếu lỗi lặp lại: đẩy thêm 1 commit bất kỳ lên `main` là đủ.
+# 2026-11-08: lỗi LẶP LẠI (site đứng yên ~13 giờ trong khi 5.400 lần chạy vẫn
+# báo success, `main` kẹt ở cùng 1 SHA từ 30/10). Lại đổi SHA bằng commit này.
 
 # File renamed from crawl.yml -> news-crawl.yml on 2026-09-15: the
 # schedule trigger had gone stale (no automatic run for ~6h after a
