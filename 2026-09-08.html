@@ -1,0 +1,575 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Vietnam News Monitor — 08/09/2026</title>
+<link rel="alternate" type="application/rss+xml" title="Vietnam News Monitor" href="feed.xml">
+
+<style>@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;700&display=swap');
+:root{
+  color-scheme:light;
+  --bg:#F6F7F9;--surface:#FFFFFF;--surface-2:#F9FAFB;
+  --text:#0F172A;--text-2:#475569;--muted:#94A3B8;
+  --border:#E2E8F0;--divider:#EEF2F6;
+  --accent:#2563EB;--accent-soft:#EAF1FF;--live:#DC2626;
+  --radius:16px;--radius-sm:10px;
+  --shadow:0 1px 2px rgba(15,23,42,.05);
+  --sans:"Inter",-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,monospace;
+  --sp-1:4px;--sp-2:8px;--sp-3:12px;--sp-4:16px;--sp-5:24px;--sp-6:32px;--sp-7:48px;
+  --pad:32px;
+  --z-header:100;--z-dropdown:200;--z-tooltip:300;--z-backdrop:390;--z-drawer:400;--z-modal:500;--z-toast:600;
+  --t-fast:150ms;--t-mid:220ms;
+}
+*{box-sizing:border-box;}
+html{scroll-behavior:smooth;}
+body{margin:0;background:var(--bg);color:var(--text);font-family:var(--sans);font-size:14px;line-height:1.55;}
+a{color:inherit;}
+h1,h2,h3,p{margin:0;}
+button,select,input{font:inherit;color:inherit;}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px;}
+.ic{width:20px;height:20px;flex:0 0 20px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;}
+.sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;}
+[hidden]{display:none!important;}
+
+/* ================= app shell ================= */
+.app{--sb-w:260px;--label:block;--header-h:64px;
+  display:grid;grid-template-columns:var(--sb-w) minmax(0,1fr);grid-template-rows:var(--header-h) 1fr;
+  grid-template-areas:"sidebar header" "sidebar main";min-height:100vh;
+  transition:grid-template-columns var(--t-mid) ease;}
+.app.sb-collapsed{--sb-w:68px;--label:none;}
+@media (min-width:768px) and (max-width:1023px){.app{--sb-w:68px;--label:none;--header-h:60px;}}
+
+.sidebar{grid-area:sidebar;position:sticky;top:0;height:100vh;background:var(--surface);
+  border-right:1px solid var(--border);display:flex;flex-direction:column;padding:var(--sp-4) var(--sp-3);
+  overflow-x:hidden;overflow-y:auto;z-index:var(--z-header);}
+.brand{display:flex;align-items:center;gap:var(--sp-3);padding:0 var(--sp-2);height:40px;margin-bottom:var(--sp-5);
+  text-decoration:none;white-space:nowrap;}
+.logo-mark{flex:0 0 32px;width:32px;height:32px;border-radius:9px;background:var(--accent);color:#fff;
+  display:grid;place-items:center;font-family:var(--mono);font-weight:700;font-size:12px;}
+.brand-name{display:var(--label);font-weight:700;font-size:15px;line-height:1.15;}
+.brand-name small{display:block;font-weight:500;font-size:11px;color:var(--muted);}
+.nav-group-title{display:var(--label);font-family:var(--mono);font-size:11px;font-weight:500;letter-spacing:.06em;
+  color:var(--muted);text-transform:uppercase;padding:var(--sp-4) var(--sp-2) var(--sp-2);}
+.nav{display:flex;flex-direction:column;gap:2px;}
+.nav-item{display:flex;align-items:center;gap:var(--sp-3);min-height:40px;padding:0 var(--sp-3);
+  border-radius:var(--radius-sm);text-decoration:none;color:var(--text-2);font-weight:500;white-space:nowrap;
+  transition:background var(--t-fast) ease,color var(--t-fast) ease;}
+.nav-item:hover{background:var(--surface-2);color:var(--text);}
+.nav-item[aria-current="page"]{background:var(--accent-soft);color:var(--accent);}
+.nav-label{display:var(--label);}
+.sb-spacer{flex:1 1 auto;min-height:var(--sp-4);}
+.sb-toggle{display:flex;align-items:center;gap:var(--sp-3);min-height:40px;padding:0 var(--sp-3);border:0;
+  background:none;border-radius:var(--radius-sm);color:var(--text-2);cursor:pointer;white-space:nowrap;}
+.sb-toggle:hover{background:var(--surface-2);color:var(--text);}
+.sb-toggle .ic{transition:transform var(--t-mid) ease;}
+.app.sb-collapsed .sb-toggle .ic{transform:rotate(180deg);}
+@media (min-width:768px) and (max-width:1023px){.sb-toggle{display:none;}}
+.nav-item .ic,.sb-toggle .ic{margin:0;}
+.app.sb-collapsed .nav-item,.app.sb-collapsed .sb-toggle{justify-content:center;padding:0;}
+@media (min-width:768px) and (max-width:1023px){.nav-item{justify-content:center;padding:0;}}
+
+.topbar{grid-area:header;position:sticky;top:0;z-index:var(--z-header);height:var(--header-h);background:var(--surface);
+  border-bottom:1px solid var(--border);display:flex;align-items:center;gap:var(--sp-4);padding:0 var(--pad);}
+.icon-btn.menu-btn{display:none;}
+.icon-btn{display:inline-grid;place-items:center;width:44px;height:44px;border:0;border-radius:var(--radius-sm);
+  background:none;color:var(--text);cursor:pointer;}
+.icon-btn:hover{background:var(--surface-2);}
+.crumb{display:flex;align-items:center;gap:var(--sp-2);min-width:0;font-size:13px;color:var(--text-2);white-space:nowrap;
+  overflow:hidden;text-overflow:ellipsis;}
+.crumb b{color:var(--text);font-weight:600;}
+.crumb .sep{color:var(--muted);}
+.topbar-actions{margin-left:auto;display:flex;align-items:center;gap:var(--sp-4);}
+.live{display:flex;align-items:center;gap:var(--sp-2);font-family:var(--mono);font-size:11px;font-weight:500;color:var(--text-2);}
+.live-dot{width:7px;height:7px;border-radius:50%;background:var(--live);}
+
+.main{grid-area:main;min-width:0;padding:var(--pad);padding-bottom:var(--sp-7);}
+.container{width:100%;max-width:1440px;margin:0 auto;}
+@media (min-width:1440px){.app{--pad:44px;}}
+@media (min-width:768px) and (max-width:1023px){.app{--pad:24px;}}
+
+.backdrop{position:fixed;inset:0;background:rgba(0,0,0,.35);z-index:var(--z-backdrop);opacity:0;pointer-events:none;
+  transition:opacity var(--t-mid) ease;}
+.bottom-nav{display:none;}
+
+/* ================= mobile (<768) ================= */
+@media (max-width:767px){
+  .app{--header-h:56px;--pad:16px;--label:block;grid-template-columns:minmax(0,1fr);
+    grid-template-areas:"header" "main";}
+  .sidebar{position:fixed;left:0;top:0;bottom:0;height:auto;width:min(320px,85vw);z-index:var(--z-drawer);
+    transform:translateX(-100%);visibility:hidden;transition:transform var(--t-mid) ease,visibility 0s linear var(--t-mid);}
+  .app.drawer-open .sidebar{transform:none;visibility:visible;transition:transform var(--t-mid) ease;}
+  .app.drawer-open .backdrop,.app.sheet-open .backdrop{opacity:1;pointer-events:auto;}
+  .sb-toggle{display:none;}
+  .icon-btn.menu-btn{display:inline-grid;}
+  .topbar{padding:0 var(--sp-2);gap:var(--sp-2);}
+  .topbar .live span.t{display:none;}
+  .main{padding-bottom:calc(56px + env(safe-area-inset-bottom,0px) + var(--sp-5));}
+  .bottom-nav{display:grid;grid-template-columns:repeat(5,1fr);position:fixed;left:0;right:0;bottom:0;
+    z-index:var(--z-header);height:calc(56px + env(safe-area-inset-bottom,0px));padding-bottom:env(safe-area-inset-bottom,0px);
+    background:var(--surface);border-top:1px solid var(--border);}
+  .bn-item{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;min-height:44px;
+    border:0;background:none;text-decoration:none;color:var(--text-2);font-size:11px;font-weight:500;cursor:pointer;}
+  .bn-item[aria-current="page"]{color:var(--accent);}
+}
+
+/* ================= page header ================= */
+.page-head{display:flex;justify-content:space-between;align-items:flex-end;gap:var(--sp-4);margin-bottom:var(--sp-5);flex-wrap:wrap;}
+.page-head h1{font-size:34px;line-height:1.15;font-weight:700;letter-spacing:-.02em;}
+.page-head p{color:var(--text-2);margin-top:var(--sp-1);max-width:70ch;}
+.page-actions{display:flex;flex-direction:column;align-items:flex-end;gap:var(--sp-2);}
+@media (max-width:767px){
+  .page-head{flex-direction:column;align-items:stretch;}
+  .page-head h1{font-size:26px;}
+  .page-actions{align-items:stretch;}
+}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:var(--sp-2);min-height:40px;padding:0 var(--sp-4);
+  border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--surface);color:var(--text);
+  font-weight:600;cursor:pointer;transition:background var(--t-fast) ease;}
+.btn:hover{background:var(--surface-2);}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:#fff;}
+.btn.primary:hover{background:#1D4ED8;}
+.btn:disabled{opacity:.6;cursor:wait;}
+@media (max-width:767px){.btn{min-height:44px;}.page-actions .btn{width:100%;}}
+.scan .status{display:block;font-family:var(--mono);font-size:11px;color:var(--muted);min-height:1.2em;text-align:right;}
+@media (max-width:767px){.scan .status{text-align:left;}}
+
+.latest-banner{display:flex;gap:var(--sp-2);flex-wrap:wrap;align-items:center;margin-bottom:var(--sp-5);padding:var(--sp-3) var(--sp-4);
+  background:var(--accent-soft);color:var(--accent);border-radius:var(--radius-sm);font-size:13px;}
+.latest-banner a{font-weight:600;}
+
+/* ================= grid + cards ================= */
+.kpi-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:var(--sp-4);margin-bottom:var(--sp-5);}
+@media (min-width:768px) and (max-width:1023px){.kpi-grid{grid-template-columns:repeat(2,minmax(0,1fr));}}
+@media (max-width:767px){.kpi-grid{grid-template-columns:1fr;gap:var(--sp-3);}}
+.kpi{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);padding:var(--sp-4) var(--sp-5);}
+.kpi-label{font-size:12px;color:var(--text-2);font-weight:500;}
+.kpi-value{font-family:var(--mono);font-size:30px;font-weight:700;letter-spacing:-.02em;line-height:1.2;margin:var(--sp-2) 0 var(--sp-1);}
+.kpi-sub{font-size:12px;color:var(--text-2);}
+.kpi-sub .up{color:var(--accent);font-weight:600;}.kpi-sub .down{color:var(--live);font-weight:600;}
+@media (max-width:767px){
+  .kpi{display:grid;grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"label value" "sub value";
+    align-items:center;column-gap:var(--sp-4);padding:var(--sp-3) var(--sp-4);}
+  .kpi-label{grid-area:label;}.kpi-sub{grid-area:sub;}
+  .kpi-value{grid-area:value;font-size:24px;margin:0;}
+}
+
+.content-grid{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));gap:var(--sp-5);margin-bottom:var(--sp-6);}
+.col-8{grid-column:span 8;}.col-4{grid-column:span 4;}.col-12{grid-column:span 12;}
+@media (max-width:1023px){.col-8,.col-4{grid-column:span 12;}}
+.panel{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);padding:var(--sp-5);}
+.panel-title{font-size:16px;font-weight:650;margin-bottom:var(--sp-1);}
+.panel-note{font-size:12px;color:var(--muted);margin-bottom:var(--sp-4);}
+@media (max-width:767px){.panel{padding:var(--sp-4);}}
+
+.section{margin-bottom:var(--sp-6);scroll-margin-top:calc(var(--header-h) + var(--sp-4));}
+.section-title{font-size:22px;font-weight:650;letter-spacing:-.01em;line-height:1.2;}
+.section-note{color:var(--muted);font-size:12px;margin:var(--sp-1) 0 var(--sp-4);}
+.section-head{display:flex;align-items:baseline;justify-content:space-between;gap:var(--sp-4);flex-wrap:wrap;margin-bottom:var(--sp-3);}
+.count-chip{font-family:var(--mono);font-size:12px;color:var(--text-2);}
+@media (max-width:767px){.section-title{font-size:20px;}}
+
+/* ---- Top issues (list inside the 8-col panel) ---- */
+.issues-grid{display:flex;flex-direction:column;gap:var(--sp-3);}
+details.issue-card{background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius);}
+details.issue-card>summary{display:flex;gap:var(--sp-4);align-items:flex-start;padding:var(--sp-4) var(--sp-5);cursor:pointer;list-style:none;user-select:none;}
+details.issue-card>summary::-webkit-details-marker{display:none;}
+details.issue-card:target>*:not(summary){display:block!important;}
+.issue-rank{font-family:var(--mono);font-weight:700;font-size:18px;color:var(--muted);flex:0 0 auto;}
+.issue-summary{flex:1 1 auto;min-width:0;}
+.issue-title-row{display:flex;justify-content:space-between;align-items:baseline;gap:var(--sp-3);flex-wrap:wrap;}
+.issue-title{font-size:18px;font-weight:650;line-height:1.25;letter-spacing:-.01em;}
+.issue-score{flex:0 0 auto;font-family:var(--mono);font-weight:700;font-size:12px;color:var(--accent);background:var(--accent-soft);
+  border-radius:999px;padding:3px 10px;white-space:nowrap;}
+.issue-stats{font-family:var(--mono);font-size:12px;color:var(--text-2);margin:var(--sp-1) 0 var(--sp-2);}
+.why-hot-compact{list-style:none;margin:0;padding:0;}
+.why-hot-compact li{font-size:13px;color:var(--text-2);padding:1px 0;}
+.why-hot-compact li::before{content:"— ";color:var(--muted);}
+.issue-detail{padding:0 var(--sp-5) var(--sp-5);border-top:1px solid var(--divider);}
+.issue-metrics{display:flex;flex-wrap:wrap;gap:var(--sp-5);padding:var(--sp-4) 0;}
+.metric{display:flex;flex-direction:column;gap:2px;}
+.metric-label{font-size:11px;color:var(--muted);}
+.metric-value{font-family:var(--mono);font-size:16px;font-weight:700;}
+.source-coverage{display:flex;flex-direction:column;gap:var(--sp-2);padding:var(--sp-2) 0 var(--sp-4);}
+.coverage-row{display:flex;align-items:center;gap:var(--sp-3);}
+.coverage-src{flex:0 0 130px;font-size:12px;color:var(--text-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.coverage-track{flex:1 1 auto;height:6px;background:var(--bg);border-radius:999px;overflow:hidden;}
+.coverage-fill{height:100%;background:var(--accent);border-radius:999px;}
+.coverage-count{flex:0 0 24px;text-align:right;font-family:var(--mono);font-size:12px;color:var(--text-2);}
+.related-articles{display:flex;flex-direction:column;}
+.related-row{display:flex;align-items:baseline;gap:var(--sp-3);padding:var(--sp-2) 0;border-top:1px solid var(--divider);font-size:13px;}
+.related-row:first-child{border-top:none;}
+.related-row .src{font-family:var(--mono);font-size:11px;color:var(--text-2);flex:0 0 110px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.related-row a{flex:1 1 auto;min-width:0;text-decoration:none;}
+.related-row a:hover{color:var(--accent);text-decoration:underline;}
+@media (max-width:767px){details.issue-card>summary{padding:var(--sp-4);gap:var(--sp-3);}.related-row{flex-direction:column;gap:2px;}
+  .related-row .src{flex:none;}}
+
+/* sources side panel */
+.bar-list{display:flex;flex-direction:column;gap:var(--sp-3);}
+.bar-row{display:grid;grid-template-columns:110px minmax(0,1fr) 34px;gap:var(--sp-3);align-items:center;font-size:13px;}
+.bar-row .name{color:var(--text-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.bar-row .val{font-family:var(--mono);font-size:12px;text-align:right;}
+
+/* ================= toolbar / filters / sheet ================= */
+.toolbar{display:flex;align-items:center;gap:var(--sp-2);flex-wrap:wrap;margin-bottom:var(--sp-3);}
+.search-box{position:relative;flex:1 1 280px;min-width:0;}
+.search-box .ic{position:absolute;left:14px;top:50%;transform:translateY(-50%);color:var(--muted);pointer-events:none;}
+.search-input{width:100%;min-height:44px;padding:0 14px 0 42px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);}
+.search-input::placeholder{color:var(--muted);}
+.filter-btn{display:none;}
+.filter-sheet{display:contents;}
+.sheet-head,.sheet-foot{display:none;}
+.fields{display:flex;gap:var(--sp-2);flex-wrap:wrap;align-items:center;}
+.field label{display:none;font-size:12px;font-weight:600;margin-bottom:var(--sp-1);}
+.pill-select{min-height:44px;padding:0 var(--sp-4);background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);cursor:pointer;max-width:220px;}
+.sort-toggle{display:flex;gap:6px;}
+.pill{min-height:44px;padding:0 var(--sp-4);font-weight:500;color:var(--text-2);background:var(--surface);border:1px solid var(--border);
+  border-radius:var(--radius-sm);cursor:pointer;}
+.pill.active{color:var(--accent);background:var(--accent-soft);border-color:var(--accent-soft);}
+@media (max-width:767px){
+  .toolbar{flex-direction:column;align-items:stretch;}
+  .filter-btn{display:inline-flex;}
+  .filter-sheet{display:flex;flex-direction:column;position:fixed;left:0;right:0;bottom:0;z-index:var(--z-modal);max-height:85vh;overflow-y:auto;
+    background:var(--surface);border-radius:20px 20px 0 0;padding:var(--sp-4) var(--sp-4) calc(var(--sp-4) + env(safe-area-inset-bottom,0px));
+    transform:translateY(100%);visibility:hidden;transition:transform var(--t-mid) ease,visibility 0s linear var(--t-mid);}
+  .app.sheet-open .filter-sheet{transform:none;visibility:visible;transition:transform var(--t-mid) ease;}
+  .sheet-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:var(--sp-3);font-weight:650;font-size:16px;}
+  .sheet-foot{display:flex;gap:var(--sp-3);margin-top:var(--sp-4);}
+  .sheet-foot .btn{flex:1;}
+  .fields{flex-direction:column;align-items:stretch;gap:var(--sp-4);}
+  .field label{display:block;}
+  .pill-select{width:100%;max-width:none;}
+  .sort-toggle .pill{flex:1;}
+}
+
+/* ================= news list (table on desktop, cards on mobile) ================= */
+.news-table{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);overflow:clip;}
+.news-head,.news-row{display:grid;grid-template-columns:150px minmax(0,1fr) 210px 56px;gap:var(--sp-4);align-items:center;padding:0 var(--sp-5);}
+.news-head{position:sticky;top:var(--header-h);z-index:10;min-height:40px;background:var(--surface-2);border-bottom:1px solid var(--border);
+  font-family:var(--mono);font-size:11px;font-weight:500;color:var(--muted);letter-spacing:.04em;text-transform:uppercase;}
+.news-head span:last-child{text-align:right;}
+.news-stream-list{display:flex;flex-direction:column;}
+.news-row{min-height:64px;padding-top:var(--sp-2);padding-bottom:var(--sp-2);border-bottom:1px solid var(--divider);transition:background var(--t-fast) ease;}
+.news-row:last-child{border-bottom:none;}
+.news-row:hover{background:var(--surface-2);}
+.news-row .src{font-family:var(--mono);font-size:12px;font-weight:500;color:var(--text-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.news-row .hl{min-width:0;display:flex;flex-direction:column;gap:4px;}
+.news-row .headline{font-size:15px;font-weight:500;line-height:1.4;text-decoration:none;display:-webkit-box;-webkit-line-clamp:2;
+  -webkit-box-orient:vertical;overflow:hidden;transition:color var(--t-fast) ease;}
+.news-row .headline:hover{color:var(--accent);}
+.hl-meta{display:flex;align-items:center;gap:6px;flex-wrap:wrap;}
+.hl-meta:empty{display:none;}
+.news-row .issue-tag{justify-self:start;max-width:100%;font-family:var(--mono);font-size:11px;font-weight:500;color:var(--accent);background:var(--accent-soft);
+  border-radius:999px;padding:3px 10px;text-decoration:none;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.news-row .ts{font-family:var(--mono);font-size:12px;color:var(--muted);text-align:right;}
+.news-row .sent{width:8px;height:8px;border-radius:50%;flex:0 0 8px;}
+.news-row .sent.neg{background:var(--live);}.news-row .sent.pos{background:var(--accent);}
+.brand-tag{font-family:var(--mono);font-size:11px;color:var(--text-2);border:1px solid var(--border);border-radius:999px;padding:1px 8px;white-space:nowrap;}
+@media (min-width:768px) and (max-width:1023px){
+  .news-head,.news-row{grid-template-columns:120px minmax(0,1fr) 56px;}
+  .news-head span:nth-child(3),.news-row .issue-tag{display:none;}
+}
+@media (max-width:767px){
+  .news-head{display:none;}
+  .news-table{border:0;box-shadow:none;background:none;}
+  .news-stream-list{gap:var(--sp-3);}
+  .news-row{grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"hl hl" "src ts" "tag tag";gap:var(--sp-2) var(--sp-3);
+    padding:var(--sp-4);background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);}
+  .news-row:last-child{border-bottom:1px solid var(--border);}
+  .news-row .hl{grid-area:hl;}.news-row .src{grid-area:src;}.news-row .ts{grid-area:ts;}.news-row .issue-tag{grid-area:tag;}
+  .news-row .headline{font-size:16px;}
+}
+.pagination{display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:6px;margin-top:var(--sp-5);}
+.page-btn{min-width:40px;min-height:40px;padding:0 var(--sp-3);font-family:var(--mono);font-size:12px;font-weight:500;color:var(--text-2);
+  background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);cursor:pointer;}
+.page-btn.active{color:var(--accent);background:var(--accent-soft);border-color:var(--accent-soft);}
+.page-ellipsis{color:var(--muted);font-family:var(--mono);padding:0 2px;}
+@media (max-width:767px){.page-btn{min-width:44px;min-height:44px;}}
+
+/* ================= states ================= */
+.state{display:flex;flex-direction:column;align-items:center;gap:var(--sp-2);text-align:center;padding:var(--sp-7) var(--sp-4);color:var(--text-2);}
+.state b{color:var(--text);font-size:16px;}
+.state.error b{color:var(--live);}
+.skeleton{display:block;height:14px;border-radius:6px;background:linear-gradient(90deg,var(--divider),var(--surface-2),var(--divider));
+  background-size:200% 100%;animation:sk 1.2s ease-in-out infinite;}
+@keyframes sk{from{background-position:200% 0}to{background-position:-200% 0}}
+@media (prefers-reduced-motion:reduce){.skeleton{animation:none}*{transition-duration:.01ms!important}}
+
+/* ================= by source (Kanban) + archive ================= */
+.source-board{display:flex;align-items:flex-start;gap:var(--sp-4);overflow-x:auto;padding-bottom:var(--sp-2);}
+details.source-col{flex:0 0 300px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);}
+details.source-col>summary{display:flex;align-items:center;gap:var(--sp-3);min-height:48px;padding:0 var(--sp-4);cursor:pointer;font-weight:600;
+  border-bottom:1px solid var(--divider);list-style:none;user-select:none;}
+details.source-col>summary::-webkit-details-marker{display:none;}
+details.source-col .count{margin-left:auto;font-family:var(--mono);font-weight:500;font-size:11px;color:var(--text-2);border:1px solid var(--border);border-radius:999px;padding:2px 9px;}
+details.source-col .chevron{font-size:10px;color:var(--muted);transition:transform var(--t-fast) ease;}
+details.source-col[open] .chevron{transform:rotate(180deg);}
+.source-list-wrap{max-height:min(65vh,600px);overflow-y:auto;padding:4px var(--sp-4);}
+.source-list-wrap ul{list-style:none;margin:0;padding:0;}
+.source-list-wrap li{display:flex;gap:10px;padding:9px 0;border-bottom:1px solid var(--divider);}
+.source-list-wrap li:last-child{border-bottom:none;}
+.source-list-wrap a{text-decoration:none;font-size:13px;line-height:1.4;}
+.source-list-wrap a:hover{color:var(--accent);text-decoration:underline;}
+.source-list-wrap .time{color:var(--muted);font-family:var(--mono);font-size:11px;white-space:nowrap;padding-top:2px;}
+@media (max-width:1023px){.source-board{flex-direction:column;overflow-x:visible;}details.source-col{flex-basis:auto;width:100%;}}
+.date-tabs{display:flex;flex-wrap:wrap;gap:6px;}
+.date-tabs a{min-height:40px;display:inline-flex;align-items:center;padding:0 var(--sp-4);font-family:var(--mono);font-size:12px;font-weight:500;text-decoration:none;
+  color:var(--text-2);background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);}
+.date-tabs a:hover{color:var(--text);}
+.date-tabs a.active{color:var(--accent);background:var(--accent-soft);border-color:var(--accent-soft);}
+.date-picker{margin-top:var(--sp-3);font-family:var(--mono);font-size:12px;color:var(--muted);display:flex;align-items:center;gap:var(--sp-2);}
+.date-picker select{min-height:40px;padding:0 var(--sp-3);background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);}
+
+/* ================= analytics / brands blocks ================= */
+.an-grid{display:grid;grid-template-columns:1fr;gap:var(--sp-4);}
+@media (min-width:1100px){.an-grid{grid-template-columns:1fr 1fr;}}
+details.an-block{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);min-width:0;}
+details.an-block>summary{padding:var(--sp-4) var(--sp-5);min-height:52px;display:flex;align-items:center;cursor:pointer;list-style:none;user-select:none;font-weight:650;font-size:16px;}
+details.an-block>summary::-webkit-details-marker{display:none;}
+details.an-block[open]>summary{border-bottom:1px solid var(--divider);}
+.an-body{padding:var(--sp-4) var(--sp-5) var(--sp-5);overflow-x:auto;}
+.an-note{color:var(--muted);font-size:12px;margin:0 0 var(--sp-3);}
+.an-note.gap{margin-top:var(--sp-4);}
+.an-empty{color:var(--muted);font-size:13px;}
+table.an-table{width:100%;border-collapse:collapse;font-size:13px;}
+.an-table th{text-align:left;font-family:var(--mono);font-size:11px;font-weight:500;color:var(--muted);padding:4px 8px 6px 0;border-bottom:1px solid var(--divider);white-space:nowrap;}
+.an-table td{padding:8px 8px 8px 0;border-bottom:1px solid var(--divider);vertical-align:top;}
+.an-table td.num,.an-table th.num{text-align:right;font-family:var(--mono);}
+.an-table tr:last-child td{border-bottom:none;}
+.an-table tbody tr:hover{background:var(--surface-2);}
+.an-list{list-style:none;margin:0;padding:0;font-size:13px;}
+.an-list li{padding:8px 0;border-bottom:1px solid var(--divider);}
+.an-list li:last-child{border-bottom:none;}
+.dim,.an-list .dim{color:var(--text-2);}
+.an-bars{display:flex;align-items:flex-end;gap:3px;height:80px;margin:6px 0 4px;}
+.an-bars .bar{flex:1 1 0;background:var(--accent);border-radius:3px 3px 0 0;min-height:2px;}
+.an-axis{display:flex;justify-content:space-between;font-family:var(--mono);font-size:10px;color:var(--muted);}
+td.heat,th.heat{font-family:var(--mono);text-align:center;}
+.role-tag{font-family:var(--mono);font-size:10px;border-radius:999px;padding:1px 7px;margin-left:6px;background:var(--accent-soft);color:var(--accent);}
+.role-tag.comp{background:var(--surface-2);color:var(--text-2);border:1px solid var(--border);}
+.crisis-list{list-style:none;margin:0;padding:0;}
+.crisis-item{border:1px solid var(--live);border-radius:var(--radius);padding:var(--sp-4) var(--sp-5);margin-bottom:var(--sp-3);background:var(--surface);}
+.crisis-item .lvl{font-family:var(--mono);font-size:11px;font-weight:700;color:var(--live);text-transform:uppercase;}
+.crisis-ok{color:var(--text-2);font-size:14px;padding:6px 0;}
+.sov-bar{min-width:90px;}
+.delta-up{color:var(--accent);}.delta-down{color:var(--live);}
+.empty{text-align:center;color:var(--muted);padding:var(--sp-7) 0;}
+.footer{margin-top:var(--sp-6);text-align:center;color:var(--muted);font-family:var(--mono);font-size:11px;}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false"><defs>
+<symbol id="i-home" viewBox="0 0 24 24"><path d="M3 11l9-8 9 8"/><path d="M5 10v10h14V10"/><path d="M10 20v-6h4v6"/></symbol>
+<symbol id="i-flame" viewBox="0 0 24 24"><path d="M12 3c1 3 5 5 5 10a5 5 0 0 1-10 0c0-2 1-3 2-4 0 2 1 3 2 3 0-3-1-5 1-9z"/></symbol>
+<symbol id="i-news" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M8 9h8M8 13h8M8 17h5"/></symbol>
+<symbol id="i-building" viewBox="0 0 24 24"><path d="M4 21V7l8-4 8 4v14"/><path d="M9 21v-6h6v6M9 10h.01M15 10h.01"/></symbol>
+<symbol id="i-chart" viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-8M22 20H2"/></symbol>
+<symbol id="i-db" viewBox="0 0 24 24"><ellipse cx="12" cy="6" rx="8" ry="3"/><path d="M4 6v6c0 1.7 3.6 3 8 3s8-1.3 8-3V6M4 12v6c0 1.7 3.6 3 8 3s8-1.3 8-3v-6"/></symbol>
+<symbol id="i-archive" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="4" rx="1"/><path d="M5 8v11h14V8M10 12h4"/></symbol>
+<symbol id="i-rss" viewBox="0 0 24 24"><path d="M5 19h.01M5 12a7 7 0 0 1 7 7M5 5a14 14 0 0 1 14 14"/></symbol>
+<symbol id="i-json" viewBox="0 0 24 24"><path d="M8 4c-2 0-3 1-3 3v2c0 1-1 2-2 3 1 1 2 2 2 3v2c0 2 1 3 3 3M16 4c2 0 3 1 3 3v2c0 1 1 2 2 3-1 1-2 2-2 3v2c0 2-1 3-3 3"/></symbol>
+<symbol id="i-menu" viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16"/></symbol>
+<symbol id="i-x" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></symbol>
+<symbol id="i-collapse" viewBox="0 0 24 24"><path d="M11 7l-5 5 5 5M18 7l-5 5 5 5"/></symbol>
+<symbol id="i-filter" viewBox="0 0 24 24"><path d="M4 5h16l-6 8v6l-4-2v-4z"/></symbol>
+<symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></symbol>
+<symbol id="i-refresh" viewBox="0 0 24 24"><path d="M20 11a8 8 0 1 0-2 6M20 5v6h-6"/></symbol>
+</defs></svg>
+<div class="app" id="app">
+<aside class="sidebar" id="sidebar" aria-label="Điều hướng chính">
+<a class="brand" href="index.html" aria-label="Vietnam News Monitor"><span class="logo-mark">VN</span><span class="brand-name">Vietnam News<small>Monitor</small></span></a>
+<div class="nav-group-title">Chính</div>
+<nav class="nav" aria-label="Chính"><a class="nav-item" href="index.html#overview" title="Tổng quan" aria-current="page"><svg class="ic" aria-hidden="true" focusable="false"><use href="#i-home"/></svg><span class="nav-label">Tổng quan</span></a><a class="nav-item" href="index.html#news" title="Tin tức"><svg class="ic" aria-hidden="true" focusable="false"><use href="#i-news"/></svg><span class="nav-label">Tin tức</span></a></nav>
+<div class="nav-group-title">Phân tích</div><nav class="nav" aria-label="Phân tích"><a class="nav-item" href="brands.html" title="Brands"><svg class="ic" aria-hidden="true" focusable="false"><use href="#i-building"/></svg><span class="nav-label">Brands</span></a><a class="nav-item" href="analytics.html" title="Analytics"><svg class="ic" aria-hidden="true" focusable="false"><use href="#i-chart"/></svg><span class="nav-label">Analytics</span></a></nav>
+<div class="nav-group-title">Quản lý</div>
+<nav class="nav" aria-label="Quản lý"><a class="nav-item" href="index.html#sources" title="Theo nguồn"><svg class="ic" aria-hidden="true" focusable="false"><use href="#i-db"/></svg><span class="nav-label">Theo nguồn</span></a><a class="nav-item" href="index.html#archive" title="Lưu trữ"><svg class="ic" aria-hidden="true" focusable="false"><use href="#i-archive"/></svg><span class="nav-label">Lưu trữ</span></a></nav>
+<div class="nav-group-title">Dữ liệu</div><nav class="nav" aria-label="Dữ liệu"><a class="nav-item" href="feed.xml" title="RSS feed"><svg class="ic" aria-hidden="true" focusable="false"><use href="#i-rss"/></svg><span class="nav-label">RSS feed</span></a><a class="nav-item" href="issues.json" title="Dữ liệu JSON"><svg class="ic" aria-hidden="true" focusable="false"><use href="#i-json"/></svg><span class="nav-label">Dữ liệu JSON</span></a></nav>
+<div class="sb-spacer"></div>
+<button class="sb-toggle" id="sb-toggle" type="button" aria-expanded="true" aria-controls="sidebar" title="Thu gọn thanh điều hướng"><svg class="ic" aria-hidden="true" focusable="false"><use href="#i-collapse"/></svg><span class="nav-label">Thu gọn</span></button>
+</aside>
+<header class="topbar">
+<button class="icon-btn menu-btn" id="menu-btn" type="button" data-open-drawer aria-label="Mở menu" aria-expanded="false" aria-controls="sidebar"><svg class="ic" aria-hidden="true" focusable="false"><use href="#i-menu"/></svg></button>
+<div class="crumb"><span>Vietnam News Monitor</span><span class="sep">/</span><b>Tin ngày 08/09/2026</b></div>
+<div class="topbar-actions"><div class="live" role="status"><span class="live-dot"></span><span class="t">LIVE ·</span><span>00:48</span></div></div>
+</header>
+<main class="main" id="main"><div class="container">
+<div class="latest-banner">Bạn đang xem tin lưu trữ, không phải ngày mới nhất — <a href="2026-11-15.html">xem tin mới nhất →</a></div><section id="overview" aria-label="Tổng quan"><div class="page-head"><div><h1>Tin ngày 08/09/2026</h1><p>Bản lưu trữ của ngày đã chọn.</p></div></div><div class="kpi-grid"><div class="kpi"><div class="kpi-label">Bài viết</div><div class="kpi-value">77</div><div class="kpi-sub"></div></div><div class="kpi"><div class="kpi-label">Nguồn có bài</div><div class="kpi-value">5</div><div class="kpi-sub">trong 23 nguồn theo dõi</div></div><div class="kpi"><div class="kpi-label">Cập nhật</div><div class="kpi-value">00:48</div><div class="kpi-sub">mỗi 20 phút</div></div></div></section><div class="content-grid"><aside class="panel col-12" aria-labelledby="top-sources-title"><h2 class="panel-title" id="top-sources-title">Nguồn đăng nhiều nhất</h2><p class="panel-note">Số bài trong ngày, 8 nguồn đứng đầu.</p><div class="bar-list"><div class="bar-row"><span class="name">VTV</span><div class="coverage-track"><div class="coverage-fill" style="width:100%"></div></div><span class="val">34</span></div><div class="bar-row"><span class="name">VietnamNet</span><div class="coverage-track"><div class="coverage-fill" style="width:94%"></div></div><span class="val">32</span></div><div class="bar-row"><span class="name">VnEconomy</span><div class="coverage-track"><div class="coverage-fill" style="width:24%"></div></div><span class="val">8</span></div><div class="bar-row"><span class="name">Đầu tư Chứng khoán</span><div class="coverage-track"><div class="coverage-fill" style="width:6%"></div></div><span class="val">2</span></div><div class="bar-row"><span class="name">Diễn đàn Doanh nghiệp</span><div class="coverage-track"><div class="coverage-fill" style="width:3%"></div></div><span class="val">1</span></div></div></aside></div><section id="news" class="section" aria-labelledby="news-title"><div class="section-head"><h2 class="section-title" id="news-title">Tin tức</h2><span class="count-chip" id="news-count" aria-live="polite"></span></div><div class="toolbar">
+<div class="search-box"><svg class="ic" aria-hidden="true" focusable="false"><use href="#i-search"/></svg><input type="search" id="search-news" class="search-input" placeholder="Tìm kiếm tiêu đề..." aria-label="Tìm kiếm tiêu đề" oninput="applyFilters()"></div>
+<button type="button" class="btn filter-btn" data-open-sheet aria-haspopup="dialog"><svg class="ic" aria-hidden="true" focusable="false"><use href="#i-filter"/></svg>Bộ lọc</button>
+<div class="filter-sheet" role="dialog" aria-label="Bộ lọc tin">
+<div class="sheet-head"><span>Bộ lọc</span><button type="button" class="icon-btn" data-close-sheet aria-label="Đóng bộ lọc"><svg class="ic" aria-hidden="true" focusable="false"><use href="#i-x"/></svg></button></div>
+<div class="fields">
+<div class="field"><label for="filter-source">Nguồn</label><select id="filter-source" class="pill-select" onchange="applyFilters()"><option value="">Tất cả nguồn</option><option value="VnEconomy">VnEconomy</option><option value="VTV">VTV</option><option value="Đầu tư Chứng khoán">Đầu tư Chứng khoán</option><option value="Diễn đàn Doanh nghiệp">Diễn đàn Doanh nghiệp</option><option value="VietnamNet">VietnamNet</option></select></div>
+<div class="field"><label for="filter-issue">Issue</label><select id="filter-issue" class="pill-select" onchange="applyFilters()"><option value="">Tất cả issue</option></select></div>
+<div class="field"><label for="filter-brand">Thương hiệu</label><select id="filter-brand" class="pill-select" onchange="applyFilters()"><option value="">Tất cả thương hiệu</option><option value="ABBank">ABBank</option><option value="ACB">ACB</option><option value="Agribank">Agribank</option><option value="BIDV">BIDV</option><option value="Bac A Bank">Bac A Bank</option><option value="BaoViet Bank">BaoViet Bank</option><option value="Eximbank">Eximbank</option><option value="HDBank">HDBank</option><option value="Kienlongbank">Kienlongbank</option><option value="LPBank">LPBank</option><option value="MB">MB</option><option value="MSB">MSB</option><option value="NCB">NCB</option><option value="Nam A Bank">Nam A Bank</option><option value="Ngân hàng Nhà nước">Ngân hàng Nhà nước</option><option value="OCB">OCB</option><option value="PVcomBank">PVcomBank</option><option value="SCB">SCB</option><option value="SHB">SHB</option><option value="Sacombank">Sacombank</option><option value="SeABank">SeABank</option><option value="TPBank">TPBank</option><option value="Techcombank">Techcombank</option><option value="VIB">VIB</option><option value="VPBank">VPBank</option><option value="Vietbank">Vietbank</option><option value="Vietcombank">Vietcombank</option><option value="VietinBank">VietinBank</option></select></div>
+<div class="field"><label>Sắp xếp</label><div class="sort-toggle">
+<button type="button" class="pill active" data-sort="newest" onclick="setSort(this,'newest')">Mới nhất</button>
+<button type="button" class="pill" data-sort="trending" onclick="setSort(this,'trending')">Đang hot</button>
+</div></div>
+</div>
+<div class="sheet-foot"><button type="button" class="btn" onclick="resetFilters()">Đặt lại</button><button type="button" class="btn primary" data-close-sheet>Áp dụng</button></div>
+</div>
+</div><div class="news-table"><div class="news-head" aria-hidden="true"><span>Nguồn</span><span>Tiêu đề</span><span>Issue</span><span>Giờ</span></div><div id="news-stream-list" class="news-stream-list"><div class="news-row" data-source="VietnamNet" data-issue="" data-brand="" data-hot="0" data-ts="1788877830"><span class="src">VietnamNet</span><div class="hl"><a class="headline" href="https://vietnamnet.vn/cong-bo-thong-tin-sai-lech-bao-cao-tai-chinh-mot-doanh-nghiep-bi-phat-2553264.html" target="_blank" rel="noopener">Công bố thông tin sai lệch báo cáo tài chính, một doanh nghiệp bị phạt</a><div class="hl-meta"></div></div><span class="ts">21:30</span></div><div class="news-row" data-source="VTV" data-issue="" data-brand="" data-hot="0" data-ts="1788874020"><span class="src">VTV</span><div class="hl"><a class="headline" href="https://vtv.vn/de-xuat-giam-nguong-mien-thue-hang-nhap-khau-gia-tri-nho-xuong-100000-dong-100260908191547448.htm" target="_blank" rel="noopener">Đề xuất giảm ngưỡng miễn thuế hàng nhập khẩu giá trị nhỏ xuống 100.000 đồng</a><div class="hl-meta"></div></div><span class="ts">20:27</span></div><div class="news-row" data-source="VietnamNet" data-issue="" data-brand="" data-hot="0" data-ts="1788873966"><span class="src">VietnamNet</span><div class="hl"><a class="headline" href="https://vietnamnet.vn/quoc-dao-tung-giau-thu-hai-the-gioi-gio-tra-gia-vi-vang-trang-can-kiet-2548671.html" target="_blank" rel="noopener">Quốc đảo từng giàu thứ hai thế giới giờ trả giá vì &amp;apos;vàng trắng&amp;apos; cạn kiệt</a><div class="hl-meta"></div></div><span class="ts">20:26</span></div><div class="news-row" data-source="VTV" data-issue="" data-brand="" data-hot="0" data-ts="1788873660"><span class="src">VTV</span><div class="hl"><a class="headline" href="https://vtv.vn/nang-gia-tri-nganh-hang-xuat-khau-chu-luc-100260908120517389.htm" target="_blank" rel="noopener">Nâng giá trị ngành hàng xuất khẩu chủ lực</a><div class="hl-meta"></div></div><span class="ts">20:21</span></div><div class="news-row" data-source="VTV" data-issue="" data-brand="" data-hot="0" data-ts="1788873600"><span class="src">VTV</span><div class="hl"><a class="headline" href="https://vtv.vn/eu-siet-cho-thue-ngan-han-de-giu-nguon-cung-nha-o-100260908124011169.htm" target="_blank" rel="noopener">EU siết cho thuê ngắn hạn để giữ nguồn cung nhà ở</a><div class="hl-meta"></div></div><span class="ts">20:20</span></div><div class="news-row" data-source="VTV" data-issue="" data-brand="" data-hot="0" data-ts="1788873300"><span class="src">VTV</span><div class="hl"><a class="headline" href="https://vtv.vn/vn-index-dao-chieu-tang-hon-8-diem-100260824155407557.htm" target="_blank" rel="noopener">VN-Index đảo chiều tăng hơn 8 điểm</a><div class="hl-meta"></div></div><span class="ts">20:15</span></div><div class="news-row" data-source="VTV" data-issue="" data-brand="" data-hot="0" data-ts="1788873240"><span class="src">VTV</span><div class="hl"><a class="headline" href="https://vtv.vn/3-cang-bien-viet-nam-giu-vi-the-tren-bang-xep-hang-the-gioi-100260908162819057.htm" target="_blank" rel="noopener">3 cảng biển Việt Nam giữ vị thế trên bảng xếp hạng thế giới</a><div class="hl-meta"></div></div><span class="ts">20:14</span></div><div class="news-row" data-source="VTV" data-issue="" data-brand="" data-hot="0" data-ts="1788873060"><span class="src">VTV</span><div class="hl"><a class="headline" href="https://vtv.vn/cac-truong-hop-duoc-xac-dinh-lai-dien-tich-dat-o-100260908152202636.htm" target="_blank" rel="noopener">Các trường hợp được xác định lại diện tích đất ở</a><div class="hl-meta"></div></div><span class="ts">20:11</span></div><div class="news-row" data-source="VTV" data-issue="" data-brand="" data-hot="0" data-ts="1788872820"><span class="src">VTV</span><div class="hl"><a class="headline" href="https://vtv.vn/gia-dong-len-muc-cao-ky-luc-100260908155737912.htm" target="_blank" rel="noopener">Giá đồng lên mức cao kỷ lục</a><div class="hl-meta"></div></div><span class="ts">20:07</span></div><div class="news-row" data-source="VTV" data-issue="" data-brand="" data-hot="0" data-ts="1788872760"><span class="src">VTV</span><div class="hl"><a class="headline" href="https://vtv.vn/det-may-chuyen-tu-tang-san-luong-sang-gia-tri-100260908155321079.htm" target="_blank" rel="noopener">Dệt may chuyển từ tăng sản lượng sang giá trị</a><div class="hl-meta"></div></div><span class="ts">20:06</span></div><div class="news-row" data-source="VietnamNet" data-issue="" data-brand="" data-hot="0" data-ts="1788872701"><span class="src">VietnamNet</span><div class="hl"><a class="headline" href="https://vietnamnet.vn/thai-nguyen-hu-ngan-sach-gan-20-000-ty-dong-xuat-khau-dat-26-3-ty-usd-2553237.html" target="_blank" rel="noopener">Thái Nguyên thu ngân sách gần 20.000 tỷ đồng, xuất khẩu đạt 26,3 tỷ USD</a><div class="hl-meta"></div></div><span class="ts">20:05</span></div><div class="news-row" data-source="VTV" data-issue="" data-brand="" data-hot="0" data-ts="1788872700"><span class="src">VTV</span><div class="hl"><a class="headline" href="https://vtv.vn/khoi-phuc-ma-so-thue-cho-hon-3000-doanh-nghiep-100260908154354361.htm" target="_blank" rel="noopener">Khôi phục mã số thuế cho hơn 3.000 doanh nghiệp</a><div class="hl-meta"></div></div><span class="ts">20:05</span></div><div class="news-row" data-source="VTV" data-issue="" data-brand="" data-hot="0" data-ts="1788872640"><span class="src">VTV</span><div class="hl"><a class="headline" href="https://vtv.vn/tim-cook-roi-ghe-ceo-apple-van-nhan-goi-thu-lao-khung-100260908094707752.htm" target="_blank" rel="noopener">Tim Cook rời ghế CEO Apple vẫn nhận gói thù lao &quot;khủng&quot;</a><div class="hl-meta"></div></div><span class="ts">20:04</span></div><div class="news-row" data-source="VTV" data-issue="" data-brand="" data-hot="0" data-ts="1788872640"><span class="src">VTV</span><div class="hl"><a class="headline" href="https://vtv.vn/de-xuat-bo-sung-truong-hop-thu-hoi-dat-vi-pham-100260908153756551.htm" target="_blank" rel="noopener">Đề xuất bổ sung trường hợp thu hồi đất vi phạm</a><div class="hl-meta"></div></div><span class="ts">20:04</span></div><div class="news-row" data-source="VTV" data-issue="" data-brand="" data-hot="0" data-ts="1788872580"><span class="src">VTV</span><div class="hl"><a class="headline" href="https://vtv.vn/29-sieu-ty-phu-dang-nam-27-tai-san-cua-gioi-ty-phu-toan-cau-10026090809073979.htm" target="_blank" rel="noopener">29 “siêu tỷ phú” đang nắm 27% tài sản của giới tỷ phú toàn cầu</a><div class="hl-meta"></div></div><span class="ts">20:03</span></div><div class="news-row" data-source="VTV" data-issue="" data-brand="" data-hot="0" data-ts="1788872580"><span class="src">VTV</span><div class="hl"><a class="headline" href="https://vtv.vn/hang-khong-dong-loat-giam-gia-ve-may-bay-nhan-ngay-doi-9-9-100260908152916969.htm" target="_blank" rel="noopener">Hàng không đồng loạt giảm giá vé máy bay nhân ngày đôi 9/9</a><div class="hl-meta"></div></div><span class="ts">20:03</span></div><div class="news-row" data-source="VTV" data-issue="" data-brand="" data-hot="0" data-ts="1788872520"><span class="src">VTV</span><div class="hl"><a class="headline" href="https://vtv.vn/gia-dau-tiep-tuc-tang-100260908151356554.htm" target="_blank" rel="noopener">Giá dầu tiếp tục tăng</a><div class="hl-meta"></div></div><span class="ts">20:02</span></div><div class="news-row" data-source="VTV" data-issue="" data-brand="" data-hot="0" data-ts="1788872400"><span class="src">VTV</span><div class="hl"><a class="headline" href="https://vtv.vn/thanh-hoa-chu-dong-kiem-soat-rui-ro-nang-hieu-qua-chan-nuoi-nuoi-trong-thuy-san-100260904162015745.htm" target="_blank" rel="noopener">Thanh Hóa: Chủ động kiểm soát rủi ro, nâng hiệu quả chăn nuôi, nuôi trồng thủy sản</a><div class="hl-meta"></div></div><span class="ts">20:00</span></div><div class="news-row" data-source="VTV" data-issue="" data-brand="" data-hot="0" data-ts="1788872040"><span class="src">VTV</span><div class="hl"><a class="headline" href="https://vtv.vn/lam-dong-doi-moi-xuc-tien-thuong-mai-huong-manh-vao-phat-trien-thi-truong-100260908191457214.htm" target="_blank" rel="noopener">Lâm Đồng đổi mới xúc tiến thương mại, hướng mạnh vào phát triển thị trường</a><div class="hl-meta"></div></div><span class="ts">19:54</span></div><div class="news-row" data-source="VnEconomy" data-issue="" data-brand="" data-hot="0" data-ts="1788867929"><span class="src">VnEconomy</span><div class="hl"><a class="headline" href="https://vneconomy.vn/muc-loi-suat-trai-phieu-kho-bac-my-co-the-de-doa-cac-tai-san-khac.htm" target="_blank" rel="noopener">Mức lợi suất trái phiếu kho bạc Mỹ có thể đe dọa các tài sản khác</a><div class="hl-meta"></div></div><span class="ts">18:45</span></div><div class="news-row" data-source="VTV" data-issue="" data-brand="" data-hot="0" data-ts="1788863880"><span class="src">VTV</span><div class="hl"><a class="headline" href="https://vtv.vn/cuc-thue-dat-muc-tieu-cham-dut-hieu-luc-ma-so-thue-trong-3-ngay-100260908155406689.htm" target="_blank" rel="noopener">Cục Thuế đặt mục tiêu chấm dứt hiệu lực mã số thuế trong 3 ngày</a><div class="hl-meta"></div></div><span class="ts">17:38</span></div><div class="news-row" data-source="Đầu tư Chứng khoán" data-issue="" data-brand="" data-hot="0" data-ts="1788863141"><span class="src">Đầu tư Chứng khoán</span><div class="hl"><a class="headline" href="https://www.tinnhanhchungkhoan.vn/co-phieu-can-quan-tam-ngay-99-post397229.html" target="_blank" rel="noopener">Cổ phiếu cần quan tâm ngày 9/9</a><div class="hl-meta"></div></div><span class="ts">17:25</span></div><div class="news-row" data-source="VietnamNet" data-issue="" data-brand="" data-hot="0" data-ts="1788856800"><span class="src">VietnamNet</span><div class="hl"><a class="headline" href="https://vietnamnet.vn/baylis-harding-va-chien-luoc-chon-san-cua-thuong-hieu-qua-tang-tu-nuoc-anh-2553138.html" target="_blank" rel="noopener">Baylis &amp;amp; Harding và chiến lược chọn ‘sân’ của thương hiệu quà tặng từ nước Anh</a><div class="hl-meta"></div></div><span class="ts">15:40</span></div><div class="news-row" data-source="VietnamNet" data-issue="" data-brand="" data-hot="0" data-ts="1788856587"><span class="src">VietnamNet</span><div class="hl"><a class="headline" href="https://vietnamnet.vn/dong-ma-so-thue-cho-doanh-nghiep-du-dieu-kien-trong-3-ngay-2553162.html" target="_blank" rel="noopener">Đóng mã số thuế cho doanh nghiệp đủ điều kiện trong 3 ngày</a><div class="hl-meta"></div></div><span class="ts">15:36</span></div><div class="news-row" data-source="VietnamNet" data-issue="" data-brand="" data-hot="0" data-ts="1788856082"><span class="src">VietnamNet</span><div class="hl"><a class="headline" href="https://vietnamnet.vn/sau-gio-dong-cho-tieu-thuong-ha-long-livestream-ban-hang-tai-khu-vuc-dac-biet-2553091.html" target="_blank" rel="noopener">Sau giờ đóng chợ, tiểu thương Hạ Long livestream bán hàng tại &amp;apos;khu vực đặc biệt&amp;apos;</a><div class="hl-meta"></div></div><span class="ts">15:28</span></div><div class="news-row" data-source="VTV" data-issue="" data-brand="" data-hot="0" data-ts="1788854400"><span class="src">VTV</span><div class="hl"><a class="headline" href="https://vtv.vn/go-diem-nghen-xu-ly-dut-diem-du-an-treo-100260908111450459.htm" target="_blank" rel="noopener">Gỡ điểm nghẽn, xử lý dứt điểm dự án “treo”</a><div class="hl-meta"></div></div><span class="ts">15:00</span></div><div class="news-row" data-source="VnEconomy" data-issue="" data-brand="" data-hot="0" data-ts="1788853040"><span class="src">VnEconomy</span><div class="hl"><a class="headline" href="https://vneconomy.vn/no-ro-chung-chi-tien-gui-duoi-6-thang-chao-lai-suat-7-8nam.htm" target="_blank" rel="noopener">Nở rộ chứng chỉ tiền gửi dưới 6 tháng chào lãi suất 7-8%/năm</a><div class="hl-meta"></div></div><span class="ts">14:37</span></div><div class="news-row" data-source="VTV" data-issue="" data-brand="" data-hot="0" data-ts="1788852900"><span class="src">VTV</span><div class="hl"><a class="headline" href="https://vtv.vn/suc-hut-trai-phieu-kho-bac-my-sut-giam-100260908112325994.htm" target="_blank" rel="noopener">Sức hút trái phiếu kho bạc Mỹ sụt giảm</a><div class="hl-meta"></div></div><span class="ts">14:35</span></div><div class="news-row" data-source="VTV" data-issue="" data-brand="" data-hot="0" data-ts="1788852780"><span class="src">VTV</span><div class="hl"><a class="headline" href="https://vtv.vn/hoan-thanh-giai-phong-mat-bang-du-an-trong-diem-100260908104548162.htm" target="_blank" rel="noopener">Hoàn thành giải phóng mặt bằng dự án trọng điểm</a><div class="hl-meta"></div></div><span class="ts">14:33</span></div><div class="news-row" data-source="VietnamNet" data-issue="" data-brand="" data-hot="0" data-ts="1788852600"><span class="src">VietnamNet</span><div class="hl"><a class="headline" href="https://vietnamnet.vn/banh-trung-thu-yen-sao-khanh-hoa-tinh-hoa-qua-tang-mua-doan-vien-2553062.html" target="_blank" rel="noopener">Bánh Trung thu Yến sào Khánh Hòa: Tinh hoa quà tặng mùa đoàn viên</a><div class="hl-meta"></div></div><span class="ts">14:30</span></div><div class="news-row" data-source="VTV" data-issue="" data-brand="" data-hot="0" data-ts="1788852600"><span class="src">VTV</span><div class="hl"><a class="headline" href="https://vtv.vn/them-bo-loc-cho-thi-truong-truoc-nang-hang-100260908113621705.htm" target="_blank" rel="noopener">Thêm bộ lọc cho thị trường trước nâng hạng</a><div class="hl-meta"></div></div><span class="ts">14:30</span></div><div class="news-row" data-source="VTV" data-issue="" data-brand="" data-hot="0" data-ts="1788852420"><span class="src">VTV</span><div class="hl"><a class="headline" href="https://vtv.vn/gia-vang-tang-600000-dong-luong-100260908124930737.htm" target="_blank" rel="noopener">Giá vàng tăng 600.000 đồng/lượng</a><div class="hl-meta"></div></div><span class="ts">14:27</span></div><div class="news-row" data-source="VietnamNet" data-issue="" data-brand="" data-hot="0" data-ts="1788851424"><span class="src">VietnamNet</span><div class="hl"><a class="headline" href="https://vietnamnet.vn/nhung-khoan-tien-am-tham-roi-vi-vi-thoi-quen-it-ai-de-y-2552897.html" target="_blank" rel="noopener">Những khoản tiền âm thầm rời ví vì thói quen ít ai để ý</a><div class="hl-meta"></div></div><span class="ts">14:10</span></div><div class="news-row" data-source="VietnamNet" data-issue="" data-brand="" data-hot="0" data-ts="1788850800"><span class="src">VietnamNet</span><div class="hl"><a class="headline" href="https://vietnamnet.vn/banh-trung-thu-cham-cham-da-dang-hoa-huong-vi-cho-gioi-tre-2553046.html" target="_blank" rel="noopener">Bánh Trung thu Cham Cham đa dạng hóa hương vị cho giới trẻ</a><div class="hl-meta"></div></div><span class="ts">14:00</span></div><div class="news-row" data-source="VietnamNet" data-issue="" data-brand="" data-hot="0" data-ts="1788850705"><span class="src">VietnamNet</span><div class="hl"><a class="headline" href="https://vietnamnet.vn/xe-mini-cooper-chay-rui-bao-hiem-dinh-gia-223-trieu-toa-buoc-tra-du-450-trieu-2552838.html" target="_blank" rel="noopener">Xe Mini Cooper cháy rụi, bảo hiểm định giá 223 triệu, tòa buộc trả đủ 450 triệu</a><div class="hl-meta"></div></div><span class="ts">13:58</span></div><div class="news-row" data-source="VietnamNet" data-issue="" data-brand="" data-hot="0" data-ts="1788849000"><span class="src">VietnamNet</span><div class="hl"><a class="headline" href="https://vietnamnet.vn/phu-tho-mo-duong-cho-doanh-nghiep-noi-dia-tham-gia-chuoi-cung-ung-toan-cau-2553052.html" target="_blank" rel="noopener">Phú Thọ mở đường cho doanh nghiệp nội địa tham gia chuỗi cung ứng toàn cầu</a><div class="hl-meta"></div></div><span class="ts">13:30</span></div><div class="news-row" data-source="VietnamNet" data-issue="" data-brand="" data-hot="0" data-ts="1788848100"><span class="src">VietnamNet</span><div class="hl"><a class="headline" href="https://vietnamnet.vn/mot-mat-hang-viet-nam-thu-gan-12-ty-usd-my-la-khach-lon-trung-quoc-mua-manh-2552713.html" target="_blank" rel="noopener">Một mặt hàng Việt Nam thu gần 12 tỷ USD, Mỹ là khách lớn, Trung Quốc mua mạnh</a><div class="hl-meta"></div></div><span class="ts">13:15</span></div><div class="news-row" data-source="VietnamNet" data-issue="" data-brand="" data-hot="0" data-ts="1788844474"><span class="src">VietnamNet</span><div class="hl"><a class="headline" href="https://vietnamnet.vn/cho-nang-nguong-thue-10-ty-ho-kinh-doanh-tam-nop-thue-the-nao-2553049.html" target="_blank" rel="noopener">Chờ nâng ngưỡng thuế 10 tỷ, hộ kinh doanh tạm nộp thuế thế nào?</a><div class="hl-meta"></div></div><span class="ts">12:14</span></div><div class="news-row" data-source="VietnamNet" data-issue="" data-brand="" data-hot="0" data-ts="1788841800"><span class="src">VietnamNet</span><div class="hl"><a class="headline" href="https://vietnamnet.vn/caluci-va-chien-luoc-tao-khac-biet-tren-thi-truong-thoi-trang-nam-2552813.html" target="_blank" rel="noopener">Caluci và chiến lược tạo khác biệt trên thị trường thời trang nam</a><div class="hl-meta"></div></div><span class="ts">11:30</span></div><div class="news-row" data-source="VTV" data-issue="" data-brand="" data-hot="0" data-ts="1788841680"><span class="src">VTV</span><div class="hl"><a class="headline" href="https://vtv.vn/trien-vong-dong-tien-ngoai-vao-thi-truong-viet-nam-khi-nang-hang-den-rat-gan-100260908101615753.htm" target="_blank" rel="noopener">Triển vọng dòng tiền ngoại vào thị trường Việt Nam khi nâng hạng đến rất gần</a><div class="hl-meta"></div></div><span class="ts">11:28</span></div><div class="news-row" data-source="VTV" data-issue="" data-brand="" data-hot="0" data-ts="1788841620"><span class="src">VTV</span><div class="hl"><a class="headline" href="https://vtv.vn/200-doanh-nghiep-dong-gan-1-trieu-ty-dong-ngan-sach-100260908101259498.htm" target="_blank" rel="noopener">200 doanh nghiệp đóng gần 1 triệu tỷ đồng ngân sách</a><div class="hl-meta"></div></div><span class="ts">11:27</span></div><div class="news-row" data-source="VTV" data-issue="" data-brand="" data-hot="0" data-ts="1788841440"><span class="src">VTV</span><div class="hl"><a class="headline" href="https://vtv.vn/de-xuat-6-tuyen-duong-sat-quoc-gia-tai-ha-noi-100260908102730395.htm" target="_blank" rel="noopener">Đề xuất 6 tuyến đường sắt quốc gia tại Hà Nội</a><div class="hl-meta"></div></div><span class="ts">11:24</span></div><div class="news-row" data-source="VietnamNet" data-issue="" data-brand="" data-hot="0" data-ts="1788840027"><span class="src">VietnamNet</span><div class="hl"><a class="headline" href="https://vietnamnet.vn/cong-an-lai-chau-amaccao-va-hanh-trinh-dua-4-mai-truong-vung-bien-ve-dich-2553024.html" target="_blank" rel="noopener">Công an Lai Châu, AMACCAO và hành trình đưa 4 mái trường vùng biên về đích</a><div class="hl-meta"></div></div><span class="ts">11:00</span></div><div class="news-row" data-source="VnEconomy" data-issue="" data-brand="" data-hot="0" data-ts="1788839831"><span class="src">VnEconomy</span><div class="hl"><a class="headline" href="https://vneconomy.vn/ty-gia-dong-yen-but-toc-len-dinh-7-thang-carry-trade-bat-dau-dao-chieu.htm" target="_blank" rel="noopener">Tỷ giá đồng yên bứt tốc lên đỉnh 7 tháng, “carry trade” bắt đầu đảo chiều</a><div class="hl-meta"></div></div><span class="ts">10:57</span></div><div class="news-row" data-source="VietnamNet" data-issue="" data-brand="" data-hot="0" data-ts="1788838200"><span class="src">VietnamNet</span><div class="hl"><a class="headline" href="https://vietnamnet.vn/gia-lai-do-luong-muc-do-hai-long-cua-nguoi-dan-voi-co-quan-hanh-chinh-2553008.html" target="_blank" rel="noopener">Gia Lai đo lường mức độ hài lòng của người dân với cơ quan hành chính</a><div class="hl-meta"></div></div><span class="ts">10:30</span></div><div class="news-row" data-source="VietnamNet" data-issue="" data-brand="" data-hot="0" data-ts="1788837605"><span class="src">VietnamNet</span><div class="hl"><a class="headline" href="https://vietnamnet.vn/ha-noi-phan-dau-grdp-nam-2026-dat-tu-11-tro-len-2552966.html" target="_blank" rel="noopener">Hà Nội phấn đấu GRDP năm 2026 đạt từ 11% trở lên</a><div class="hl-meta"></div></div><span class="ts">10:20</span></div><div class="news-row" data-source="VTV" data-issue="" data-brand="" data-hot="0" data-ts="1788837120"><span class="src">VTV</span><div class="hl"><a class="headline" href="https://vtv.vn/quy-dinh-ve-nhap-xuat-hang-du-tru-quoc-gia-100260908061404237.htm" target="_blank" rel="noopener">Quy định về nhập, xuất hàng dự trữ quốc gia</a><div class="hl-meta"></div></div><span class="ts">10:12</span></div><div class="news-row" data-source="VTV" data-issue="" data-brand="" data-hot="0" data-ts="1788837000"><span class="src">VTV</span><div class="hl"><a class="headline" href="https://vtv.vn/mien-bac-hut-tren-80-von-fdi-san-xuat-dang-ky-moi-100260907192154939.htm" target="_blank" rel="noopener">Miền Bắc hút trên 80% vốn FDI sản xuất đăng ký mới</a><div class="hl-meta"></div></div><span class="ts">10:10</span></div><div class="news-row" data-source="VTV" data-issue="" data-brand="" data-hot="0" data-ts="1788836400"><span class="src">VTV</span><div class="hl"><a class="headline" href="https://vtv.vn/sahmyook-ba-nam-lien-tiep-duoc-nguoi-tieu-dung-viet-nam-lua-chon-100260905185842729.htm" target="_blank" rel="noopener">Sahmyook ba năm liên tiếp được người tiêu dùng Việt Nam lựa chọn</a><div class="hl-meta"></div></div><span class="ts">10:00</span></div><div class="news-row" data-source="VTV" data-issue="" data-brand="" data-hot="0" data-ts="1788836400"><span class="src">VTV</span><div class="hl"><a class="headline" href="https://vtv.vn/dewdap-duoc-nguoi-tieu-dung-viet-nam-binh-chon-tai-brand-of-the-year-2026-100260905190349403.htm" target="_blank" rel="noopener">DEWDAP được người tiêu dùng Việt Nam bình chọn tại Brand of the Year 2026</a><div class="hl-meta"></div></div><span class="ts">10:00</span></div><div class="news-row" data-source="VTV" data-issue="" data-brand="" data-hot="0" data-ts="1788836400"><span class="src">VTV</span><div class="hl"><a class="headline" href="https://vtv.vn/face-republic-duoc-nguoi-tieu-dung-viet-nam-lua-chon-tai-brand-of-the-year-2026-100260905190935906.htm" target="_blank" rel="noopener">Face Republic được người tiêu dùng Việt Nam lựa chọn tại Brand of the Year 2026</a><div class="hl-meta"></div></div><span class="ts">10:00</span></div><div class="news-row" data-source="VietnamNet" data-issue="" data-brand="" data-hot="0" data-ts="1788835952"><span class="src">VietnamNet</span><div class="hl"><a class="headline" href="https://vietnamnet.vn/chong-tu-vong-sau-2-nam-mua-bao-hiem-vo-nhan-2-1-ty-sau-khi-bi-tu-choi-chi-tra-2545216.html" target="_blank" rel="noopener">Chồng tử vong sau 2 năm mua bảo hiểm, vợ nhận 2,1 tỷ sau khi bị từ chối chi trả</a><div class="hl-meta"></div></div><span class="ts">09:52</span></div><div class="news-row" data-source="VietnamNet" data-issue="" data-brand="" data-hot="0" data-ts="1788835936"><span class="src">VietnamNet</span><div class="hl"><a class="headline" href="https://vietnamnet.vn/con-trai-mua-bao-hiem-roi-qua-doi-nguoi-me-chat-vat-doi-hon-2-3-ty-dong-2545902.html" target="_blank" rel="noopener">Con trai mua bảo hiểm rồi qua đời, người mẹ chật vật đòi hơn 2,3 tỷ đồng</a><div class="hl-meta"></div></div><span class="ts">09:52</span></div><div class="news-row" data-source="VietnamNet" data-issue="" data-brand="" data-hot="0" data-ts="1788835921"><span class="src">VietnamNet</span><div class="hl"><a class="headline" href="https://vietnamnet.vn/tu-vong-sau-hon-2-thang-ky-hop-dong-cong-ty-bao-hiem-tu-choi-chi-tra-2548718.html" target="_blank" rel="noopener">Khách tử vong sau hơn 2 tháng ký hợp đồng, công ty bảo hiểm từ chối chi trả</a><div class="hl-meta"></div></div><span class="ts">09:52</span></div><div class="news-row" data-source="VietnamNet" data-issue="" data-brand="" data-hot="0" data-ts="1788835903"><span class="src">VietnamNet</span><div class="hl"><a class="headline" href="https://vietnamnet.vn/o-to-350-trieu-chay-sau-gan-1-thang-mua-bao-hiem-chu-xe-bi-tu-choi-boi-thuong-2549052.html" target="_blank" rel="noopener">Ô tô 350 triệu bị cháy sau gần 1 tháng mua bảo hiểm, chủ xe bị từ chối bồi thường</a><div class="hl-meta"></div></div><span class="ts">09:51</span></div><div class="news-row" data-source="VietnamNet" data-issue="" data-brand="" data-hot="0" data-ts="1788835890"><span class="src">VietnamNet</span><div class="hl"><a class="headline" href="https://vietnamnet.vn/o-to-hong-sau-tai-nan-chu-xe-doi-dn-bao-hiem-tra-hon-237-trieu-nhung-bi-tu-choi-2550493.html" target="_blank" rel="noopener">Ô tô hỏng sau tai nạn, chủ xe đòi DN bảo hiểm trả hơn 237 triệu nhưng bị từ chối</a><div class="hl-meta"></div></div><span class="ts">09:51</span></div><div class="news-row" data-source="VietnamNet" data-issue="" data-brand="" data-hot="0" data-ts="1788835877"><span class="src">VietnamNet</span><div class="hl"><a class="headline" href="https://vietnamnet.vn/nghi-chu-xuong-go-gian-lan-sau-vu-chay-bao-hiem-van-phai-tra-hon-20-7-ty-dong-2551307.html" target="_blank" rel="noopener">Nghi chủ xưởng gỗ gian lận sau vụ cháy, bảo hiểm vẫn phải trả hơn 20,7 tỷ đồng</a><div class="hl-meta"></div></div><span class="ts">09:51</span></div><div class="news-row" data-source="VietnamNet" data-issue="" data-brand="" data-hot="0" data-ts="1788833365"><span class="src">VietnamNet</span><div class="hl"><a class="headline" href="https://vietnamnet.vn/lai-suat-ngan-hang-hom-nay-8-9-2026-sau-cong-them-lai-suat-thuc-nhan-9-4-nam-2552954.html" target="_blank" rel="noopener">Lãi suất ngân hàng hôm nay 8/9/2026: Sau cộng thêm, lãi suất thực nhận 9,4%/năm</a><div class="hl-meta"></div></div><span class="ts">09:09</span></div><div class="news-row" data-source="VietnamNet" data-issue="" data-brand="" data-hot="0" data-ts="1788832881"><span class="src">VietnamNet</span><div class="hl"><a class="headline" href="https://vietnamnet.vn/doanh-nghiep-quoc-gia-bai-hoc-tu-cac-nen-kinh-te-lon-2552962.html" target="_blank" rel="noopener">Doanh nghiệp Quốc gia: Bài học từ các nền kinh tế lớn</a><div class="hl-meta"></div></div><span class="ts">09:01</span></div><div class="news-row" data-source="VTV" data-issue="" data-brand="" data-hot="0" data-ts="1788832800"><span class="src">VTV</span><div class="hl"><a class="headline" href="https://vtv.vn/chuyen-gia-quang-cao-quoc-te-4a-jonathan-beh-gia-nhap-chicilon-media-100260908083324352.htm" target="_blank" rel="noopener">Chuyên gia quảng cáo quốc tế 4A Jonathan Beh gia nhập Chicilon Media</a><div class="hl-meta"></div></div><span class="ts">09:00</span></div><div class="news-row" data-source="VnEconomy" data-issue="" data-brand="" data-hot="0" data-ts="1788830399"><span class="src">VnEconomy</span><div class="hl"><a class="headline" href="https://vneconomy.vn/khong-de-san-pham-du-dieu-kien-tai-trung-tam-tai-chinh-quoc-te-tiep-tuc-cho-trien-khai.htm" target="_blank" rel="noopener">Không để sản phẩm đủ điều kiện tại Trung tâm Tài chính Quốc tế tiếp tục chờ triển khai</a><div class="hl-meta"></div></div><span class="ts">08:19</span></div><div class="news-row" data-source="VietnamNet" data-issue="" data-brand="" data-hot="0" data-ts="1788829602"><span class="src">VietnamNet</span><div class="hl"><a class="headline" href="https://vietnamnet.vn/gia-vang-hom-nay-7-9-vang-sjc-va-vang-nhan-dong-loat-giam-2552471.html" target="_blank" rel="noopener">Giá vàng hôm nay 7/9/2026: Tuột dốc, vàng trong nước giảm hơn 1 triệu đồng/lượng</a><div class="hl-meta"></div></div><span class="ts">08:06</span></div><div class="news-row" data-source="VietnamNet" data-issue="" data-brand="" data-hot="0" data-ts="1788829542"><span class="src">VietnamNet</span><div class="hl"><a class="headline" href="https://vietnamnet.vn/ong-chu-bi-de-nghi-truy-to-cay-xanh-cong-minh-trung-hon-600-goi-thau-2552899.html" target="_blank" rel="noopener">Ông chủ bị đề nghị truy tố, Cây xanh Công Minh trúng hơn 600 gói thầu trị giá 3.500 tỷ đồng</a><div class="hl-meta"></div></div><span class="ts">08:05</span></div><div class="news-row" data-source="VietnamNet" data-issue="" data-brand="" data-hot="0" data-ts="1788829497"><span class="src">VietnamNet</span><div class="hl"><a class="headline" href="https://vietnamnet.vn/cong-ty-cua-ong-le-viet-hai-van-lo-hon-2-000-ty-no-phai-tra-gan-14-700-ty-2552790.html" target="_blank" rel="noopener">Công ty do ông Lê Viết Hải làm Chủ tịch vẫn lỗ hơn 2.000 tỷ, nợ phải trả gần 14.700 tỷ</a><div class="hl-meta"></div></div><span class="ts">08:04</span></div><div class="news-row" data-source="VietnamNet" data-issue="" data-brand="" data-hot="0" data-ts="1788829200"><span class="src">VietnamNet</span><div class="hl"><a class="headline" href="https://vietnamnet.vn/shop-thien-nhan-5272-gop-phan-dua-dac-san-dia-phuong-vuon-xa-2552796.html" target="_blank" rel="noopener">Shop Thiện Nhân 5272 góp phần đưa đặc sản địa phương vươn xa</a><div class="hl-meta"></div></div><span class="ts">08:00</span></div><div class="news-row" data-source="VnEconomy" data-issue="" data-brand="|Kienlongbank|" data-hot="0" data-ts="1788829200"><span class="src">VnEconomy</span><div class="hl"><a class="headline" href="https://vneconomy.vn/kienlongbank-ra-mat-he-sinh-thai-so-myshop-50-all-in-one-cho-ho-kinh-doanh.htm" target="_blank" rel="noopener">KienlongBank ra mắt hệ sinh thái số MyShop 5.0 All-in-One cho Hộ kinh doanh</a><div class="hl-meta"><span class="sent pos" role="img" aria-label="tích cực" title="tích cực (ước lượng): ra mắt"></span><span class="brand-tag">Kienlongbank</span></div></div><span class="ts">08:00</span></div><div class="news-row" data-source="VnEconomy" data-issue="" data-brand="" data-hot="0" data-ts="1788829176"><span class="src">VnEconomy</span><div class="hl"><a class="headline" href="https://vneconomy.vn/hai-quan-tich-thu-hon-15300-ty-dong-hang-hoa-vi-pham.htm" target="_blank" rel="noopener">Hải quan tịch thu hơn 15.300 tỷ đồng hàng hóa vi phạm</a><div class="hl-meta"></div></div><span class="ts">07:59</span></div><div class="news-row" data-source="VnEconomy" data-issue="" data-brand="" data-hot="0" data-ts="1788828928"><span class="src">VnEconomy</span><div class="hl"><a class="headline" href="https://vneconomy.vn/nhieu-nha-du-bao-tro-nen-lac-quan-hon-ve-trien-vong-tang-gia-cua-vang.htm" target="_blank" rel="noopener">Nhiều nhà dự báo trở nên lạc quan hơn về triển vọng tăng giá của vàng</a><div class="hl-meta"></div></div><span class="ts">07:55</span></div><div class="news-row" data-source="VietnamNet" data-issue="" data-brand="" data-hot="0" data-ts="1788828092"><span class="src">VietnamNet</span><div class="hl"><a class="headline" href="https://vietnamnet.vn/gia-xang-dau-hom-nay-8-9-the-gioi-tang-cao-trong-nuoc-cho-dieu-chinh-2552939.html" target="_blank" rel="noopener">Giá xăng dầu hôm nay 8/9: Thế giới tăng cao, trong nước chờ điều chỉnh</a><div class="hl-meta"></div></div><span class="ts">07:41</span></div><div class="news-row" data-source="VnEconomy" data-issue="" data-brand="" data-hot="0" data-ts="1788827897"><span class="src">VnEconomy</span><div class="hl"><a class="headline" href="https://vneconomy.vn/moi-lo-lai-suat-tang-neo-gia-vang-quanh-nguong-4400-usdoz.htm" target="_blank" rel="noopener">Mối lo lãi suất tăng &quot;neo&quot; giá vàng quanh ngưỡng 4.400 USD/oz</a><div class="hl-meta"></div></div><span class="ts">07:38</span></div><div class="news-row" data-source="VTV" data-issue="" data-brand="" data-hot="0" data-ts="1788825540"><span class="src">VTV</span><div class="hl"><a class="headline" href="https://vtv.vn/du-tru-ngoai-hoi-nhat-ban-giam-manh-nhat-lich-su-100260908061033538.htm" target="_blank" rel="noopener">Dự trữ ngoại hối Nhật Bản giảm mạnh nhất lịch sử</a><div class="hl-meta"></div></div><span class="ts">06:59</span></div><div class="news-row" data-source="VTV" data-issue="" data-brand="" data-hot="0" data-ts="1788825420"><span class="src">VTV</span><div class="hl"><a class="headline" href="https://vtv.vn/buoc-vao-cao-diem-kiem-tra-tau-bien-quoc-te-100260908055655878.htm" target="_blank" rel="noopener">Bước vào cao điểm kiểm tra tàu biển quốc tế</a><div class="hl-meta"></div></div><span class="ts">06:57</span></div><div class="news-row" data-source="VTV" data-issue="" data-brand="" data-hot="0" data-ts="1788825420"><span class="src">VTV</span><div class="hl"><a class="headline" href="https://vtv.vn/nguon-cung-nhien-lieu-hang-hai-that-chat-100260908060417109.htm" target="_blank" rel="noopener">Nguồn cung nhiên liệu hàng hải thắt chặt</a><div class="hl-meta"></div></div><span class="ts">06:57</span></div><div class="news-row" data-source="VietnamNet" data-issue="" data-brand="" data-hot="0" data-ts="1788822132"><span class="src">VietnamNet</span><div class="hl"><a class="headline" href="https://vietnamnet.vn/dai-gia-kinh-bac-nam-quyen-kiem-soat-doanh-nghiep-quan-ly-doi-bong-2552855.html" target="_blank" rel="noopener">Đại gia Kinh Bắc nắm quyền kiểm soát Công ty KBC Hưng Yên</a><div class="hl-meta"></div></div><span class="ts">06:02</span></div><div class="news-row" data-source="Diễn đàn Doanh nghiệp" data-issue="" data-brand="" data-hot="0" data-ts="1788820440"><span class="src">Diễn đàn Doanh nghiệp</span><div class="hl"><a class="headline" href="https://diendandoanhnghiep.vn/phat-trien-ben-vung-thi-truong-trai-phieu-doanh-nghiep-10184254.html" target="_blank" rel="noopener">Phát triển bền vững thị trường trái phiếu doanh nghiệp</a><div class="hl-meta"></div></div><span class="ts">05:34</span></div><div class="news-row" data-source="VietnamNet" data-issue="" data-brand="" data-hot="0" data-ts="1788820200"><span class="src">VietnamNet</span><div class="hl"><a class="headline" href="https://vietnamnet.vn/doanh-thu-0-dong-vi-sao-nhieu-doanh-nghiep-ngung-hoat-dong-van-ganh-no-thue-2552789.html" target="_blank" rel="noopener">Doanh thu 0 đồng, vì sao nhiều doanh nghiệp ngừng hoạt động vẫn &amp;apos;gánh&amp;apos; nợ thuế?</a><div class="hl-meta"></div></div><span class="ts">05:30</span></div><div class="news-row" data-source="Đầu tư Chứng khoán" data-issue="" data-brand="" data-hot="0" data-ts="1788803845"><span class="src">Đầu tư Chứng khoán</span><div class="hl"><a class="headline" href="https://www.tinnhanhchungkhoan.vn/bao-dau-tu-so-72-post397740.html" target="_blank" rel="noopener">Báo Đầu tư số 72</a><div class="hl-meta"></div></div><span class="ts">00:57</span></div></div><div class="state" id="news-empty" hidden><b>Không tìm thấy tin phù hợp</b><span>Thử đổi từ khoá hoặc bộ lọc.</span><button type="button" class="btn" onclick="resetFilters()">Xoá bộ lọc</button></div></div><div id="news-pagination" class="pagination"></div></section><section id="sources" class="section" aria-labelledby="sources-title"><div class="section-head"><h2 class="section-title" id="sources-title">Theo nguồn</h2></div><div class="source-board"><details class="source-col" open><summary><span class="source-name">VnEconomy</span><span class="count">8</span><span class="chevron" aria-hidden="true">▾</span></summary><div class="source-list-wrap"><ul><li><span class="time">18:45</span><a href="https://vneconomy.vn/muc-loi-suat-trai-phieu-kho-bac-my-co-the-de-doa-cac-tai-san-khac.htm" target="_blank" rel="noopener">Mức lợi suất trái phiếu kho bạc Mỹ có thể đe dọa các tài sản khác</a></li><li><span class="time">14:37</span><a href="https://vneconomy.vn/no-ro-chung-chi-tien-gui-duoi-6-thang-chao-lai-suat-7-8nam.htm" target="_blank" rel="noopener">Nở rộ chứng chỉ tiền gửi dưới 6 tháng chào lãi suất 7-8%/năm</a></li><li><span class="time">10:57</span><a href="https://vneconomy.vn/ty-gia-dong-yen-but-toc-len-dinh-7-thang-carry-trade-bat-dau-dao-chieu.htm" target="_blank" rel="noopener">Tỷ giá đồng yên bứt tốc lên đỉnh 7 tháng, “carry trade” bắt đầu đảo chiều</a></li><li><span class="time">08:19</span><a href="https://vneconomy.vn/khong-de-san-pham-du-dieu-kien-tai-trung-tam-tai-chinh-quoc-te-tiep-tuc-cho-trien-khai.htm" target="_blank" rel="noopener">Không để sản phẩm đủ điều kiện tại Trung tâm Tài chính Quốc tế tiếp tục chờ triển khai</a></li><li><span class="time">08:00</span><a href="https://vneconomy.vn/kienlongbank-ra-mat-he-sinh-thai-so-myshop-50-all-in-one-cho-ho-kinh-doanh.htm" target="_blank" rel="noopener">KienlongBank ra mắt hệ sinh thái số MyShop 5.0 All-in-One cho Hộ kinh doanh</a></li><li><span class="time">07:59</span><a href="https://vneconomy.vn/hai-quan-tich-thu-hon-15300-ty-dong-hang-hoa-vi-pham.htm" target="_blank" rel="noopener">Hải quan tịch thu hơn 15.300 tỷ đồng hàng hóa vi phạm</a></li><li><span class="time">07:55</span><a href="https://vneconomy.vn/nhieu-nha-du-bao-tro-nen-lac-quan-hon-ve-trien-vong-tang-gia-cua-vang.htm" target="_blank" rel="noopener">Nhiều nhà dự báo trở nên lạc quan hơn về triển vọng tăng giá của vàng</a></li><li><span class="time">07:38</span><a href="https://vneconomy.vn/moi-lo-lai-suat-tang-neo-gia-vang-quanh-nguong-4400-usdoz.htm" target="_blank" rel="noopener">Mối lo lãi suất tăng &quot;neo&quot; giá vàng quanh ngưỡng 4.400 USD/oz</a></li></ul></div></details><details class="source-col" open><summary><span class="source-name">VTV</span><span class="count">34</span><span class="chevron" aria-hidden="true">▾</span></summary><div class="source-list-wrap"><ul><li><span class="time">20:27</span><a href="https://vtv.vn/de-xuat-giam-nguong-mien-thue-hang-nhap-khau-gia-tri-nho-xuong-100000-dong-100260908191547448.htm" target="_blank" rel="noopener">Đề xuất giảm ngưỡng miễn thuế hàng nhập khẩu giá trị nhỏ xuống 100.000 đồng</a></li><li><span class="time">20:21</span><a href="https://vtv.vn/nang-gia-tri-nganh-hang-xuat-khau-chu-luc-100260908120517389.htm" target="_blank" rel="noopener">Nâng giá trị ngành hàng xuất khẩu chủ lực</a></li><li><span class="time">20:20</span><a href="https://vtv.vn/eu-siet-cho-thue-ngan-han-de-giu-nguon-cung-nha-o-100260908124011169.htm" target="_blank" rel="noopener">EU siết cho thuê ngắn hạn để giữ nguồn cung nhà ở</a></li><li><span class="time">20:15</span><a href="https://vtv.vn/vn-index-dao-chieu-tang-hon-8-diem-100260824155407557.htm" target="_blank" rel="noopener">VN-Index đảo chiều tăng hơn 8 điểm</a></li><li><span class="time">20:14</span><a href="https://vtv.vn/3-cang-bien-viet-nam-giu-vi-the-tren-bang-xep-hang-the-gioi-100260908162819057.htm" target="_blank" rel="noopener">3 cảng biển Việt Nam giữ vị thế trên bảng xếp hạng thế giới</a></li><li><span class="time">20:11</span><a href="https://vtv.vn/cac-truong-hop-duoc-xac-dinh-lai-dien-tich-dat-o-100260908152202636.htm" target="_blank" rel="noopener">Các trường hợp được xác định lại diện tích đất ở</a></li><li><span class="time">20:07</span><a href="https://vtv.vn/gia-dong-len-muc-cao-ky-luc-100260908155737912.htm" target="_blank" rel="noopener">Giá đồng lên mức cao kỷ lục</a></li><li><span class="time">20:06</span><a href="https://vtv.vn/det-may-chuyen-tu-tang-san-luong-sang-gia-tri-100260908155321079.htm" target="_blank" rel="noopener">Dệt may chuyển từ tăng sản lượng sang giá trị</a></li><li><span class="time">20:05</span><a href="https://vtv.vn/khoi-phuc-ma-so-thue-cho-hon-3000-doanh-nghiep-100260908154354361.htm" target="_blank" rel="noopener">Khôi phục mã số thuế cho hơn 3.000 doanh nghiệp</a></li><li><span class="time">20:04</span><a href="https://vtv.vn/tim-cook-roi-ghe-ceo-apple-van-nhan-goi-thu-lao-khung-100260908094707752.htm" target="_blank" rel="noopener">Tim Cook rời ghế CEO Apple vẫn nhận gói thù lao &quot;khủng&quot;</a></li><li><span class="time">20:04</span><a href="https://vtv.vn/de-xuat-bo-sung-truong-hop-thu-hoi-dat-vi-pham-100260908153756551.htm" target="_blank" rel="noopener">Đề xuất bổ sung trường hợp thu hồi đất vi phạm</a></li><li><span class="time">20:03</span><a href="https://vtv.vn/29-sieu-ty-phu-dang-nam-27-tai-san-cua-gioi-ty-phu-toan-cau-10026090809073979.htm" target="_blank" rel="noopener">29 “siêu tỷ phú” đang nắm 27% tài sản của giới tỷ phú toàn cầu</a></li><li><span class="time">20:03</span><a href="https://vtv.vn/hang-khong-dong-loat-giam-gia-ve-may-bay-nhan-ngay-doi-9-9-100260908152916969.htm" target="_blank" rel="noopener">Hàng không đồng loạt giảm giá vé máy bay nhân ngày đôi 9/9</a></li><li><span class="time">20:02</span><a href="https://vtv.vn/gia-dau-tiep-tuc-tang-100260908151356554.htm" target="_blank" rel="noopener">Giá dầu tiếp tục tăng</a></li><li><span class="time">20:00</span><a href="https://vtv.vn/thanh-hoa-chu-dong-kiem-soat-rui-ro-nang-hieu-qua-chan-nuoi-nuoi-trong-thuy-san-100260904162015745.htm" target="_blank" rel="noopener">Thanh Hóa: Chủ động kiểm soát rủi ro, nâng hiệu quả chăn nuôi, nuôi trồng thủy sản</a></li><li><span class="time">19:54</span><a href="https://vtv.vn/lam-dong-doi-moi-xuc-tien-thuong-mai-huong-manh-vao-phat-trien-thi-truong-100260908191457214.htm" target="_blank" rel="noopener">Lâm Đồng đổi mới xúc tiến thương mại, hướng mạnh vào phát triển thị trường</a></li><li><span class="time">17:38</span><a href="https://vtv.vn/cuc-thue-dat-muc-tieu-cham-dut-hieu-luc-ma-so-thue-trong-3-ngay-100260908155406689.htm" target="_blank" rel="noopener">Cục Thuế đặt mục tiêu chấm dứt hiệu lực mã số thuế trong 3 ngày</a></li><li><span class="time">15:00</span><a href="https://vtv.vn/go-diem-nghen-xu-ly-dut-diem-du-an-treo-100260908111450459.htm" target="_blank" rel="noopener">Gỡ điểm nghẽn, xử lý dứt điểm dự án “treo”</a></li><li><span class="time">14:35</span><a href="https://vtv.vn/suc-hut-trai-phieu-kho-bac-my-sut-giam-100260908112325994.htm" target="_blank" rel="noopener">Sức hút trái phiếu kho bạc Mỹ sụt giảm</a></li><li><span class="time">14:33</span><a href="https://vtv.vn/hoan-thanh-giai-phong-mat-bang-du-an-trong-diem-100260908104548162.htm" target="_blank" rel="noopener">Hoàn thành giải phóng mặt bằng dự án trọng điểm</a></li><li><span class="time">14:30</span><a href="https://vtv.vn/them-bo-loc-cho-thi-truong-truoc-nang-hang-100260908113621705.htm" target="_blank" rel="noopener">Thêm bộ lọc cho thị trường trước nâng hạng</a></li><li><span class="time">14:27</span><a href="https://vtv.vn/gia-vang-tang-600000-dong-luong-100260908124930737.htm" target="_blank" rel="noopener">Giá vàng tăng 600.000 đồng/lượng</a></li><li><span class="time">11:28</span><a href="https://vtv.vn/trien-vong-dong-tien-ngoai-vao-thi-truong-viet-nam-khi-nang-hang-den-rat-gan-100260908101615753.htm" target="_blank" rel="noopener">Triển vọng dòng tiền ngoại vào thị trường Việt Nam khi nâng hạng đến rất gần</a></li><li><span class="time">11:27</span><a href="https://vtv.vn/200-doanh-nghiep-dong-gan-1-trieu-ty-dong-ngan-sach-100260908101259498.htm" target="_blank" rel="noopener">200 doanh nghiệp đóng gần 1 triệu tỷ đồng ngân sách</a></li><li><span class="time">11:24</span><a href="https://vtv.vn/de-xuat-6-tuyen-duong-sat-quoc-gia-tai-ha-noi-100260908102730395.htm" target="_blank" rel="noopener">Đề xuất 6 tuyến đường sắt quốc gia tại Hà Nội</a></li><li><span class="time">10:12</span><a href="https://vtv.vn/quy-dinh-ve-nhap-xuat-hang-du-tru-quoc-gia-100260908061404237.htm" target="_blank" rel="noopener">Quy định về nhập, xuất hàng dự trữ quốc gia</a></li><li><span class="time">10:10</span><a href="https://vtv.vn/mien-bac-hut-tren-80-von-fdi-san-xuat-dang-ky-moi-100260907192154939.htm" target="_blank" rel="noopener">Miền Bắc hút trên 80% vốn FDI sản xuất đăng ký mới</a></li><li><span class="time">10:00</span><a href="https://vtv.vn/sahmyook-ba-nam-lien-tiep-duoc-nguoi-tieu-dung-viet-nam-lua-chon-100260905185842729.htm" target="_blank" rel="noopener">Sahmyook ba năm liên tiếp được người tiêu dùng Việt Nam lựa chọn</a></li><li><span class="time">10:00</span><a href="https://vtv.vn/dewdap-duoc-nguoi-tieu-dung-viet-nam-binh-chon-tai-brand-of-the-year-2026-100260905190349403.htm" target="_blank" rel="noopener">DEWDAP được người tiêu dùng Việt Nam bình chọn tại Brand of the Year 2026</a></li><li><span class="time">10:00</span><a href="https://vtv.vn/face-republic-duoc-nguoi-tieu-dung-viet-nam-lua-chon-tai-brand-of-the-year-2026-100260905190935906.htm" target="_blank" rel="noopener">Face Republic được người tiêu dùng Việt Nam lựa chọn tại Brand of the Year 2026</a></li><li><span class="time">09:00</span><a href="https://vtv.vn/chuyen-gia-quang-cao-quoc-te-4a-jonathan-beh-gia-nhap-chicilon-media-100260908083324352.htm" target="_blank" rel="noopener">Chuyên gia quảng cáo quốc tế 4A Jonathan Beh gia nhập Chicilon Media</a></li><li><span class="time">06:59</span><a href="https://vtv.vn/du-tru-ngoai-hoi-nhat-ban-giam-manh-nhat-lich-su-100260908061033538.htm" target="_blank" rel="noopener">Dự trữ ngoại hối Nhật Bản giảm mạnh nhất lịch sử</a></li><li><span class="time">06:57</span><a href="https://vtv.vn/buoc-vao-cao-diem-kiem-tra-tau-bien-quoc-te-100260908055655878.htm" target="_blank" rel="noopener">Bước vào cao điểm kiểm tra tàu biển quốc tế</a></li><li><span class="time">06:57</span><a href="https://vtv.vn/nguon-cung-nhien-lieu-hang-hai-that-chat-100260908060417109.htm" target="_blank" rel="noopener">Nguồn cung nhiên liệu hàng hải thắt chặt</a></li></ul></div></details><details class="source-col" open><summary><span class="source-name">Đầu tư Chứng khoán</span><span class="count">2</span><span class="chevron" aria-hidden="true">▾</span></summary><div class="source-list-wrap"><ul><li><span class="time">17:25</span><a href="https://www.tinnhanhchungkhoan.vn/co-phieu-can-quan-tam-ngay-99-post397229.html" target="_blank" rel="noopener">Cổ phiếu cần quan tâm ngày 9/9</a></li><li><span class="time">00:57</span><a href="https://www.tinnhanhchungkhoan.vn/bao-dau-tu-so-72-post397740.html" target="_blank" rel="noopener">Báo Đầu tư số 72</a></li></ul></div></details><details class="source-col" open><summary><span class="source-name">Diễn đàn Doanh nghiệp</span><span class="count">1</span><span class="chevron" aria-hidden="true">▾</span></summary><div class="source-list-wrap"><ul><li><span class="time">05:34</span><a href="https://diendandoanhnghiep.vn/phat-trien-ben-vung-thi-truong-trai-phieu-doanh-nghiep-10184254.html" target="_blank" rel="noopener">Phát triển bền vững thị trường trái phiếu doanh nghiệp</a></li></ul></div></details><details class="source-col" open><summary><span class="source-name">VietnamNet</span><span class="count">32</span><span class="chevron" aria-hidden="true">▾</span></summary><div class="source-list-wrap"><ul><li><span class="time">21:30</span><a href="https://vietnamnet.vn/cong-bo-thong-tin-sai-lech-bao-cao-tai-chinh-mot-doanh-nghiep-bi-phat-2553264.html" target="_blank" rel="noopener">Công bố thông tin sai lệch báo cáo tài chính, một doanh nghiệp bị phạt</a></li><li><span class="time">20:26</span><a href="https://vietnamnet.vn/quoc-dao-tung-giau-thu-hai-the-gioi-gio-tra-gia-vi-vang-trang-can-kiet-2548671.html" target="_blank" rel="noopener">Quốc đảo từng giàu thứ hai thế giới giờ trả giá vì &amp;apos;vàng trắng&amp;apos; cạn kiệt</a></li><li><span class="time">20:05</span><a href="https://vietnamnet.vn/thai-nguyen-hu-ngan-sach-gan-20-000-ty-dong-xuat-khau-dat-26-3-ty-usd-2553237.html" target="_blank" rel="noopener">Thái Nguyên thu ngân sách gần 20.000 tỷ đồng, xuất khẩu đạt 26,3 tỷ USD</a></li><li><span class="time">15:40</span><a href="https://vietnamnet.vn/baylis-harding-va-chien-luoc-chon-san-cua-thuong-hieu-qua-tang-tu-nuoc-anh-2553138.html" target="_blank" rel="noopener">Baylis &amp;amp; Harding và chiến lược chọn ‘sân’ của thương hiệu quà tặng từ nước Anh</a></li><li><span class="time">15:36</span><a href="https://vietnamnet.vn/dong-ma-so-thue-cho-doanh-nghiep-du-dieu-kien-trong-3-ngay-2553162.html" target="_blank" rel="noopener">Đóng mã số thuế cho doanh nghiệp đủ điều kiện trong 3 ngày</a></li><li><span class="time">15:28</span><a href="https://vietnamnet.vn/sau-gio-dong-cho-tieu-thuong-ha-long-livestream-ban-hang-tai-khu-vuc-dac-biet-2553091.html" target="_blank" rel="noopener">Sau giờ đóng chợ, tiểu thương Hạ Long livestream bán hàng tại &amp;apos;khu vực đặc biệt&amp;apos;</a></li><li><span class="time">14:30</span><a href="https://vietnamnet.vn/banh-trung-thu-yen-sao-khanh-hoa-tinh-hoa-qua-tang-mua-doan-vien-2553062.html" target="_blank" rel="noopener">Bánh Trung thu Yến sào Khánh Hòa: Tinh hoa quà tặng mùa đoàn viên</a></li><li><span class="time">14:10</span><a href="https://vietnamnet.vn/nhung-khoan-tien-am-tham-roi-vi-vi-thoi-quen-it-ai-de-y-2552897.html" target="_blank" rel="noopener">Những khoản tiền âm thầm rời ví vì thói quen ít ai để ý</a></li><li><span class="time">14:00</span><a href="https://vietnamnet.vn/banh-trung-thu-cham-cham-da-dang-hoa-huong-vi-cho-gioi-tre-2553046.html" target="_blank" rel="noopener">Bánh Trung thu Cham Cham đa dạng hóa hương vị cho giới trẻ</a></li><li><span class="time">13:58</span><a href="https://vietnamnet.vn/xe-mini-cooper-chay-rui-bao-hiem-dinh-gia-223-trieu-toa-buoc-tra-du-450-trieu-2552838.html" target="_blank" rel="noopener">Xe Mini Cooper cháy rụi, bảo hiểm định giá 223 triệu, tòa buộc trả đủ 450 triệu</a></li><li><span class="time">13:30</span><a href="https://vietnamnet.vn/phu-tho-mo-duong-cho-doanh-nghiep-noi-dia-tham-gia-chuoi-cung-ung-toan-cau-2553052.html" target="_blank" rel="noopener">Phú Thọ mở đường cho doanh nghiệp nội địa tham gia chuỗi cung ứng toàn cầu</a></li><li><span class="time">13:15</span><a href="https://vietnamnet.vn/mot-mat-hang-viet-nam-thu-gan-12-ty-usd-my-la-khach-lon-trung-quoc-mua-manh-2552713.html" target="_blank" rel="noopener">Một mặt hàng Việt Nam thu gần 12 tỷ USD, Mỹ là khách lớn, Trung Quốc mua mạnh</a></li><li><span class="time">12:14</span><a href="https://vietnamnet.vn/cho-nang-nguong-thue-10-ty-ho-kinh-doanh-tam-nop-thue-the-nao-2553049.html" target="_blank" rel="noopener">Chờ nâng ngưỡng thuế 10 tỷ, hộ kinh doanh tạm nộp thuế thế nào?</a></li><li><span class="time">11:30</span><a href="https://vietnamnet.vn/caluci-va-chien-luoc-tao-khac-biet-tren-thi-truong-thoi-trang-nam-2552813.html" target="_blank" rel="noopener">Caluci và chiến lược tạo khác biệt trên thị trường thời trang nam</a></li><li><span class="time">11:00</span><a href="https://vietnamnet.vn/cong-an-lai-chau-amaccao-va-hanh-trinh-dua-4-mai-truong-vung-bien-ve-dich-2553024.html" target="_blank" rel="noopener">Công an Lai Châu, AMACCAO và hành trình đưa 4 mái trường vùng biên về đích</a></li><li><span class="time">10:30</span><a href="https://vietnamnet.vn/gia-lai-do-luong-muc-do-hai-long-cua-nguoi-dan-voi-co-quan-hanh-chinh-2553008.html" target="_blank" rel="noopener">Gia Lai đo lường mức độ hài lòng của người dân với cơ quan hành chính</a></li><li><span class="time">10:20</span><a href="https://vietnamnet.vn/ha-noi-phan-dau-grdp-nam-2026-dat-tu-11-tro-len-2552966.html" target="_blank" rel="noopener">Hà Nội phấn đấu GRDP năm 2026 đạt từ 11% trở lên</a></li><li><span class="time">09:52</span><a href="https://vietnamnet.vn/chong-tu-vong-sau-2-nam-mua-bao-hiem-vo-nhan-2-1-ty-sau-khi-bi-tu-choi-chi-tra-2545216.html" target="_blank" rel="noopener">Chồng tử vong sau 2 năm mua bảo hiểm, vợ nhận 2,1 tỷ sau khi bị từ chối chi trả</a></li><li><span class="time">09:52</span><a href="https://vietnamnet.vn/con-trai-mua-bao-hiem-roi-qua-doi-nguoi-me-chat-vat-doi-hon-2-3-ty-dong-2545902.html" target="_blank" rel="noopener">Con trai mua bảo hiểm rồi qua đời, người mẹ chật vật đòi hơn 2,3 tỷ đồng</a></li><li><span class="time">09:52</span><a href="https://vietnamnet.vn/tu-vong-sau-hon-2-thang-ky-hop-dong-cong-ty-bao-hiem-tu-choi-chi-tra-2548718.html" target="_blank" rel="noopener">Khách tử vong sau hơn 2 tháng ký hợp đồng, công ty bảo hiểm từ chối chi trả</a></li><li><span class="time">09:51</span><a href="https://vietnamnet.vn/o-to-350-trieu-chay-sau-gan-1-thang-mua-bao-hiem-chu-xe-bi-tu-choi-boi-thuong-2549052.html" target="_blank" rel="noopener">Ô tô 350 triệu bị cháy sau gần 1 tháng mua bảo hiểm, chủ xe bị từ chối bồi thường</a></li><li><span class="time">09:51</span><a href="https://vietnamnet.vn/o-to-hong-sau-tai-nan-chu-xe-doi-dn-bao-hiem-tra-hon-237-trieu-nhung-bi-tu-choi-2550493.html" target="_blank" rel="noopener">Ô tô hỏng sau tai nạn, chủ xe đòi DN bảo hiểm trả hơn 237 triệu nhưng bị từ chối</a></li><li><span class="time">09:51</span><a href="https://vietnamnet.vn/nghi-chu-xuong-go-gian-lan-sau-vu-chay-bao-hiem-van-phai-tra-hon-20-7-ty-dong-2551307.html" target="_blank" rel="noopener">Nghi chủ xưởng gỗ gian lận sau vụ cháy, bảo hiểm vẫn phải trả hơn 20,7 tỷ đồng</a></li><li><span class="time">09:09</span><a href="https://vietnamnet.vn/lai-suat-ngan-hang-hom-nay-8-9-2026-sau-cong-them-lai-suat-thuc-nhan-9-4-nam-2552954.html" target="_blank" rel="noopener">Lãi suất ngân hàng hôm nay 8/9/2026: Sau cộng thêm, lãi suất thực nhận 9,4%/năm</a></li><li><span class="time">09:01</span><a href="https://vietnamnet.vn/doanh-nghiep-quoc-gia-bai-hoc-tu-cac-nen-kinh-te-lon-2552962.html" target="_blank" rel="noopener">Doanh nghiệp Quốc gia: Bài học từ các nền kinh tế lớn</a></li><li><span class="time">08:06</span><a href="https://vietnamnet.vn/gia-vang-hom-nay-7-9-vang-sjc-va-vang-nhan-dong-loat-giam-2552471.html" target="_blank" rel="noopener">Giá vàng hôm nay 7/9/2026: Tuột dốc, vàng trong nước giảm hơn 1 triệu đồng/lượng</a></li><li><span class="time">08:05</span><a href="https://vietnamnet.vn/ong-chu-bi-de-nghi-truy-to-cay-xanh-cong-minh-trung-hon-600-goi-thau-2552899.html" target="_blank" rel="noopener">Ông chủ bị đề nghị truy tố, Cây xanh Công Minh trúng hơn 600 gói thầu trị giá 3.500 tỷ đồng</a></li><li><span class="time">08:04</span><a href="https://vietnamnet.vn/cong-ty-cua-ong-le-viet-hai-van-lo-hon-2-000-ty-no-phai-tra-gan-14-700-ty-2552790.html" target="_blank" rel="noopener">Công ty do ông Lê Viết Hải làm Chủ tịch vẫn lỗ hơn 2.000 tỷ, nợ phải trả gần 14.700 tỷ</a></li><li><span class="time">08:00</span><a href="https://vietnamnet.vn/shop-thien-nhan-5272-gop-phan-dua-dac-san-dia-phuong-vuon-xa-2552796.html" target="_blank" rel="noopener">Shop Thiện Nhân 5272 góp phần đưa đặc sản địa phương vươn xa</a></li><li><span class="time">07:41</span><a href="https://vietnamnet.vn/gia-xang-dau-hom-nay-8-9-the-gioi-tang-cao-trong-nuoc-cho-dieu-chinh-2552939.html" target="_blank" rel="noopener">Giá xăng dầu hôm nay 8/9: Thế giới tăng cao, trong nước chờ điều chỉnh</a></li><li><span class="time">06:02</span><a href="https://vietnamnet.vn/dai-gia-kinh-bac-nam-quyen-kiem-soat-doanh-nghiep-quan-ly-doi-bong-2552855.html" target="_blank" rel="noopener">Đại gia Kinh Bắc nắm quyền kiểm soát Công ty KBC Hưng Yên</a></li><li><span class="time">05:30</span><a href="https://vietnamnet.vn/doanh-thu-0-dong-vi-sao-nhieu-doanh-nghiep-ngung-hoat-dong-van-ganh-no-thue-2552789.html" target="_blank" rel="noopener">Doanh thu 0 đồng, vì sao nhiều doanh nghiệp ngừng hoạt động vẫn &amp;apos;gánh&amp;apos; nợ thuế?</a></li></ul></div></details></div></section><section id="archive" class="section" aria-labelledby="archive-title"><div class="section-head"><h2 class="section-title" id="archive-title">Lưu trữ</h2></div><div class="date-tabs"><a href="2026-09-11.html">11/09</a><a href="2026-09-10.html">10/09</a><a href="2026-09-09.html">09/09</a><a href="2026-09-08.html" class="active">08/09</a><a href="2026-09-07.html">07/09</a><a href="2026-09-06.html">06/09</a><a href="2026-09-05.html">05/09</a></div><div class="date-picker"><label for="date-picker">Ngày khác:</label> <select id="date-picker" onchange="location.href=this.value"><option value="2026-11-15.html">15/11/2026</option><option value="2026-11-14.html">14/11/2026</option><option value="2026-11-13.html">13/11/2026</option><option value="2026-11-12.html">12/11/2026</option><option value="2026-11-11.html">11/11/2026</option><option value="2026-11-10.html">10/11/2026</option><option value="2026-11-09.html">09/11/2026</option><option value="2026-11-08.html">08/11/2026</option><option value="2026-11-07.html">07/11/2026</option><option value="2026-11-06.html">06/11/2026</option><option value="2026-11-05.html">05/11/2026</option><option value="2026-11-04.html">04/11/2026</option><option value="2026-11-03.html">03/11/2026</option><option value="2026-11-02.html">02/11/2026</option><option value="2026-11-01.html">01/11/2026</option><option value="2026-10-31.html">31/10/2026</option><option value="2026-10-30.html">30/10/2026</option><option value="2026-10-29.html">29/10/2026</option><option value="2026-10-28.html">28/10/2026</option><option value="2026-10-27.html">27/10/2026</option><option value="2026-10-26.html">26/10/2026</option><option value="2026-10-25.html">25/10/2026</option><option value="2026-10-24.html">24/10/2026</option><option value="2026-10-23.html">23/10/2026</option><option value="2026-10-22.html">22/10/2026</option><option value="2026-10-21.html">21/10/2026</option><option value="2026-10-20.html">20/10/2026</option><option value="2026-10-19.html">19/10/2026</option><option value="2026-10-18.html">18/10/2026</option><option value="2026-10-17.html">17/10/2026</option><option value="2026-10-16.html">16/10/2026</option><option value="2026-10-15.html">15/10/2026</option><option value="2026-10-14.html">14/10/2026</option><option value="2026-10-13.html">13/10/2026</option><option value="2026-10-12.html">12/10/2026</option><option value="2026-10-11.html">11/10/2026</option><option value="2026-10-10.html">10/10/2026</option><option value="2026-10-09.html">09/10/2026</option><option value="2026-10-08.html">08/10/2026</option><option value="2026-10-07.html">07/10/2026</option><option value="2026-10-06.html">06/10/2026</option><option value="2026-10-05.html">05/10/2026</option><option value="2026-10-04.html">04/10/2026</option><option value="2026-10-03.html">03/10/2026</option><option value="2026-10-02.html">02/10/2026</option><option value="2026-10-01.html">01/10/2026</option><option value="2026-09-30.html">30/09/2026</option><option value="2026-09-29.html">29/09/2026</option><option value="2026-09-28.html">28/09/2026</option><option value="2026-09-27.html">27/09/2026</option><option value="2026-09-26.html">26/09/2026</option><option value="2026-09-25.html">25/09/2026</option><option value="2026-09-24.html">24/09/2026</option><option value="2026-09-23.html">23/09/2026</option><option value="2026-09-22.html">22/09/2026</option><option value="2026-09-21.html">21/09/2026</option><option value="2026-09-20.html">20/09/2026</option><option value="2026-09-19.html">19/09/2026</option><option value="2026-09-18.html">18/09/2026</option><option value="2026-09-17.html">17/09/2026</option><option value="2026-09-16.html">16/09/2026</option><option value="2026-09-15.html">15/09/2026</option><option value="2026-09-14.html">14/09/2026</option><option value="2026-09-13.html">13/09/2026</option><option value="2026-09-12.html">12/09/2026</option><option value="2026-09-11.html">11/09/2026</option><option value="2026-09-10.html">10/09/2026</option><option value="2026-09-09.html">09/09/2026</option><option value="2026-09-08.html" selected>08/09/2026</option><option value="2026-09-07.html">07/09/2026</option><option value="2026-09-06.html">06/09/2026</option><option value="2026-09-05.html">05/09/2026</option><option value="2026-09-04.html">04/09/2026</option><option value="2026-09-03.html">03/09/2026</option><option value="2026-09-02.html">02/09/2026</option><option value="2026-09-01.html">01/09/2026</option><option value="2026-08-31.html">31/08/2026</option><option value="2026-08-30.html">30/08/2026</option><option value="2026-08-29.html">29/08/2026</option><option value="2026-08-28.html">28/08/2026</option><option value="2026-08-27.html">27/08/2026</option><option value="2026-08-26.html">26/08/2026</option><option value="2026-08-25.html">25/08/2026</option><option value="2026-08-24.html">24/08/2026</option><option value="2026-08-23.html">23/08/2026</option><option value="2026-08-22.html">22/08/2026</option><option value="2026-08-21.html">21/08/2026</option><option value="2026-08-20.html">20/08/2026</option><option value="2026-08-19.html">19/08/2026</option><option value="2026-08-18.html">18/08/2026</option><option value="2026-08-17.html">17/08/2026</option><option value="2026-08-16.html">16/08/2026</option><option value="2026-08-15.html">15/08/2026</option><option value="2026-08-14.html">14/08/2026</option><option value="2026-08-13.html">13/08/2026</option><option value="2026-08-12.html">12/08/2026</option><option value="2026-08-11.html">11/08/2026</option><option value="2026-08-10.html">10/08/2026</option><option value="2026-08-09.html">09/08/2026</option><option value="2026-08-08.html">08/08/2026</option><option value="2026-08-07.html">07/08/2026</option><option value="2026-08-06.html">06/08/2026</option><option value="2026-08-05.html">05/08/2026</option><option value="2026-08-04.html">04/08/2026</option><option value="2026-08-03.html">03/08/2026</option><option value="2026-08-02.html">02/08/2026</option><option value="2026-08-01.html">01/08/2026</option></select></div></section>
+<p class="footer">Tự động cập nhật mỗi 20 phút qua GitHub Actions.</p>
+</div></main>
+<div class="backdrop" id="backdrop"></div>
+<nav class="bottom-nav" aria-label="Điều hướng nhanh"><a class="bn-item" href="index.html#overview" aria-current="page"><svg class="ic" aria-hidden="true" focusable="false"><use href="#i-home"/></svg><span>Tổng quan</span></a><a class="bn-item" href="index.html#news"><svg class="ic" aria-hidden="true" focusable="false"><use href="#i-news"/></svg><span>Tin tức</span></a><a class="bn-item" href="brands.html"><svg class="ic" aria-hidden="true" focusable="false"><use href="#i-building"/></svg><span>Brands</span></a><a class="bn-item" href="analytics.html"><svg class="ic" aria-hidden="true" focusable="false"><use href="#i-chart"/></svg><span>Analytics</span></a><button class="bn-item" type="button" data-open-drawer aria-label="Mở menu"><svg class="ic" aria-hidden="true" focusable="false"><use href="#i-menu"/></svg><span>Menu</span></button></nav>
+</div>
+<script>
+(function () {
+  var app = document.getElementById('app');
+  var menuBtn = document.getElementById('menu-btn');
+  var sbToggle = document.getElementById('sb-toggle');
+  var sidebar = document.getElementById('sidebar');
+  var mobile = window.matchMedia('(max-width: 767px)');
+  function store(k, v) { try { if (v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); } catch (e) { return null; } }
+
+  if (store('sb') === 'collapsed' && !mobile.matches) { app.classList.add('sb-collapsed'); }
+  if (sbToggle) {
+    sbToggle.setAttribute('aria-expanded', String(!app.classList.contains('sb-collapsed')));
+    sbToggle.addEventListener('click', function () {
+      var c = app.classList.toggle('sb-collapsed');
+      sbToggle.setAttribute('aria-expanded', String(!c));
+      store('sb', c ? 'collapsed' : 'expanded');
+    });
+  }
+
+  var lastFocus = null;
+  function openDrawer() {
+    lastFocus = document.activeElement;
+    app.classList.add('drawer-open');
+    menuBtn && menuBtn.setAttribute('aria-expanded', 'true');
+    var first = sidebar.querySelector('a,button');
+    first && first.focus();
+  }
+  function closeDrawer(restore) {
+    if (!app.classList.contains('drawer-open')) return;
+    app.classList.remove('drawer-open');
+    menuBtn && menuBtn.setAttribute('aria-expanded', 'false');
+    if (restore !== false && lastFocus) lastFocus.focus();
+  }
+  function openSheet() { app.classList.add('sheet-open'); var f = document.querySelector('.filter-sheet select'); f && f.focus(); }
+  function closeSheet() { app.classList.remove('sheet-open'); }
+
+  document.querySelectorAll('[data-open-drawer]').forEach(function (b) { b.addEventListener('click', openDrawer); });
+  document.querySelectorAll('[data-open-sheet]').forEach(function (b) { b.addEventListener('click', openSheet); });
+  document.querySelectorAll('[data-close-sheet]').forEach(function (b) { b.addEventListener('click', closeSheet); });
+  document.getElementById('backdrop').addEventListener('click', function () { closeDrawer(); closeSheet(); });
+  sidebar.addEventListener('click', function (e) { if (e.target.closest('a')) closeDrawer(false); });
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape') { closeDrawer(); closeSheet(); return; }
+    if (e.key === 'Tab' && app.classList.contains('drawer-open')) {
+      var items = sidebar.querySelectorAll('a,button');
+      if (!items.length) return;
+      var first = items[0], last = items[items.length - 1];
+      if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+      else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+    }
+  });
+  mobile.addEventListener && mobile.addEventListener('change', function () { closeDrawer(false); closeSheet(); });
+})();
+</script>
+<script>
+var PAGE_SIZE = 15;
+var currentPage = 1;
+
+function rowsList() { return document.querySelectorAll('#news-stream-list .news-row'); }
+function matchingRows() {
+  return Array.prototype.filter.call(rowsList(), function (row) { return !row.classList.contains('filtered-out'); });
+}
+
+function applyFilters() {
+  var q = (document.getElementById('search-news').value || '').trim().toLowerCase();
+  var src = document.getElementById('filter-source').value;
+  var iss = document.getElementById('filter-issue').value;
+  var brandSel = document.getElementById('filter-brand');
+  var brd = brandSel ? brandSel.value : '';
+  rowsList().forEach(function (row) {
+    var ok = true;
+    if (src && row.dataset.source !== src) ok = false;
+    if (iss && row.dataset.issue !== iss) ok = false;
+    if (brd && (row.dataset.brand || '').indexOf('|' + brd + '|') === -1) ok = false;
+    if (ok && q && row.textContent.toLowerCase().indexOf(q) === -1) ok = false;
+    row.classList.toggle('filtered-out', !ok);
+  });
+  currentPage = 1;
+  renderPage();
+}
+
+function setSort(btn, mode) {
+  document.querySelectorAll('.sort-toggle .pill').forEach(function (b) { b.classList.remove('active'); });
+  btn.classList.add('active');
+  var container = document.getElementById('news-stream-list');
+  var arr = Array.prototype.slice.call(rowsList());
+  arr.sort(function (a, b) {
+    if (mode === 'trending') {
+      var bh = parseFloat(b.dataset.hot) || 0, ah = parseFloat(a.dataset.hot) || 0;
+      if (bh !== ah) return bh - ah;
+    }
+    return parseInt(b.dataset.ts, 10) - parseInt(a.dataset.ts, 10);
+  });
+  arr.forEach(function (row) { container.appendChild(row); });
+  currentPage = 1;
+  renderPage();
+}
+
+// Shows only the current page's slice of rows that still pass the
+// active filters (so pagination and filtering compose correctly —
+// e.g. filtering down to 8 matches collapses to a single page), then
+// (re)draws the numbered page buttons below the list.
+function renderPage() {
+  var matching = matchingRows();
+  var totalPages = Math.max(1, Math.ceil(matching.length / PAGE_SIZE));
+  if (currentPage > totalPages) currentPage = totalPages;
+  var start = (currentPage - 1) * PAGE_SIZE;
+  rowsList().forEach(function (row) { row.style.display = 'none'; });
+  matching.slice(start, start + PAGE_SIZE).forEach(function (row) { row.style.display = ''; });
+  var empty = document.getElementById('news-empty');
+  if (empty) empty.hidden = matching.length > 0;
+  var count = document.getElementById('news-count');
+  if (count) count.textContent = matching.length + ' tin';
+  renderPagination(totalPages);
+}
+
+function resetFilters() {
+  ['search-news', 'filter-source', 'filter-issue', 'filter-brand'].forEach(function (id) {
+    var el = document.getElementById(id);
+    if (el) el.value = '';
+  });
+  var newest = document.querySelector('.sort-toggle .pill[data-sort="newest"]');
+  if (newest) setSort(newest, 'newest');
+  applyFilters();
+}
+
+function goToPage(p) {
+  currentPage = p;
+  renderPage();
+  document.getElementById('news').scrollIntoView({behavior: 'smooth', block: 'start'});
+}
+
+// Windowed page numbers (1 … currentPage-2..currentPage+2 … last) so a
+// 400+ article day doesn't render 30 raw page buttons in a row.
+function renderPagination(totalPages) {
+  var container = document.getElementById('news-pagination');
+  if (totalPages <= 1) { container.innerHTML = ''; return; }
+  var pages = [];
+  for (var p = 1; p <= totalPages; p++) {
+    if (p === 1 || p === totalPages || Math.abs(p - currentPage) <= 2) {
+      pages.push(p);
+    } else if (pages[pages.length - 1] !== '...') {
+      pages.push('...');
+    }
+  }
+  container.innerHTML = pages.map(function (p) {
+    if (p === '...') return '<span class="page-ellipsis">…</span>';
+    var cls = 'page-btn' + (p === currentPage ? ' active' : '');
+    return '<button type="button" class="' + cls + '" onclick="goToPage(' + p + ')">' + p + '</button>';
+  }).join('');
+}
+
+renderPage();
+</script>
+</body>
+</html>

@@ -1,0 +1,575 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Vietnam News Monitor — 02/08/2026</title>
+<link rel="alternate" type="application/rss+xml" title="Vietnam News Monitor" href="feed.xml">
+
+<style>@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;700&display=swap');
+:root{
+  color-scheme:light;
+  --bg:#F6F7F9;--surface:#FFFFFF;--surface-2:#F9FAFB;
+  --text:#0F172A;--text-2:#475569;--muted:#94A3B8;
+  --border:#E2E8F0;--divider:#EEF2F6;
+  --accent:#2563EB;--accent-soft:#EAF1FF;--live:#DC2626;
+  --radius:16px;--radius-sm:10px;
+  --shadow:0 1px 2px rgba(15,23,42,.05);
+  --sans:"Inter",-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,monospace;
+  --sp-1:4px;--sp-2:8px;--sp-3:12px;--sp-4:16px;--sp-5:24px;--sp-6:32px;--sp-7:48px;
+  --pad:32px;
+  --z-header:100;--z-dropdown:200;--z-tooltip:300;--z-backdrop:390;--z-drawer:400;--z-modal:500;--z-toast:600;
+  --t-fast:150ms;--t-mid:220ms;
+}
+*{box-sizing:border-box;}
+html{scroll-behavior:smooth;}
+body{margin:0;background:var(--bg);color:var(--text);font-family:var(--sans);font-size:14px;line-height:1.55;}
+a{color:inherit;}
+h1,h2,h3,p{margin:0;}
+button,select,input{font:inherit;color:inherit;}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px;}
+.ic{width:20px;height:20px;flex:0 0 20px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;}
+.sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;}
+[hidden]{display:none!important;}
+
+/* ================= app shell ================= */
+.app{--sb-w:260px;--label:block;--header-h:64px;
+  display:grid;grid-template-columns:var(--sb-w) minmax(0,1fr);grid-template-rows:var(--header-h) 1fr;
+  grid-template-areas:"sidebar header" "sidebar main";min-height:100vh;
+  transition:grid-template-columns var(--t-mid) ease;}
+.app.sb-collapsed{--sb-w:68px;--label:none;}
+@media (min-width:768px) and (max-width:1023px){.app{--sb-w:68px;--label:none;--header-h:60px;}}
+
+.sidebar{grid-area:sidebar;position:sticky;top:0;height:100vh;background:var(--surface);
+  border-right:1px solid var(--border);display:flex;flex-direction:column;padding:var(--sp-4) var(--sp-3);
+  overflow-x:hidden;overflow-y:auto;z-index:var(--z-header);}
+.brand{display:flex;align-items:center;gap:var(--sp-3);padding:0 var(--sp-2);height:40px;margin-bottom:var(--sp-5);
+  text-decoration:none;white-space:nowrap;}
+.logo-mark{flex:0 0 32px;width:32px;height:32px;border-radius:9px;background:var(--accent);color:#fff;
+  display:grid;place-items:center;font-family:var(--mono);font-weight:700;font-size:12px;}
+.brand-name{display:var(--label);font-weight:700;font-size:15px;line-height:1.15;}
+.brand-name small{display:block;font-weight:500;font-size:11px;color:var(--muted);}
+.nav-group-title{display:var(--label);font-family:var(--mono);font-size:11px;font-weight:500;letter-spacing:.06em;
+  color:var(--muted);text-transform:uppercase;padding:var(--sp-4) var(--sp-2) var(--sp-2);}
+.nav{display:flex;flex-direction:column;gap:2px;}
+.nav-item{display:flex;align-items:center;gap:var(--sp-3);min-height:40px;padding:0 var(--sp-3);
+  border-radius:var(--radius-sm);text-decoration:none;color:var(--text-2);font-weight:500;white-space:nowrap;
+  transition:background var(--t-fast) ease,color var(--t-fast) ease;}
+.nav-item:hover{background:var(--surface-2);color:var(--text);}
+.nav-item[aria-current="page"]{background:var(--accent-soft);color:var(--accent);}
+.nav-label{display:var(--label);}
+.sb-spacer{flex:1 1 auto;min-height:var(--sp-4);}
+.sb-toggle{display:flex;align-items:center;gap:var(--sp-3);min-height:40px;padding:0 var(--sp-3);border:0;
+  background:none;border-radius:var(--radius-sm);color:var(--text-2);cursor:pointer;white-space:nowrap;}
+.sb-toggle:hover{background:var(--surface-2);color:var(--text);}
+.sb-toggle .ic{transition:transform var(--t-mid) ease;}
+.app.sb-collapsed .sb-toggle .ic{transform:rotate(180deg);}
+@media (min-width:768px) and (max-width:1023px){.sb-toggle{display:none;}}
+.nav-item .ic,.sb-toggle .ic{margin:0;}
+.app.sb-collapsed .nav-item,.app.sb-collapsed .sb-toggle{justify-content:center;padding:0;}
+@media (min-width:768px) and (max-width:1023px){.nav-item{justify-content:center;padding:0;}}
+
+.topbar{grid-area:header;position:sticky;top:0;z-index:var(--z-header);height:var(--header-h);background:var(--surface);
+  border-bottom:1px solid var(--border);display:flex;align-items:center;gap:var(--sp-4);padding:0 var(--pad);}
+.icon-btn.menu-btn{display:none;}
+.icon-btn{display:inline-grid;place-items:center;width:44px;height:44px;border:0;border-radius:var(--radius-sm);
+  background:none;color:var(--text);cursor:pointer;}
+.icon-btn:hover{background:var(--surface-2);}
+.crumb{display:flex;align-items:center;gap:var(--sp-2);min-width:0;font-size:13px;color:var(--text-2);white-space:nowrap;
+  overflow:hidden;text-overflow:ellipsis;}
+.crumb b{color:var(--text);font-weight:600;}
+.crumb .sep{color:var(--muted);}
+.topbar-actions{margin-left:auto;display:flex;align-items:center;gap:var(--sp-4);}
+.live{display:flex;align-items:center;gap:var(--sp-2);font-family:var(--mono);font-size:11px;font-weight:500;color:var(--text-2);}
+.live-dot{width:7px;height:7px;border-radius:50%;background:var(--live);}
+
+.main{grid-area:main;min-width:0;padding:var(--pad);padding-bottom:var(--sp-7);}
+.container{width:100%;max-width:1440px;margin:0 auto;}
+@media (min-width:1440px){.app{--pad:44px;}}
+@media (min-width:768px) and (max-width:1023px){.app{--pad:24px;}}
+
+.backdrop{position:fixed;inset:0;background:rgba(0,0,0,.35);z-index:var(--z-backdrop);opacity:0;pointer-events:none;
+  transition:opacity var(--t-mid) ease;}
+.bottom-nav{display:none;}
+
+/* ================= mobile (<768) ================= */
+@media (max-width:767px){
+  .app{--header-h:56px;--pad:16px;--label:block;grid-template-columns:minmax(0,1fr);
+    grid-template-areas:"header" "main";}
+  .sidebar{position:fixed;left:0;top:0;bottom:0;height:auto;width:min(320px,85vw);z-index:var(--z-drawer);
+    transform:translateX(-100%);visibility:hidden;transition:transform var(--t-mid) ease,visibility 0s linear var(--t-mid);}
+  .app.drawer-open .sidebar{transform:none;visibility:visible;transition:transform var(--t-mid) ease;}
+  .app.drawer-open .backdrop,.app.sheet-open .backdrop{opacity:1;pointer-events:auto;}
+  .sb-toggle{display:none;}
+  .icon-btn.menu-btn{display:inline-grid;}
+  .topbar{padding:0 var(--sp-2);gap:var(--sp-2);}
+  .topbar .live span.t{display:none;}
+  .main{padding-bottom:calc(56px + env(safe-area-inset-bottom,0px) + var(--sp-5));}
+  .bottom-nav{display:grid;grid-template-columns:repeat(5,1fr);position:fixed;left:0;right:0;bottom:0;
+    z-index:var(--z-header);height:calc(56px + env(safe-area-inset-bottom,0px));padding-bottom:env(safe-area-inset-bottom,0px);
+    background:var(--surface);border-top:1px solid var(--border);}
+  .bn-item{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;min-height:44px;
+    border:0;background:none;text-decoration:none;color:var(--text-2);font-size:11px;font-weight:500;cursor:pointer;}
+  .bn-item[aria-current="page"]{color:var(--accent);}
+}
+
+/* ================= page header ================= */
+.page-head{display:flex;justify-content:space-between;align-items:flex-end;gap:var(--sp-4);margin-bottom:var(--sp-5);flex-wrap:wrap;}
+.page-head h1{font-size:34px;line-height:1.15;font-weight:700;letter-spacing:-.02em;}
+.page-head p{color:var(--text-2);margin-top:var(--sp-1);max-width:70ch;}
+.page-actions{display:flex;flex-direction:column;align-items:flex-end;gap:var(--sp-2);}
+@media (max-width:767px){
+  .page-head{flex-direction:column;align-items:stretch;}
+  .page-head h1{font-size:26px;}
+  .page-actions{align-items:stretch;}
+}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:var(--sp-2);min-height:40px;padding:0 var(--sp-4);
+  border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--surface);color:var(--text);
+  font-weight:600;cursor:pointer;transition:background var(--t-fast) ease;}
+.btn:hover{background:var(--surface-2);}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:#fff;}
+.btn.primary:hover{background:#1D4ED8;}
+.btn:disabled{opacity:.6;cursor:wait;}
+@media (max-width:767px){.btn{min-height:44px;}.page-actions .btn{width:100%;}}
+.scan .status{display:block;font-family:var(--mono);font-size:11px;color:var(--muted);min-height:1.2em;text-align:right;}
+@media (max-width:767px){.scan .status{text-align:left;}}
+
+.latest-banner{display:flex;gap:var(--sp-2);flex-wrap:wrap;align-items:center;margin-bottom:var(--sp-5);padding:var(--sp-3) var(--sp-4);
+  background:var(--accent-soft);color:var(--accent);border-radius:var(--radius-sm);font-size:13px;}
+.latest-banner a{font-weight:600;}
+
+/* ================= grid + cards ================= */
+.kpi-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:var(--sp-4);margin-bottom:var(--sp-5);}
+@media (min-width:768px) and (max-width:1023px){.kpi-grid{grid-template-columns:repeat(2,minmax(0,1fr));}}
+@media (max-width:767px){.kpi-grid{grid-template-columns:1fr;gap:var(--sp-3);}}
+.kpi{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);padding:var(--sp-4) var(--sp-5);}
+.kpi-label{font-size:12px;color:var(--text-2);font-weight:500;}
+.kpi-value{font-family:var(--mono);font-size:30px;font-weight:700;letter-spacing:-.02em;line-height:1.2;margin:var(--sp-2) 0 var(--sp-1);}
+.kpi-sub{font-size:12px;color:var(--text-2);}
+.kpi-sub .up{color:var(--accent);font-weight:600;}.kpi-sub .down{color:var(--live);font-weight:600;}
+@media (max-width:767px){
+  .kpi{display:grid;grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"label value" "sub value";
+    align-items:center;column-gap:var(--sp-4);padding:var(--sp-3) var(--sp-4);}
+  .kpi-label{grid-area:label;}.kpi-sub{grid-area:sub;}
+  .kpi-value{grid-area:value;font-size:24px;margin:0;}
+}
+
+.content-grid{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));gap:var(--sp-5);margin-bottom:var(--sp-6);}
+.col-8{grid-column:span 8;}.col-4{grid-column:span 4;}.col-12{grid-column:span 12;}
+@media (max-width:1023px){.col-8,.col-4{grid-column:span 12;}}
+.panel{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);padding:var(--sp-5);}
+.panel-title{font-size:16px;font-weight:650;margin-bottom:var(--sp-1);}
+.panel-note{font-size:12px;color:var(--muted);margin-bottom:var(--sp-4);}
+@media (max-width:767px){.panel{padding:var(--sp-4);}}
+
+.section{margin-bottom:var(--sp-6);scroll-margin-top:calc(var(--header-h) + var(--sp-4));}
+.section-title{font-size:22px;font-weight:650;letter-spacing:-.01em;line-height:1.2;}
+.section-note{color:var(--muted);font-size:12px;margin:var(--sp-1) 0 var(--sp-4);}
+.section-head{display:flex;align-items:baseline;justify-content:space-between;gap:var(--sp-4);flex-wrap:wrap;margin-bottom:var(--sp-3);}
+.count-chip{font-family:var(--mono);font-size:12px;color:var(--text-2);}
+@media (max-width:767px){.section-title{font-size:20px;}}
+
+/* ---- Top issues (list inside the 8-col panel) ---- */
+.issues-grid{display:flex;flex-direction:column;gap:var(--sp-3);}
+details.issue-card{background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius);}
+details.issue-card>summary{display:flex;gap:var(--sp-4);align-items:flex-start;padding:var(--sp-4) var(--sp-5);cursor:pointer;list-style:none;user-select:none;}
+details.issue-card>summary::-webkit-details-marker{display:none;}
+details.issue-card:target>*:not(summary){display:block!important;}
+.issue-rank{font-family:var(--mono);font-weight:700;font-size:18px;color:var(--muted);flex:0 0 auto;}
+.issue-summary{flex:1 1 auto;min-width:0;}
+.issue-title-row{display:flex;justify-content:space-between;align-items:baseline;gap:var(--sp-3);flex-wrap:wrap;}
+.issue-title{font-size:18px;font-weight:650;line-height:1.25;letter-spacing:-.01em;}
+.issue-score{flex:0 0 auto;font-family:var(--mono);font-weight:700;font-size:12px;color:var(--accent);background:var(--accent-soft);
+  border-radius:999px;padding:3px 10px;white-space:nowrap;}
+.issue-stats{font-family:var(--mono);font-size:12px;color:var(--text-2);margin:var(--sp-1) 0 var(--sp-2);}
+.why-hot-compact{list-style:none;margin:0;padding:0;}
+.why-hot-compact li{font-size:13px;color:var(--text-2);padding:1px 0;}
+.why-hot-compact li::before{content:"— ";color:var(--muted);}
+.issue-detail{padding:0 var(--sp-5) var(--sp-5);border-top:1px solid var(--divider);}
+.issue-metrics{display:flex;flex-wrap:wrap;gap:var(--sp-5);padding:var(--sp-4) 0;}
+.metric{display:flex;flex-direction:column;gap:2px;}
+.metric-label{font-size:11px;color:var(--muted);}
+.metric-value{font-family:var(--mono);font-size:16px;font-weight:700;}
+.source-coverage{display:flex;flex-direction:column;gap:var(--sp-2);padding:var(--sp-2) 0 var(--sp-4);}
+.coverage-row{display:flex;align-items:center;gap:var(--sp-3);}
+.coverage-src{flex:0 0 130px;font-size:12px;color:var(--text-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.coverage-track{flex:1 1 auto;height:6px;background:var(--bg);border-radius:999px;overflow:hidden;}
+.coverage-fill{height:100%;background:var(--accent);border-radius:999px;}
+.coverage-count{flex:0 0 24px;text-align:right;font-family:var(--mono);font-size:12px;color:var(--text-2);}
+.related-articles{display:flex;flex-direction:column;}
+.related-row{display:flex;align-items:baseline;gap:var(--sp-3);padding:var(--sp-2) 0;border-top:1px solid var(--divider);font-size:13px;}
+.related-row:first-child{border-top:none;}
+.related-row .src{font-family:var(--mono);font-size:11px;color:var(--text-2);flex:0 0 110px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.related-row a{flex:1 1 auto;min-width:0;text-decoration:none;}
+.related-row a:hover{color:var(--accent);text-decoration:underline;}
+@media (max-width:767px){details.issue-card>summary{padding:var(--sp-4);gap:var(--sp-3);}.related-row{flex-direction:column;gap:2px;}
+  .related-row .src{flex:none;}}
+
+/* sources side panel */
+.bar-list{display:flex;flex-direction:column;gap:var(--sp-3);}
+.bar-row{display:grid;grid-template-columns:110px minmax(0,1fr) 34px;gap:var(--sp-3);align-items:center;font-size:13px;}
+.bar-row .name{color:var(--text-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.bar-row .val{font-family:var(--mono);font-size:12px;text-align:right;}
+
+/* ================= toolbar / filters / sheet ================= */
+.toolbar{display:flex;align-items:center;gap:var(--sp-2);flex-wrap:wrap;margin-bottom:var(--sp-3);}
+.search-box{position:relative;flex:1 1 280px;min-width:0;}
+.search-box .ic{position:absolute;left:14px;top:50%;transform:translateY(-50%);color:var(--muted);pointer-events:none;}
+.search-input{width:100%;min-height:44px;padding:0 14px 0 42px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);}
+.search-input::placeholder{color:var(--muted);}
+.filter-btn{display:none;}
+.filter-sheet{display:contents;}
+.sheet-head,.sheet-foot{display:none;}
+.fields{display:flex;gap:var(--sp-2);flex-wrap:wrap;align-items:center;}
+.field label{display:none;font-size:12px;font-weight:600;margin-bottom:var(--sp-1);}
+.pill-select{min-height:44px;padding:0 var(--sp-4);background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);cursor:pointer;max-width:220px;}
+.sort-toggle{display:flex;gap:6px;}
+.pill{min-height:44px;padding:0 var(--sp-4);font-weight:500;color:var(--text-2);background:var(--surface);border:1px solid var(--border);
+  border-radius:var(--radius-sm);cursor:pointer;}
+.pill.active{color:var(--accent);background:var(--accent-soft);border-color:var(--accent-soft);}
+@media (max-width:767px){
+  .toolbar{flex-direction:column;align-items:stretch;}
+  .filter-btn{display:inline-flex;}
+  .filter-sheet{display:flex;flex-direction:column;position:fixed;left:0;right:0;bottom:0;z-index:var(--z-modal);max-height:85vh;overflow-y:auto;
+    background:var(--surface);border-radius:20px 20px 0 0;padding:var(--sp-4) var(--sp-4) calc(var(--sp-4) + env(safe-area-inset-bottom,0px));
+    transform:translateY(100%);visibility:hidden;transition:transform var(--t-mid) ease,visibility 0s linear var(--t-mid);}
+  .app.sheet-open .filter-sheet{transform:none;visibility:visible;transition:transform var(--t-mid) ease;}
+  .sheet-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:var(--sp-3);font-weight:650;font-size:16px;}
+  .sheet-foot{display:flex;gap:var(--sp-3);margin-top:var(--sp-4);}
+  .sheet-foot .btn{flex:1;}
+  .fields{flex-direction:column;align-items:stretch;gap:var(--sp-4);}
+  .field label{display:block;}
+  .pill-select{width:100%;max-width:none;}
+  .sort-toggle .pill{flex:1;}
+}
+
+/* ================= news list (table on desktop, cards on mobile) ================= */
+.news-table{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);overflow:clip;}
+.news-head,.news-row{display:grid;grid-template-columns:150px minmax(0,1fr) 210px 56px;gap:var(--sp-4);align-items:center;padding:0 var(--sp-5);}
+.news-head{position:sticky;top:var(--header-h);z-index:10;min-height:40px;background:var(--surface-2);border-bottom:1px solid var(--border);
+  font-family:var(--mono);font-size:11px;font-weight:500;color:var(--muted);letter-spacing:.04em;text-transform:uppercase;}
+.news-head span:last-child{text-align:right;}
+.news-stream-list{display:flex;flex-direction:column;}
+.news-row{min-height:64px;padding-top:var(--sp-2);padding-bottom:var(--sp-2);border-bottom:1px solid var(--divider);transition:background var(--t-fast) ease;}
+.news-row:last-child{border-bottom:none;}
+.news-row:hover{background:var(--surface-2);}
+.news-row .src{font-family:var(--mono);font-size:12px;font-weight:500;color:var(--text-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.news-row .hl{min-width:0;display:flex;flex-direction:column;gap:4px;}
+.news-row .headline{font-size:15px;font-weight:500;line-height:1.4;text-decoration:none;display:-webkit-box;-webkit-line-clamp:2;
+  -webkit-box-orient:vertical;overflow:hidden;transition:color var(--t-fast) ease;}
+.news-row .headline:hover{color:var(--accent);}
+.hl-meta{display:flex;align-items:center;gap:6px;flex-wrap:wrap;}
+.hl-meta:empty{display:none;}
+.news-row .issue-tag{justify-self:start;max-width:100%;font-family:var(--mono);font-size:11px;font-weight:500;color:var(--accent);background:var(--accent-soft);
+  border-radius:999px;padding:3px 10px;text-decoration:none;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.news-row .ts{font-family:var(--mono);font-size:12px;color:var(--muted);text-align:right;}
+.news-row .sent{width:8px;height:8px;border-radius:50%;flex:0 0 8px;}
+.news-row .sent.neg{background:var(--live);}.news-row .sent.pos{background:var(--accent);}
+.brand-tag{font-family:var(--mono);font-size:11px;color:var(--text-2);border:1px solid var(--border);border-radius:999px;padding:1px 8px;white-space:nowrap;}
+@media (min-width:768px) and (max-width:1023px){
+  .news-head,.news-row{grid-template-columns:120px minmax(0,1fr) 56px;}
+  .news-head span:nth-child(3),.news-row .issue-tag{display:none;}
+}
+@media (max-width:767px){
+  .news-head{display:none;}
+  .news-table{border:0;box-shadow:none;background:none;}
+  .news-stream-list{gap:var(--sp-3);}
+  .news-row{grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"hl hl" "src ts" "tag tag";gap:var(--sp-2) var(--sp-3);
+    padding:var(--sp-4);background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);}
+  .news-row:last-child{border-bottom:1px solid var(--border);}
+  .news-row .hl{grid-area:hl;}.news-row .src{grid-area:src;}.news-row .ts{grid-area:ts;}.news-row .issue-tag{grid-area:tag;}
+  .news-row .headline{font-size:16px;}
+}
+.pagination{display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:6px;margin-top:var(--sp-5);}
+.page-btn{min-width:40px;min-height:40px;padding:0 var(--sp-3);font-family:var(--mono);font-size:12px;font-weight:500;color:var(--text-2);
+  background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);cursor:pointer;}
+.page-btn.active{color:var(--accent);background:var(--accent-soft);border-color:var(--accent-soft);}
+.page-ellipsis{color:var(--muted);font-family:var(--mono);padding:0 2px;}
+@media (max-width:767px){.page-btn{min-width:44px;min-height:44px;}}
+
+/* ================= states ================= */
+.state{display:flex;flex-direction:column;align-items:center;gap:var(--sp-2);text-align:center;padding:var(--sp-7) var(--sp-4);color:var(--text-2);}
+.state b{color:var(--text);font-size:16px;}
+.state.error b{color:var(--live);}
+.skeleton{display:block;height:14px;border-radius:6px;background:linear-gradient(90deg,var(--divider),var(--surface-2),var(--divider));
+  background-size:200% 100%;animation:sk 1.2s ease-in-out infinite;}
+@keyframes sk{from{background-position:200% 0}to{background-position:-200% 0}}
+@media (prefers-reduced-motion:reduce){.skeleton{animation:none}*{transition-duration:.01ms!important}}
+
+/* ================= by source (Kanban) + archive ================= */
+.source-board{display:flex;align-items:flex-start;gap:var(--sp-4);overflow-x:auto;padding-bottom:var(--sp-2);}
+details.source-col{flex:0 0 300px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);}
+details.source-col>summary{display:flex;align-items:center;gap:var(--sp-3);min-height:48px;padding:0 var(--sp-4);cursor:pointer;font-weight:600;
+  border-bottom:1px solid var(--divider);list-style:none;user-select:none;}
+details.source-col>summary::-webkit-details-marker{display:none;}
+details.source-col .count{margin-left:auto;font-family:var(--mono);font-weight:500;font-size:11px;color:var(--text-2);border:1px solid var(--border);border-radius:999px;padding:2px 9px;}
+details.source-col .chevron{font-size:10px;color:var(--muted);transition:transform var(--t-fast) ease;}
+details.source-col[open] .chevron{transform:rotate(180deg);}
+.source-list-wrap{max-height:min(65vh,600px);overflow-y:auto;padding:4px var(--sp-4);}
+.source-list-wrap ul{list-style:none;margin:0;padding:0;}
+.source-list-wrap li{display:flex;gap:10px;padding:9px 0;border-bottom:1px solid var(--divider);}
+.source-list-wrap li:last-child{border-bottom:none;}
+.source-list-wrap a{text-decoration:none;font-size:13px;line-height:1.4;}
+.source-list-wrap a:hover{color:var(--accent);text-decoration:underline;}
+.source-list-wrap .time{color:var(--muted);font-family:var(--mono);font-size:11px;white-space:nowrap;padding-top:2px;}
+@media (max-width:1023px){.source-board{flex-direction:column;overflow-x:visible;}details.source-col{flex-basis:auto;width:100%;}}
+.date-tabs{display:flex;flex-wrap:wrap;gap:6px;}
+.date-tabs a{min-height:40px;display:inline-flex;align-items:center;padding:0 var(--sp-4);font-family:var(--mono);font-size:12px;font-weight:500;text-decoration:none;
+  color:var(--text-2);background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);}
+.date-tabs a:hover{color:var(--text);}
+.date-tabs a.active{color:var(--accent);background:var(--accent-soft);border-color:var(--accent-soft);}
+.date-picker{margin-top:var(--sp-3);font-family:var(--mono);font-size:12px;color:var(--muted);display:flex;align-items:center;gap:var(--sp-2);}
+.date-picker select{min-height:40px;padding:0 var(--sp-3);background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);}
+
+/* ================= analytics / brands blocks ================= */
+.an-grid{display:grid;grid-template-columns:1fr;gap:var(--sp-4);}
+@media (min-width:1100px){.an-grid{grid-template-columns:1fr 1fr;}}
+details.an-block{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);min-width:0;}
+details.an-block>summary{padding:var(--sp-4) var(--sp-5);min-height:52px;display:flex;align-items:center;cursor:pointer;list-style:none;user-select:none;font-weight:650;font-size:16px;}
+details.an-block>summary::-webkit-details-marker{display:none;}
+details.an-block[open]>summary{border-bottom:1px solid var(--divider);}
+.an-body{padding:var(--sp-4) var(--sp-5) var(--sp-5);overflow-x:auto;}
+.an-note{color:var(--muted);font-size:12px;margin:0 0 var(--sp-3);}
+.an-note.gap{margin-top:var(--sp-4);}
+.an-empty{color:var(--muted);font-size:13px;}
+table.an-table{width:100%;border-collapse:collapse;font-size:13px;}
+.an-table th{text-align:left;font-family:var(--mono);font-size:11px;font-weight:500;color:var(--muted);padding:4px 8px 6px 0;border-bottom:1px solid var(--divider);white-space:nowrap;}
+.an-table td{padding:8px 8px 8px 0;border-bottom:1px solid var(--divider);vertical-align:top;}
+.an-table td.num,.an-table th.num{text-align:right;font-family:var(--mono);}
+.an-table tr:last-child td{border-bottom:none;}
+.an-table tbody tr:hover{background:var(--surface-2);}
+.an-list{list-style:none;margin:0;padding:0;font-size:13px;}
+.an-list li{padding:8px 0;border-bottom:1px solid var(--divider);}
+.an-list li:last-child{border-bottom:none;}
+.dim,.an-list .dim{color:var(--text-2);}
+.an-bars{display:flex;align-items:flex-end;gap:3px;height:80px;margin:6px 0 4px;}
+.an-bars .bar{flex:1 1 0;background:var(--accent);border-radius:3px 3px 0 0;min-height:2px;}
+.an-axis{display:flex;justify-content:space-between;font-family:var(--mono);font-size:10px;color:var(--muted);}
+td.heat,th.heat{font-family:var(--mono);text-align:center;}
+.role-tag{font-family:var(--mono);font-size:10px;border-radius:999px;padding:1px 7px;margin-left:6px;background:var(--accent-soft);color:var(--accent);}
+.role-tag.comp{background:var(--surface-2);color:var(--text-2);border:1px solid var(--border);}
+.crisis-list{list-style:none;margin:0;padding:0;}
+.crisis-item{border:1px solid var(--live);border-radius:var(--radius);padding:var(--sp-4) var(--sp-5);margin-bottom:var(--sp-3);background:var(--surface);}
+.crisis-item .lvl{font-family:var(--mono);font-size:11px;font-weight:700;color:var(--live);text-transform:uppercase;}
+.crisis-ok{color:var(--text-2);font-size:14px;padding:6px 0;}
+.sov-bar{min-width:90px;}
+.delta-up{color:var(--accent);}.delta-down{color:var(--live);}
+.empty{text-align:center;color:var(--muted);padding:var(--sp-7) 0;}
+.footer{margin-top:var(--sp-6);text-align:center;color:var(--muted);font-family:var(--mono);font-size:11px;}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false"><defs>
+<symbol id="i-home" viewBox="0 0 24 24"><path d="M3 11l9-8 9 8"/><path d="M5 10v10h14V10"/><path d="M10 20v-6h4v6"/></symbol>
+<symbol id="i-flame" viewBox="0 0 24 24"><path d="M12 3c1 3 5 5 5 10a5 5 0 0 1-10 0c0-2 1-3 2-4 0 2 1 3 2 3 0-3-1-5 1-9z"/></symbol>
+<symbol id="i-news" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M8 9h8M8 13h8M8 17h5"/></symbol>
+<symbol id="i-building" viewBox="0 0 24 24"><path d="M4 21V7l8-4 8 4v14"/><path d="M9 21v-6h6v6M9 10h.01M15 10h.01"/></symbol>
+<symbol id="i-chart" viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-8M22 20H2"/></symbol>
+<symbol id="i-db" viewBox="0 0 24 24"><ellipse cx="12" cy="6" rx="8" ry="3"/><path d="M4 6v6c0 1.7 3.6 3 8 3s8-1.3 8-3V6M4 12v6c0 1.7 3.6 3 8 3s8-1.3 8-3v-6"/></symbol>
+<symbol id="i-archive" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="4" rx="1"/><path d="M5 8v11h14V8M10 12h4"/></symbol>
+<symbol id="i-rss" viewBox="0 0 24 24"><path d="M5 19h.01M5 12a7 7 0 0 1 7 7M5 5a14 14 0 0 1 14 14"/></symbol>
+<symbol id="i-json" viewBox="0 0 24 24"><path d="M8 4c-2 0-3 1-3 3v2c0 1-1 2-2 3 1 1 2 2 2 3v2c0 2 1 3 3 3M16 4c2 0 3 1 3 3v2c0 1 1 2 2 3-1 1-2 2-2 3v2c0 2-1 3-3 3"/></symbol>
+<symbol id="i-menu" viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16"/></symbol>
+<symbol id="i-x" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></symbol>
+<symbol id="i-collapse" viewBox="0 0 24 24"><path d="M11 7l-5 5 5 5M18 7l-5 5 5 5"/></symbol>
+<symbol id="i-filter" viewBox="0 0 24 24"><path d="M4 5h16l-6 8v6l-4-2v-4z"/></symbol>
+<symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></symbol>
+<symbol id="i-refresh" viewBox="0 0 24 24"><path d="M20 11a8 8 0 1 0-2 6M20 5v6h-6"/></symbol>
+</defs></svg>
+<div class="app" id="app">
+<aside class="sidebar" id="sidebar" aria-label="Điều hướng chính">
+<a class="brand" href="index.html" aria-label="Vietnam News Monitor"><span class="logo-mark">VN</span><span class="brand-name">Vietnam News<small>Monitor</small></span></a>
+<div class="nav-group-title">Chính</div>
+<nav class="nav" aria-label="Chính"><a class="nav-item" href="index.html#overview" title="Tổng quan" aria-current="page"><svg class="ic" aria-hidden="true" focusable="false"><use href="#i-home"/></svg><span class="nav-label">Tổng quan</span></a><a class="nav-item" href="index.html#news" title="Tin tức"><svg class="ic" aria-hidden="true" focusable="false"><use href="#i-news"/></svg><span class="nav-label">Tin tức</span></a></nav>
+<div class="nav-group-title">Phân tích</div><nav class="nav" aria-label="Phân tích"><a class="nav-item" href="brands.html" title="Brands"><svg class="ic" aria-hidden="true" focusable="false"><use href="#i-building"/></svg><span class="nav-label">Brands</span></a><a class="nav-item" href="analytics.html" title="Analytics"><svg class="ic" aria-hidden="true" focusable="false"><use href="#i-chart"/></svg><span class="nav-label">Analytics</span></a></nav>
+<div class="nav-group-title">Quản lý</div>
+<nav class="nav" aria-label="Quản lý"><a class="nav-item" href="index.html#sources" title="Theo nguồn"><svg class="ic" aria-hidden="true" focusable="false"><use href="#i-db"/></svg><span class="nav-label">Theo nguồn</span></a><a class="nav-item" href="index.html#archive" title="Lưu trữ"><svg class="ic" aria-hidden="true" focusable="false"><use href="#i-archive"/></svg><span class="nav-label">Lưu trữ</span></a></nav>
+<div class="nav-group-title">Dữ liệu</div><nav class="nav" aria-label="Dữ liệu"><a class="nav-item" href="feed.xml" title="RSS feed"><svg class="ic" aria-hidden="true" focusable="false"><use href="#i-rss"/></svg><span class="nav-label">RSS feed</span></a><a class="nav-item" href="issues.json" title="Dữ liệu JSON"><svg class="ic" aria-hidden="true" focusable="false"><use href="#i-json"/></svg><span class="nav-label">Dữ liệu JSON</span></a></nav>
+<div class="sb-spacer"></div>
+<button class="sb-toggle" id="sb-toggle" type="button" aria-expanded="true" aria-controls="sidebar" title="Thu gọn thanh điều hướng"><svg class="ic" aria-hidden="true" focusable="false"><use href="#i-collapse"/></svg><span class="nav-label">Thu gọn</span></button>
+</aside>
+<header class="topbar">
+<button class="icon-btn menu-btn" id="menu-btn" type="button" data-open-drawer aria-label="Mở menu" aria-expanded="false" aria-controls="sidebar"><svg class="ic" aria-hidden="true" focusable="false"><use href="#i-menu"/></svg></button>
+<div class="crumb"><span>Vietnam News Monitor</span><span class="sep">/</span><b>Tin ngày 02/08/2026</b></div>
+<div class="topbar-actions"><div class="live" role="status"><span class="live-dot"></span><span class="t">LIVE ·</span><span>00:48</span></div></div>
+</header>
+<main class="main" id="main"><div class="container">
+<div class="latest-banner">Bạn đang xem tin lưu trữ, không phải ngày mới nhất — <a href="2026-11-15.html">xem tin mới nhất →</a></div><section id="overview" aria-label="Tổng quan"><div class="page-head"><div><h1>Tin ngày 02/08/2026</h1><p>Bản lưu trữ của ngày đã chọn.</p></div></div><div class="kpi-grid"><div class="kpi"><div class="kpi-label">Bài viết</div><div class="kpi-value">12</div><div class="kpi-sub"></div></div><div class="kpi"><div class="kpi-label">Nguồn có bài</div><div class="kpi-value">1</div><div class="kpi-sub">trong 23 nguồn theo dõi</div></div><div class="kpi"><div class="kpi-label">Cập nhật</div><div class="kpi-value">00:48</div><div class="kpi-sub">mỗi 20 phút</div></div></div></section><div class="content-grid"><aside class="panel col-12" aria-labelledby="top-sources-title"><h2 class="panel-title" id="top-sources-title">Nguồn đăng nhiều nhất</h2><p class="panel-note">Số bài trong ngày, 8 nguồn đứng đầu.</p><div class="bar-list"><div class="bar-row"><span class="name">VietnamNet</span><div class="coverage-track"><div class="coverage-fill" style="width:100%"></div></div><span class="val">12</span></div></div></aside></div><section id="news" class="section" aria-labelledby="news-title"><div class="section-head"><h2 class="section-title" id="news-title">Tin tức</h2><span class="count-chip" id="news-count" aria-live="polite"></span></div><div class="toolbar">
+<div class="search-box"><svg class="ic" aria-hidden="true" focusable="false"><use href="#i-search"/></svg><input type="search" id="search-news" class="search-input" placeholder="Tìm kiếm tiêu đề..." aria-label="Tìm kiếm tiêu đề" oninput="applyFilters()"></div>
+<button type="button" class="btn filter-btn" data-open-sheet aria-haspopup="dialog"><svg class="ic" aria-hidden="true" focusable="false"><use href="#i-filter"/></svg>Bộ lọc</button>
+<div class="filter-sheet" role="dialog" aria-label="Bộ lọc tin">
+<div class="sheet-head"><span>Bộ lọc</span><button type="button" class="icon-btn" data-close-sheet aria-label="Đóng bộ lọc"><svg class="ic" aria-hidden="true" focusable="false"><use href="#i-x"/></svg></button></div>
+<div class="fields">
+<div class="field"><label for="filter-source">Nguồn</label><select id="filter-source" class="pill-select" onchange="applyFilters()"><option value="">Tất cả nguồn</option><option value="VietnamNet">VietnamNet</option></select></div>
+<div class="field"><label for="filter-issue">Issue</label><select id="filter-issue" class="pill-select" onchange="applyFilters()"><option value="">Tất cả issue</option></select></div>
+<div class="field"><label for="filter-brand">Thương hiệu</label><select id="filter-brand" class="pill-select" onchange="applyFilters()"><option value="">Tất cả thương hiệu</option><option value="ABBank">ABBank</option><option value="ACB">ACB</option><option value="Agribank">Agribank</option><option value="BIDV">BIDV</option><option value="Bac A Bank">Bac A Bank</option><option value="BaoViet Bank">BaoViet Bank</option><option value="Eximbank">Eximbank</option><option value="HDBank">HDBank</option><option value="Kienlongbank">Kienlongbank</option><option value="LPBank">LPBank</option><option value="MB">MB</option><option value="MSB">MSB</option><option value="NCB">NCB</option><option value="Nam A Bank">Nam A Bank</option><option value="Ngân hàng Nhà nước">Ngân hàng Nhà nước</option><option value="OCB">OCB</option><option value="PVcomBank">PVcomBank</option><option value="SCB">SCB</option><option value="SHB">SHB</option><option value="Sacombank">Sacombank</option><option value="SeABank">SeABank</option><option value="TPBank">TPBank</option><option value="Techcombank">Techcombank</option><option value="VIB">VIB</option><option value="VPBank">VPBank</option><option value="Vietbank">Vietbank</option><option value="Vietcombank">Vietcombank</option><option value="VietinBank">VietinBank</option></select></div>
+<div class="field"><label>Sắp xếp</label><div class="sort-toggle">
+<button type="button" class="pill active" data-sort="newest" onclick="setSort(this,'newest')">Mới nhất</button>
+<button type="button" class="pill" data-sort="trending" onclick="setSort(this,'trending')">Đang hot</button>
+</div></div>
+</div>
+<div class="sheet-foot"><button type="button" class="btn" onclick="resetFilters()">Đặt lại</button><button type="button" class="btn primary" data-close-sheet>Áp dụng</button></div>
+</div>
+</div><div class="news-table"><div class="news-head" aria-hidden="true"><span>Nguồn</span><span>Tiêu đề</span><span>Issue</span><span>Giờ</span></div><div id="news-stream-list" class="news-stream-list"><div class="news-row" data-source="VietnamNet" data-issue="" data-brand="" data-hot="0" data-ts="1785672137"><span class="src">VietnamNet</span><div class="hl"><a class="headline" href="https://vietnamnet.vn/tim-duoc-tam-ve-trung-doc-dac-vietlott-gan-30-ty-dong-2541404.html" target="_blank" rel="noopener">Tìm được tấm vé đổi đời, một người trúng độc đắc Vietlott gần 30 tỷ đồng</a><div class="hl-meta"></div></div><span class="ts">19:02</span></div><div class="news-row" data-source="VietnamNet" data-issue="" data-brand="" data-hot="0" data-ts="1785667215"><span class="src">VietnamNet</span><div class="hl"><a class="headline" href="https://vietnamnet.vn/khong-de-xay-ra-tinh-trang-dung-ban-xang-dau-khong-co-ly-do-2541387.html" target="_blank" rel="noopener">Không để xảy ra tình trạng dừng bán xăng dầu không có lý do</a><div class="hl-meta"></div></div><span class="ts">17:40</span></div><div class="news-row" data-source="VietnamNet" data-issue="" data-brand="" data-hot="0" data-ts="1785655309"><span class="src">VietnamNet</span><div class="hl"><a class="headline" href="https://vietnamnet.vn/chung-cu-nuoi-lon-26-tang-thit-lon-81-000-dong-kg-2540826.html" target="_blank" rel="noopener">‘Chung cư’ nuôi lợn 26 tầng, thịt lợn 81.000 đồng/kg</a><div class="hl-meta"></div></div><span class="ts">14:21</span></div><div class="news-row" data-source="VietnamNet" data-issue="" data-brand="" data-hot="0" data-ts="1785654339"><span class="src">VietnamNet</span><div class="hl"><a class="headline" href="https://vietnamnet.vn/tivi-giam-gia-50-mot-mau-iphone-xuong-gia-thap-ky-luc-2541270.html" target="_blank" rel="noopener">Tivi giảm giá 50%, một mẫu iPhone xuống giá thấp kỷ lục</a><div class="hl-meta"></div></div><span class="ts">14:05</span></div><div class="news-row" data-source="VietnamNet" data-issue="" data-brand="" data-hot="0" data-ts="1785637167"><span class="src">VietnamNet</span><div class="hl"><a class="headline" href="https://vietnamnet.vn/dien-bien-bat-thuong-o-bamboo-airways-dai-gia-nguyen-minh-chinh-tiem-luc-ra-sao-2541275.html" target="_blank" rel="noopener">Diễn biến bất thường ở Bamboo Airways; đại gia Nguyễn Minh Chính tiềm lực ra sao?</a><div class="hl-meta"></div></div><span class="ts">09:19</span></div><div class="news-row" data-source="VietnamNet" data-issue="" data-brand="" data-hot="0" data-ts="1785637105"><span class="src">VietnamNet</span><div class="hl"><a class="headline" href="https://vietnamnet.vn/gia-vang-hom-nay-2-8-2026-giam-sau-vang-nhan-sjc-boc-hoi-gan-6-trieu-dong-2541174.html" target="_blank" rel="noopener">Giá vàng hôm nay 2/8/2026 giảm sâu, vàng nhẫn SJC &amp;apos;bốc hơi&amp;apos; gần 6 triệu đồng</a><div class="hl-meta"></div></div><span class="ts">09:18</span></div><div class="news-row" data-source="VietnamNet" data-issue="" data-brand="" data-hot="0" data-ts="1785637067"><span class="src">VietnamNet</span><div class="hl"><a class="headline" href="https://vietnamnet.vn/doanh-thu-1-ty-1-nam-dong-thue-bao-nhieu-2540436.html" target="_blank" rel="noopener">Doanh thu 1 tỷ 1 năm đóng thuế bao nhiêu?</a><div class="hl-meta"></div></div><span class="ts">09:17</span></div><div class="news-row" data-source="VietnamNet" data-issue="" data-brand="" data-hot="0" data-ts="1785634611"><span class="src">VietnamNet</span><div class="hl"><a class="headline" href="https://vietnamnet.vn/gia-xang-dau-hom-nay-2-8-the-gioi-co-tuan-giam-manh-trong-nuoc-tang-2541267.html" target="_blank" rel="noopener">Giá xăng dầu hôm nay 2/8: Thế giới có tuần giảm mạnh, trong nước tăng</a><div class="hl-meta"></div></div><span class="ts">08:36</span></div><div class="news-row" data-source="VietnamNet" data-issue="" data-brand="" data-hot="0" data-ts="1785633539"><span class="src">VietnamNet</span><div class="hl"><a class="headline" href="https://vietnamnet.vn/ong-lon-phong-gym-lien-tiep-dong-cua-thoi-hoang-kim-phong-tap-cao-cap-da-qua-2541024.html" target="_blank" rel="noopener">‘Ông lớn’ phòng gym liên tiếp đóng cửa: Thời hoàng kim phòng tập cao cấp đã qua?</a><div class="hl-meta"></div></div><span class="ts">08:18</span></div><div class="news-row" data-source="VietnamNet" data-issue="" data-brand="" data-hot="0" data-ts="1785626340"><span class="src">VietnamNet</span><div class="hl"><a class="headline" href="https://vietnamnet.vn/tap-doan-thai-thu-loi-lon-tu-thi-truong-viet-nam-2541045.html" target="_blank" rel="noopener">Tập đoàn Thái thu lợi &amp;apos;khủng&amp;apos; khi vào thị trường Việt Nam</a><div class="hl-meta"></div></div><span class="ts">06:19</span></div><div class="news-row" data-source="VietnamNet" data-issue="" data-brand="" data-hot="0" data-ts="1785625200"><span class="src">VietnamNet</span><div class="hl"><a class="headline" href="https://vietnamnet.vn/4-ong-lon-ngan-hang-nam-hon-mot-nua-tien-gui-cua-28-nha-bang-2541135.html" target="_blank" rel="noopener">4 &amp;apos;ông lớn&amp;apos; ngân hàng nắm hơn một nửa tiền gửi của 28 nhà băng</a><div class="hl-meta"></div></div><span class="ts">06:00</span></div><div class="news-row" data-source="VietnamNet" data-issue="" data-brand="" data-hot="0" data-ts="1785623400"><span class="src">VietnamNet</span><div class="hl"><a class="headline" href="https://vietnamnet.vn/sai-pham-tai-goi-thau-35-000-ty-o-san-bay-long-thanh-vinaconex-lam-an-ra-sao-2540621.html" target="_blank" rel="noopener">Sai phạm tại gói thầu 35.000 tỷ ở sân bay Long Thành: Vinaconex làm ăn ra sao?</a><div class="hl-meta"></div></div><span class="ts">05:30</span></div></div><div class="state" id="news-empty" hidden><b>Không tìm thấy tin phù hợp</b><span>Thử đổi từ khoá hoặc bộ lọc.</span><button type="button" class="btn" onclick="resetFilters()">Xoá bộ lọc</button></div></div><div id="news-pagination" class="pagination"></div></section><section id="sources" class="section" aria-labelledby="sources-title"><div class="section-head"><h2 class="section-title" id="sources-title">Theo nguồn</h2></div><div class="source-board"><details class="source-col" open><summary><span class="source-name">VietnamNet</span><span class="count">12</span><span class="chevron" aria-hidden="true">▾</span></summary><div class="source-list-wrap"><ul><li><span class="time">19:02</span><a href="https://vietnamnet.vn/tim-duoc-tam-ve-trung-doc-dac-vietlott-gan-30-ty-dong-2541404.html" target="_blank" rel="noopener">Tìm được tấm vé đổi đời, một người trúng độc đắc Vietlott gần 30 tỷ đồng</a></li><li><span class="time">17:40</span><a href="https://vietnamnet.vn/khong-de-xay-ra-tinh-trang-dung-ban-xang-dau-khong-co-ly-do-2541387.html" target="_blank" rel="noopener">Không để xảy ra tình trạng dừng bán xăng dầu không có lý do</a></li><li><span class="time">14:21</span><a href="https://vietnamnet.vn/chung-cu-nuoi-lon-26-tang-thit-lon-81-000-dong-kg-2540826.html" target="_blank" rel="noopener">‘Chung cư’ nuôi lợn 26 tầng, thịt lợn 81.000 đồng/kg</a></li><li><span class="time">14:05</span><a href="https://vietnamnet.vn/tivi-giam-gia-50-mot-mau-iphone-xuong-gia-thap-ky-luc-2541270.html" target="_blank" rel="noopener">Tivi giảm giá 50%, một mẫu iPhone xuống giá thấp kỷ lục</a></li><li><span class="time">09:19</span><a href="https://vietnamnet.vn/dien-bien-bat-thuong-o-bamboo-airways-dai-gia-nguyen-minh-chinh-tiem-luc-ra-sao-2541275.html" target="_blank" rel="noopener">Diễn biến bất thường ở Bamboo Airways; đại gia Nguyễn Minh Chính tiềm lực ra sao?</a></li><li><span class="time">09:18</span><a href="https://vietnamnet.vn/gia-vang-hom-nay-2-8-2026-giam-sau-vang-nhan-sjc-boc-hoi-gan-6-trieu-dong-2541174.html" target="_blank" rel="noopener">Giá vàng hôm nay 2/8/2026 giảm sâu, vàng nhẫn SJC &amp;apos;bốc hơi&amp;apos; gần 6 triệu đồng</a></li><li><span class="time">09:17</span><a href="https://vietnamnet.vn/doanh-thu-1-ty-1-nam-dong-thue-bao-nhieu-2540436.html" target="_blank" rel="noopener">Doanh thu 1 tỷ 1 năm đóng thuế bao nhiêu?</a></li><li><span class="time">08:36</span><a href="https://vietnamnet.vn/gia-xang-dau-hom-nay-2-8-the-gioi-co-tuan-giam-manh-trong-nuoc-tang-2541267.html" target="_blank" rel="noopener">Giá xăng dầu hôm nay 2/8: Thế giới có tuần giảm mạnh, trong nước tăng</a></li><li><span class="time">08:18</span><a href="https://vietnamnet.vn/ong-lon-phong-gym-lien-tiep-dong-cua-thoi-hoang-kim-phong-tap-cao-cap-da-qua-2541024.html" target="_blank" rel="noopener">‘Ông lớn’ phòng gym liên tiếp đóng cửa: Thời hoàng kim phòng tập cao cấp đã qua?</a></li><li><span class="time">06:19</span><a href="https://vietnamnet.vn/tap-doan-thai-thu-loi-lon-tu-thi-truong-viet-nam-2541045.html" target="_blank" rel="noopener">Tập đoàn Thái thu lợi &amp;apos;khủng&amp;apos; khi vào thị trường Việt Nam</a></li><li><span class="time">06:00</span><a href="https://vietnamnet.vn/4-ong-lon-ngan-hang-nam-hon-mot-nua-tien-gui-cua-28-nha-bang-2541135.html" target="_blank" rel="noopener">4 &amp;apos;ông lớn&amp;apos; ngân hàng nắm hơn một nửa tiền gửi của 28 nhà băng</a></li><li><span class="time">05:30</span><a href="https://vietnamnet.vn/sai-pham-tai-goi-thau-35-000-ty-o-san-bay-long-thanh-vinaconex-lam-an-ra-sao-2540621.html" target="_blank" rel="noopener">Sai phạm tại gói thầu 35.000 tỷ ở sân bay Long Thành: Vinaconex làm ăn ra sao?</a></li></ul></div></details></div></section><section id="archive" class="section" aria-labelledby="archive-title"><div class="section-head"><h2 class="section-title" id="archive-title">Lưu trữ</h2></div><div class="date-tabs"><a href="2026-08-07.html">07/08</a><a href="2026-08-06.html">06/08</a><a href="2026-08-05.html">05/08</a><a href="2026-08-04.html">04/08</a><a href="2026-08-03.html">03/08</a><a href="2026-08-02.html" class="active">02/08</a><a href="2026-08-01.html">01/08</a></div><div class="date-picker"><label for="date-picker">Ngày khác:</label> <select id="date-picker" onchange="location.href=this.value"><option value="2026-11-15.html">15/11/2026</option><option value="2026-11-14.html">14/11/2026</option><option value="2026-11-13.html">13/11/2026</option><option value="2026-11-12.html">12/11/2026</option><option value="2026-11-11.html">11/11/2026</option><option value="2026-11-10.html">10/11/2026</option><option value="2026-11-09.html">09/11/2026</option><option value="2026-11-08.html">08/11/2026</option><option value="2026-11-07.html">07/11/2026</option><option value="2026-11-06.html">06/11/2026</option><option value="2026-11-05.html">05/11/2026</option><option value="2026-11-04.html">04/11/2026</option><option value="2026-11-03.html">03/11/2026</option><option value="2026-11-02.html">02/11/2026</option><option value="2026-11-01.html">01/11/2026</option><option value="2026-10-31.html">31/10/2026</option><option value="2026-10-30.html">30/10/2026</option><option value="2026-10-29.html">29/10/2026</option><option value="2026-10-28.html">28/10/2026</option><option value="2026-10-27.html">27/10/2026</option><option value="2026-10-26.html">26/10/2026</option><option value="2026-10-25.html">25/10/2026</option><option value="2026-10-24.html">24/10/2026</option><option value="2026-10-23.html">23/10/2026</option><option value="2026-10-22.html">22/10/2026</option><option value="2026-10-21.html">21/10/2026</option><option value="2026-10-20.html">20/10/2026</option><option value="2026-10-19.html">19/10/2026</option><option value="2026-10-18.html">18/10/2026</option><option value="2026-10-17.html">17/10/2026</option><option value="2026-10-16.html">16/10/2026</option><option value="2026-10-15.html">15/10/2026</option><option value="2026-10-14.html">14/10/2026</option><option value="2026-10-13.html">13/10/2026</option><option value="2026-10-12.html">12/10/2026</option><option value="2026-10-11.html">11/10/2026</option><option value="2026-10-10.html">10/10/2026</option><option value="2026-10-09.html">09/10/2026</option><option value="2026-10-08.html">08/10/2026</option><option value="2026-10-07.html">07/10/2026</option><option value="2026-10-06.html">06/10/2026</option><option value="2026-10-05.html">05/10/2026</option><option value="2026-10-04.html">04/10/2026</option><option value="2026-10-03.html">03/10/2026</option><option value="2026-10-02.html">02/10/2026</option><option value="2026-10-01.html">01/10/2026</option><option value="2026-09-30.html">30/09/2026</option><option value="2026-09-29.html">29/09/2026</option><option value="2026-09-28.html">28/09/2026</option><option value="2026-09-27.html">27/09/2026</option><option value="2026-09-26.html">26/09/2026</option><option value="2026-09-25.html">25/09/2026</option><option value="2026-09-24.html">24/09/2026</option><option value="2026-09-23.html">23/09/2026</option><option value="2026-09-22.html">22/09/2026</option><option value="2026-09-21.html">21/09/2026</option><option value="2026-09-20.html">20/09/2026</option><option value="2026-09-19.html">19/09/2026</option><option value="2026-09-18.html">18/09/2026</option><option value="2026-09-17.html">17/09/2026</option><option value="2026-09-16.html">16/09/2026</option><option value="2026-09-15.html">15/09/2026</option><option value="2026-09-14.html">14/09/2026</option><option value="2026-09-13.html">13/09/2026</option><option value="2026-09-12.html">12/09/2026</option><option value="2026-09-11.html">11/09/2026</option><option value="2026-09-10.html">10/09/2026</option><option value="2026-09-09.html">09/09/2026</option><option value="2026-09-08.html">08/09/2026</option><option value="2026-09-07.html">07/09/2026</option><option value="2026-09-06.html">06/09/2026</option><option value="2026-09-05.html">05/09/2026</option><option value="2026-09-04.html">04/09/2026</option><option value="2026-09-03.html">03/09/2026</option><option value="2026-09-02.html">02/09/2026</option><option value="2026-09-01.html">01/09/2026</option><option value="2026-08-31.html">31/08/2026</option><option value="2026-08-30.html">30/08/2026</option><option value="2026-08-29.html">29/08/2026</option><option value="2026-08-28.html">28/08/2026</option><option value="2026-08-27.html">27/08/2026</option><option value="2026-08-26.html">26/08/2026</option><option value="2026-08-25.html">25/08/2026</option><option value="2026-08-24.html">24/08/2026</option><option value="2026-08-23.html">23/08/2026</option><option value="2026-08-22.html">22/08/2026</option><option value="2026-08-21.html">21/08/2026</option><option value="2026-08-20.html">20/08/2026</option><option value="2026-08-19.html">19/08/2026</option><option value="2026-08-18.html">18/08/2026</option><option value="2026-08-17.html">17/08/2026</option><option value="2026-08-16.html">16/08/2026</option><option value="2026-08-15.html">15/08/2026</option><option value="2026-08-14.html">14/08/2026</option><option value="2026-08-13.html">13/08/2026</option><option value="2026-08-12.html">12/08/2026</option><option value="2026-08-11.html">11/08/2026</option><option value="2026-08-10.html">10/08/2026</option><option value="2026-08-09.html">09/08/2026</option><option value="2026-08-08.html">08/08/2026</option><option value="2026-08-07.html">07/08/2026</option><option value="2026-08-06.html">06/08/2026</option><option value="2026-08-05.html">05/08/2026</option><option value="2026-08-04.html">04/08/2026</option><option value="2026-08-03.html">03/08/2026</option><option value="2026-08-02.html" selected>02/08/2026</option><option value="2026-08-01.html">01/08/2026</option></select></div></section>
+<p class="footer">Tự động cập nhật mỗi 20 phút qua GitHub Actions.</p>
+</div></main>
+<div class="backdrop" id="backdrop"></div>
+<nav class="bottom-nav" aria-label="Điều hướng nhanh"><a class="bn-item" href="index.html#overview" aria-current="page"><svg class="ic" aria-hidden="true" focusable="false"><use href="#i-home"/></svg><span>Tổng quan</span></a><a class="bn-item" href="index.html#news"><svg class="ic" aria-hidden="true" focusable="false"><use href="#i-news"/></svg><span>Tin tức</span></a><a class="bn-item" href="brands.html"><svg class="ic" aria-hidden="true" focusable="false"><use href="#i-building"/></svg><span>Brands</span></a><a class="bn-item" href="analytics.html"><svg class="ic" aria-hidden="true" focusable="false"><use href="#i-chart"/></svg><span>Analytics</span></a><button class="bn-item" type="button" data-open-drawer aria-label="Mở menu"><svg class="ic" aria-hidden="true" focusable="false"><use href="#i-menu"/></svg><span>Menu</span></button></nav>
+</div>
+<script>
+(function () {
+  var app = document.getElementById('app');
+  var menuBtn = document.getElementById('menu-btn');
+  var sbToggle = document.getElementById('sb-toggle');
+  var sidebar = document.getElementById('sidebar');
+  var mobile = window.matchMedia('(max-width: 767px)');
+  function store(k, v) { try { if (v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); } catch (e) { return null; } }
+
+  if (store('sb') === 'collapsed' && !mobile.matches) { app.classList.add('sb-collapsed'); }
+  if (sbToggle) {
+    sbToggle.setAttribute('aria-expanded', String(!app.classList.contains('sb-collapsed')));
+    sbToggle.addEventListener('click', function () {
+      var c = app.classList.toggle('sb-collapsed');
+      sbToggle.setAttribute('aria-expanded', String(!c));
+      store('sb', c ? 'collapsed' : 'expanded');
+    });
+  }
+
+  var lastFocus = null;
+  function openDrawer() {
+    lastFocus = document.activeElement;
+    app.classList.add('drawer-open');
+    menuBtn && menuBtn.setAttribute('aria-expanded', 'true');
+    var first = sidebar.querySelector('a,button');
+    first && first.focus();
+  }
+  function closeDrawer(restore) {
+    if (!app.classList.contains('drawer-open')) return;
+    app.classList.remove('drawer-open');
+    menuBtn && menuBtn.setAttribute('aria-expanded', 'false');
+    if (restore !== false && lastFocus) lastFocus.focus();
+  }
+  function openSheet() { app.classList.add('sheet-open'); var f = document.querySelector('.filter-sheet select'); f && f.focus(); }
+  function closeSheet() { app.classList.remove('sheet-open'); }
+
+  document.querySelectorAll('[data-open-drawer]').forEach(function (b) { b.addEventListener('click', openDrawer); });
+  document.querySelectorAll('[data-open-sheet]').forEach(function (b) { b.addEventListener('click', openSheet); });
+  document.querySelectorAll('[data-close-sheet]').forEach(function (b) { b.addEventListener('click', closeSheet); });
+  document.getElementById('backdrop').addEventListener('click', function () { closeDrawer(); closeSheet(); });
+  sidebar.addEventListener('click', function (e) { if (e.target.closest('a')) closeDrawer(false); });
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape') { closeDrawer(); closeSheet(); return; }
+    if (e.key === 'Tab' && app.classList.contains('drawer-open')) {
+      var items = sidebar.querySelectorAll('a,button');
+      if (!items.length) return;
+      var first = items[0], last = items[items.length - 1];
+      if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+      else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+    }
+  });
+  mobile.addEventListener && mobile.addEventListener('change', function () { closeDrawer(false); closeSheet(); });
+})();
+</script>
+<script>
+var PAGE_SIZE = 15;
+var currentPage = 1;
+
+function rowsList() { return document.querySelectorAll('#news-stream-list .news-row'); }
+function matchingRows() {
+  return Array.prototype.filter.call(rowsList(), function (row) { return !row.classList.contains('filtered-out'); });
+}
+
+function applyFilters() {
+  var q = (document.getElementById('search-news').value || '').trim().toLowerCase();
+  var src = document.getElementById('filter-source').value;
+  var iss = document.getElementById('filter-issue').value;
+  var brandSel = document.getElementById('filter-brand');
+  var brd = brandSel ? brandSel.value : '';
+  rowsList().forEach(function (row) {
+    var ok = true;
+    if (src && row.dataset.source !== src) ok = false;
+    if (iss && row.dataset.issue !== iss) ok = false;
+    if (brd && (row.dataset.brand || '').indexOf('|' + brd + '|') === -1) ok = false;
+    if (ok && q && row.textContent.toLowerCase().indexOf(q) === -1) ok = false;
+    row.classList.toggle('filtered-out', !ok);
+  });
+  currentPage = 1;
+  renderPage();
+}
+
+function setSort(btn, mode) {
+  document.querySelectorAll('.sort-toggle .pill').forEach(function (b) { b.classList.remove('active'); });
+  btn.classList.add('active');
+  var container = document.getElementById('news-stream-list');
+  var arr = Array.prototype.slice.call(rowsList());
+  arr.sort(function (a, b) {
+    if (mode === 'trending') {
+      var bh = parseFloat(b.dataset.hot) || 0, ah = parseFloat(a.dataset.hot) || 0;
+      if (bh !== ah) return bh - ah;
+    }
+    return parseInt(b.dataset.ts, 10) - parseInt(a.dataset.ts, 10);
+  });
+  arr.forEach(function (row) { container.appendChild(row); });
+  currentPage = 1;
+  renderPage();
+}
+
+// Shows only the current page's slice of rows that still pass the
+// active filters (so pagination and filtering compose correctly —
+// e.g. filtering down to 8 matches collapses to a single page), then
+// (re)draws the numbered page buttons below the list.
+function renderPage() {
+  var matching = matchingRows();
+  var totalPages = Math.max(1, Math.ceil(matching.length / PAGE_SIZE));
+  if (currentPage > totalPages) currentPage = totalPages;
+  var start = (currentPage - 1) * PAGE_SIZE;
+  rowsList().forEach(function (row) { row.style.display = 'none'; });
+  matching.slice(start, start + PAGE_SIZE).forEach(function (row) { row.style.display = ''; });
+  var empty = document.getElementById('news-empty');
+  if (empty) empty.hidden = matching.length > 0;
+  var count = document.getElementById('news-count');
+  if (count) count.textContent = matching.length + ' tin';
+  renderPagination(totalPages);
+}
+
+function resetFilters() {
+  ['search-news', 'filter-source', 'filter-issue', 'filter-brand'].forEach(function (id) {
+    var el = document.getElementById(id);
+    if (el) el.value = '';
+  });
+  var newest = document.querySelector('.sort-toggle .pill[data-sort="newest"]');
+  if (newest) setSort(newest, 'newest');
+  applyFilters();
+}
+
+function goToPage(p) {
+  currentPage = p;
+  renderPage();
+  document.getElementById('news').scrollIntoView({behavior: 'smooth', block: 'start'});
+}
+
+// Windowed page numbers (1 … currentPage-2..currentPage+2 … last) so a
+// 400+ article day doesn't render 30 raw page buttons in a row.
+function renderPagination(totalPages) {
+  var container = document.getElementById('news-pagination');
+  if (totalPages <= 1) { container.innerHTML = ''; return; }
+  var pages = [];
+  for (var p = 1; p <= totalPages; p++) {
+    if (p === 1 || p === totalPages || Math.abs(p - currentPage) <= 2) {
+      pages.push(p);
+    } else if (pages[pages.length - 1] !== '...') {
+      pages.push('...');
+    }
+  }
+  container.innerHTML = pages.map(function (p) {
+    if (p === '...') return '<span class="page-ellipsis">…</span>';
+    var cls = 'page-btn' + (p === currentPage ? ' active' : '');
+    return '<button type="button" class="' + cls + '" onclick="goToPage(' + p + ')">' + p + '</button>';
+  }).join('');
+}
+
+renderPage();
+</script>
+</body>
+</html>
